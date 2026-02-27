@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PYRAMID SCHEME™</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="title-bar">
+  <h1>⚡ PYRAMID SCHEME™ ⚡</h1>
+  <div class="sub">★ WALK THE DESERT ★ BUILD YOUR EMPIRE ★ TOTALLY LEGAL ★</div>
+</div>
+<div id="game-wrapper">
+  <div id="lp">
+    <div class="pb">
+      <div class="pt">▶ YOUR EMPIRE</div>
+      <div id="tb" style="text-align:center;padding:5px 3px;margin-bottom:5px;border:2px solid var(--gold-dim);background:var(--bg-input)">
+        <span id="tn" style="color:var(--gold);font-size:7px;display:block;margin-bottom:3px">PEASANT</span>
+        <span id="td" style="color:var(--tan);font-size:5px;line-height:1.8">Buy in to begin</span>
+      </div>
+      <div class="sr"><span class="sl">INVESTED</span><span class="sv r" id="s-inv">$0</span></div>
+      <div class="sr"><span class="sl">EARNED</span><span class="sv g" id="s-ern">$0.00</span></div>
+      <div class="sr"><span class="sl">NET P&L</span><span class="sv" id="s-net">$0</span></div>
+      <div class="sr"><span class="sl">RECRUITS</span><span class="sv" id="s-tot">0</span></div>
+      <div class="sr"><span class="sl">YOUR LAYERS</span><span class="sv" id="s-ly">0</span></div>
+      <div style="color:var(--tan);font-size:5px;margin-top:2px;margin-bottom:2px">DEPTH BREAKDOWN</div>
+      <div class="db-row" id="db-rows">—</div>
+    </div>
+    <div class="pb">
+      <div class="pt">▶ PAYOUT RATES</div>
+      <div style="color:var(--tan-muted);font-size:4px;text-align:center;margin-bottom:4px">PER $10 BUY-IN</div>
+      <table id="pt-table">
+        <tbody id="pt-body"></tbody>
+      </table>
+      <button class="cfg-btn" onclick="openConfig()">⚙ TUNE RATES</button>
+    </div>
+    <div class="pb">
+      <div class="pt">▶ ACTIVITY</div>
+      <div id="lb"></div>
+    </div>
+  </div>
+
+  <div id="cc">
+    <canvas id="c" width="780" height="540"></canvas>
+    <div id="sl"></div>
+    <div id="dlg">
+      <div id="dlg-speaker"></div>
+      <div id="dlg-text"></div>
+      <div id="dlg-choices"></div>
+      <div id="dlg-hint"></div>
+    </div>
+  </div>
+
+  <div id="rp">
+    <div class="pb">
+      <div class="pt">▶ ACTIONS</div>
+      <button class="btn g" id="bi" onclick="buyIn()">💰 BUY IN<br><span style="font-size:5px;display:block;margin-top:3px">$10 → 4 SCROLLS</span></button>
+      <div style="margin:4px 0 3px;color:var(--tan);font-size:5px;text-align:center">INVITE SCROLLS</div>
+      <div id="is" style="display:flex;gap:4px;justify-content:center;margin-bottom:6px">
+        <div class="ss" id="s0">📜</div><div class="ss" id="s1">📜</div>
+        <div class="ss" id="s2">📜</div><div class="ss" id="s3">📜</div>
+      </div>
+      <button class="btn" id="rb" onclick="recruitFriend()" disabled>
+        SEND SCROLL<br><span id="rs" style="font-size:5px;display:block;margin-top:3px">BUY IN FIRST</span>
+      </button>
+      <div class="ilb" id="il" style="display:none">🔗 pyramid.gg/<span id="rc">—</span></div>
+    </div>
+    <div class="pb">
+      <div class="pt">▶ YOUR RECRUITS</div>
+      <div id="fl"></div>
+      <div id="nf" style="color:var(--tan-muted);font-size:5px;text-align:center;padding:6px;line-height:2">No followers yet.<br>Buy in to start!</div>
+    </div>
+    <div class="pb">
+      <div class="pt">▶ HOW IT WORKS</div>
+      <div style="color:var(--tan);font-size:5px;line-height:2.2">
+        BUY IN $10<br>
+        GET 4 invite scrolls<br>
+        ———————<br>
+        EACH JOIN PAYS:<br>
+        <span id="hw-d1" style="color:var(--gold)">D1 → $4.00</span><br>
+        <span id="hw-d2" style="color:var(--gold-dim)">D2 → $2.00</span><br>
+        <span id="hw-d3" style="color:var(--tan)">D3 → $1.00</span><br>
+        <span style="color:var(--tan-muted)">D4+ → halves...</span><br>
+        ———————<br>
+        WALK to friend pyrs!<br>
+        SPACE to inspect.<br>
+        <span style="color:var(--red)">TOTALLY LEGAL™</span>
+      </div>
+    </div>
+    <div class="pb" style="padding:5px 7px">
+      <div class="pt">▶ CONTROLS</div>
+      <div style="color:var(--tan);font-size:5px;line-height:2.4">
+        <span style="color:var(--gold)">← →</span> WALK<br>
+        STEP UP PYRAMID<br>
+        STEP OFF EDGE→FALL<br>
+        <span style="color:var(--gold)">↓</span> WALK IN FRONT<br>
+        <span style="color:var(--gold)">↑</span> BACK TO SURFACE<br>
+        <span style="color:var(--gold)">SPACE</span> INTERACT
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Config editor -->
+<div id="cfg-panel">
+  <h3>⚙ TUNE PAYOUT RATES</h3>
+  <div class="cfg-note">
+    Rule: platformFee + Σ(all payouts) = entryFee<br>
+    D1 payout × (1/(1-decay)) = pool<br>
+    Math must balance or scheme collapses!
+  </div>
+  <div class="cfg-row"><label>ENTRY FEE ($)</label><input id="cfg-fee" type="number" step="1" min="1" value="10"></div>
+  <div class="cfg-row"><label>PLATFORM CUT ($)</label><input id="cfg-cut" type="number" step="0.5" min="0" value="2"></div>
+  <div class="cfg-row"><label>D1 PAYOUT ($)</label><input id="cfg-d1" type="number" step="0.5" min="0.5" value="4"></div>
+  <div class="cfg-row"><label>DECAY FACTOR</label><input id="cfg-dc" type="number" step="0.05" min="0.1" max="0.95" value="0.5"></div>
+  <div class="cfg-row"><label>MIN PAYOUT ($)</label><input id="cfg-min" type="number" step="0.01" min="0.001" value="0.01"></div>
+  <div id="cfg-valid"></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn" style="font-size:5px;padding:5px" onclick="validateConfig()">CHECK MATH</button>
+    <button class="btn g" style="font-size:5px;padding:5px" onclick="applyConfig()">APPLY</button>
+    <button class="btn" style="font-size:5px;padding:5px;background:#3a0000;border-color:#f02020" onclick="closeConfig()">CANCEL</button>
+  </div>
+</div>
+
+<div id="mo"><div id="md">
+  <h2 id="mh">GLORIOUS!</h2>
+  <p id="mb" style="white-space:pre-line"></p>
+  <button class="btn g" onclick="closeModal()" style="margin-top:6px">★ CONTINUE ★</button>
+</div></div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>

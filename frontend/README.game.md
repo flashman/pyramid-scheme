@@ -1,0 +1,200 @@
+# ⚡ PYRAMID SCHEME™ ⚡
+
+> *★ WALK THE DESERT ★ BUILD YOUR EMPIRE ★ TOTALLY LEGAL ★*
+
+A browser-based canvas game about building a pyramid scheme in ancient Egypt — and eventually being recruited into a **galactic** one. Walk the desert, recruit followers, climb the ranks from Peasant to Pharaoh, descend into the crypt, and ascend to the stars.
+
+---
+
+## Quick Start
+
+This project uses ES modules, which require a web server (browsers block `file://` imports for security). The simplest way to run it locally:
+
+```bash
+python -m http.server 8000
+```
+
+Then open **http://localhost:8000** in your browser.
+
+> Any static file server works — `npx serve`, `live-server`, etc. The project has no build step and no dependencies.
+
+---
+
+## Gameplay Overview
+
+| Action | Key |
+|--------|-----|
+| Walk left / right | `← →` or `A / D` |
+| Step in front of pyramids (foreground layer) | `↓` |
+| Return to surface layer / enter doors / ascend | `↑` |
+| Interact / inspect / confirm dialogue | `Space` |
+| Navigate dialogue choices | `↑ ↓` |
+| Skip dialogue text | `Space` (while text is printing) |
+
+**The loop:**
+1. Click **BUY IN** ($10) to place your capstone and receive 4 invite scrolls.
+2. Click **SEND SCROLL** to recruit a follower — each one pays out up the chain.
+3. Walk the desert to visit your recruits' pyramids. Press `Space` to inspect them.
+4. Climb the tier ladder (Peasant → Scribe → Acolyte → Vizier → High Priest → Pharaoh).
+5. Fly into the sky, meet the seven Egyptian sky gods.
+6. Reach Pharaoh + meet all 7 gods → unlock the crypt beneath your pyramid.
+7. Speak to Sector Chief Ω-7 in the crypt. Accept the cosmic upline.
+8. Ascend from your capstone to the Galactic Council. Meet the Grand Archon. Accept Tier Omega.
+
+---
+
+## Project Structure
+
+```
+pyramid-scheme/
+│
+├── index.html              # Shell: canvas, side panels, config editor, modal
+├── main.js                 # Entry point: wires realms, quests, input, game loop
+├── style.css               # All CSS — dark Egyptian theme, panel layout
+│
+├── engine/                 # Reusable, game-agnostic systems
+│   ├── canvas.js           # Canvas element + 2D context (X), screen dimensions
+│   ├── colors.js           # Central color palette (COL)
+│   ├── events.js           # Lightweight pub/sub event bus (Events)
+│   ├── flags.js            # Named boolean/value flags + quest manager
+│   ├── realm.js            # Realm, PhysicsRealm, RealmManager with transition animations
+│   ├── entity.js           # Base Entity and NPC classes
+│   ├── interactables.js    # Per-frame nearest-interactable registry
+│   └── dialogue.js         # Canvas-rendered branching dialogue system
+│
+├── game/                   # Game-specific logic and state
+│   ├── state.js            # Singleton G — all shared mutable game state
+│   ├── config.js           # Payout math: entry fee, decay curve, depth limits
+│   ├── tiers.js            # Rank tiers, recruit names, ID generation
+│   ├── recruits.js         # Buy-in, scroll sending, pyramid placement, inspect
+│   │                       #   └── exports earthLayout (PyramidLayout) + scheduleSubRecruitsFor
+│   ├── pyramids.js         # Data model only: mkPyr, addLayer, pyrEarnings, PyramidLayout
+│   │                       #   addLayer emits 'pyramid:layer_added' — no draw imports
+│   └── quests.js           # All quest definitions (registered at startup)
+│
+├── draw/                   # Shared drawing utilities used across realms
+│   ├── pharaoh.js          # Player sprite (the Pharaoh character)
+│   ├── hud.js              # HUD bar, minimap, particles, quest tracker
+│   └── utils.js            # depthColor, fogTint, spawnParts helpers
+│
+├── ui/                     # HTML panel updates (left/right sidebars)
+│   ├── panels.js           # Stats, recruit list, activity log, scroll slots
+│   ├── config-editor.js    # Payout rate tuner (validates the math must balance)
+│   ├── modal.js            # Full-screen announcement modal
+│   └── dev-panel.js        # Developer overlay (backtick to toggle)
+│
+└── worlds/                 # One folder per realm/scene
+    ├── constants.js        # Cross-realm constants (player speed, layer height)
+    ├── WORLD_TEMPLATE.md   # Guide for adding new worlds
+    │
+    ├── earth/              # The desert world (default starting realm)
+    │   ├── WorldRealm.js   # Extends PhysicsRealm; overrides surfaceAt/canStepTo with pyramid terrain
+    │   ├── constants.js    # World width, ground Y, Z-layer parallax data, slots
+    │   ├── terrain.js      # Pyramid geometry + surface queries (lyrRect, surfAt, canStep, …)
+    │   └── draw/
+    │       ├── background.js   # Sky gradient, stars, desert ground
+    │       ├── celestial.js    # Sun, moon, clouds
+    │       ├── gods.js         # 7 sky god entities with branching dialogues
+    │       └── pyramids.js     # Isometric pyramid drawing with depth/fog tinting
+    │
+    ├── crypt/              # Inside the player's pyramid (unlocked mid-game)
+    │   ├── ChamberRealm.js # Chamber movement + Sector Chief Ω-7 dialogue
+    │   ├── constants.js    # Floor Y, NPC position
+    │   └── draw/
+    │       └── chamber.js  # Crypt interior: stone walls, torches, hieroglyphs
+    │
+    └── council/            # Galactic Council station (end-game)
+        ├── CouncilRealm.js # Council movement + Grand Archon Ω-1 dialogue
+        ├── constants.js    # Floor Y, NPC positions, Earth portal X
+        └── draw/
+            └── council.js  # Space station interior: stars, columns, cosmic FX
+```
+
+---
+
+## Architecture Notes
+
+### Realms (scene management)
+Each scene is a `Realm` subclass registered with `RealmManager`. Switching scenes calls `onExit()` on the current realm and `onEnter(fromId)` on the next.
+
+Realms with walkable terrain should extend **`PhysicsRealm`** instead of `Realm` directly. `PhysicsRealm` is configured with `{ gravity, worldW, floor, maxFallSpeed }` and exposes `_gravityStep()`, `_clampX()`, and `_trackCameraX()` helpers, eliminating copy-pasted physics math.
+
+**Terrain interface.** `PhysicsRealm` declares two virtual methods with flat-floor defaults. Override them to give your realm its own surface shape:
+
+```js
+// Returns highest surface Y at world-x x (default: flat floor).
+surfaceAt(x) { return this.floor; }
+
+// Returns true if the player at feetY can step to x (default: always passable).
+canStepTo(feetY, x) { return true; }
+```
+
+`WorldRealm` overrides both using the geometry from `worlds/earth/terrain.js`. A future ruins realm with platforms would override just `surfaceAt()`. The physics loop in `WorldRealm.update()` calls `this.surfaceAt()` and `this.canStepTo()` and never needs to change.
+
+**Transition animations** are first-class. Instead of managing a local `_launch` flag, realms call:
+```js
+RealmManager.scheduleTransition('target-realm', {
+  duration: 2600,
+  render: (progress) => { /* draw overlay at 0..1 */ }
+});
+```
+`main.js` calls `RealmManager.tickTransition()` and `RealmManager.renderTransition()` each frame. Input is blocked during the animation.
+
+### Events (decoupling)
+`Events` is a simple pub/sub bus. It's the main tool for keeping layers separate — for example, `engine/flags.js` emits `game:log` instead of importing the UI directly, and `game/pyramids.js` emits `pyramid:layer_added` instead of importing `spawnParts`. Wire cross-system reactions in `main.js`, not inside the individual systems.
+
+### Flags & Quests
+`Flags` is a key/value store that fires `flag:change` on every mutation. `QuestManager` holds quest definitions; call `QuestManager.check()` after any state change that might complete a quest. Quests use `condition()` to stay hidden until prerequisites are met.
+
+### Payout Math
+The scheme must always balance: `platformFee + Σ(all depth payouts) = entryFee`.  
+The payout curve is geometric: `d1Payout × decay^(depth-1)`, truncated at `minPayout`.  
+The config editor enforces this constraint before applying changes.
+
+### Z-Layers (depth / parallax)
+The desert world has 3 depth layers (0 = foreground, 1 = mid, 2 = far).  
+Each layer has its own `parallax` scroll factor, `scale`, `alpha`, and `fog` amount.  
+The player can press `↓` to walk in the foreground plane (z=-1), which places them in front of everything.
+
+### PyramidLayout
+Every realm that places friend pyramids uses the same pattern: near/mid/far slot arrays indexed round-robin per recruit depth. `PyramidLayout` owns those arrays and counters so realms don't re-implement the bookkeeping. Earth uses `earthLayout` (exported from `game/recruits.js`); a future realm just creates its own:
+```js
+const myLayout = new PyramidLayout({ near: [...], mid: [...], far: [...] });
+const wx = myLayout.nextX(depth);
+```
+
+### Sub-recruit scheduling
+`scheduleSubRecruitsFor(rec, addFn)` (exported from `game/recruits.js`) contains the trickle-down timing and probability logic for one realm. It accepts any `addFn(name, depth, parent)` so new realms don't duplicate the scheduling math — they just supply their own `addFn`.
+
+---
+
+## Adding a New World
+
+See `worlds/WORLD_TEMPLATE.md` for a step-by-step guide. In short:
+
+1. Create `worlds/<n>/` with `<n>Realm.js` and `constants.js`.
+2. Extend `PhysicsRealm` (or `Realm` for fixed-camera scenes) and implement `update(ts)`, `render()`, and `onKeyDown(key)`.
+3. Register it in `main.js`: `RealmManager.register(new YourRealm())`.
+4. Transition to it via `RealmManager.scheduleTransition('your-realm-id', { ... })`.
+5. Create a `PyramidLayout` for your slot arrays if the realm has friend pyramids.
+
+---
+
+## Future Plans
+
+- **Proper frontend/backend split** — move game state to a server, enable persistent sessions and real multiplayer recruitment chains.
+- Leaderboard / live recruit feed.
+- Additional realms and story content.
+- Mobile touch controls.
+- Sound effects and music.
+
+---
+
+## File Naming Conventions
+
+| Pattern | Meaning |
+|---------|---------|
+| `*.js~` or `#*.js#` | Editor backup files — safe to delete |
+| `.DS_Store` | macOS metadata — safe to delete |
+| `WORLD_TEMPLATE.md` | Developer reference doc, not shipped |
+| `CHANGES.md` | Running changelog |

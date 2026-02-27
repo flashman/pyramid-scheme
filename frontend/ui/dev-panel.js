@@ -1,0 +1,442 @@
+// ── FILE: ui/dev-panel.js ─────────────────────────────────
+// Developer panel for testing — realm teleports, flag toggles, state cheats.
+// Toggle with the [DEV] button or backtick key.
+
+import { G }               from '../game/state.js';
+import { earthLayout }     from '../game/recruits.js';
+import { Flags }           from '../engine/flags.js';
+import { RealmManager }    from '../engine/realm.js';
+import { updateStats, updateSlots, log } from './panels.js';
+import { GND }             from '../worlds/earth/constants.js';
+import { mkPyr, addLayer } from '../game/pyramids.js';
+
+// ── DOM scaffold ─────────────────────────────────────────
+
+const PANEL_HTML = `
+<div id="dev-panel">
+  <div id="dev-header">
+    <span>⚠ DEV PANEL</span>
+    <button id="dev-close" title="Close (backtick)">✕</button>
+  </div>
+
+  <div class="dev-section">
+    <div class="dev-section-title">REALM TELEPORT</div>
+    <div class="dev-btn-row" id="dev-realms"></div>
+  </div>
+
+  <div class="dev-section">
+    <div class="dev-section-title">PROGRESSION FLAGS</div>
+    <div id="dev-flags"></div>
+  </div>
+
+  <div class="dev-section">
+    <div class="dev-section-title">STATE CHEATS</div>
+    <div class="dev-btn-row" id="dev-cheats"></div>
+  </div>
+
+  <div class="dev-section">
+    <div class="dev-section-title">ACTIVE FLAGS</div>
+    <div id="dev-flag-dump" class="dev-dump"></div>
+  </div>
+</div>
+`;
+
+const PANEL_CSS = `
+#dev-toggle {
+  position: fixed;
+  bottom: 8px;
+  left: 8px;
+  z-index: 9999;
+  font: 600 9px/1 monospace;
+  padding: 4px 7px;
+  background: #1a0a00;
+  color: #ff9030;
+  border: 1px solid #ff6010;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+#dev-toggle:hover { background:#2a1400; }
+
+#dev-panel {
+  display: none;
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9998;
+  width: 620px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #0d0800;
+  border: 2px solid #ff6010;
+  font: 9px/1 monospace;
+  color: #d0a060;
+  box-shadow: 0 0 40px #ff601040;
+}
+#dev-panel.open { display: block; }
+
+#dev-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: #1a0800;
+  border-bottom: 1px solid #ff6010;
+  font-size: 10px;
+  color: #ff9030;
+  letter-spacing: 2px;
+}
+#dev-close {
+  background: none; border: none; color: #ff6010; cursor: pointer;
+  font-size: 12px; padding: 0;
+}
+#dev-close:hover { color: #ff2000; }
+
+.dev-section {
+  padding: 8px 10px;
+  border-bottom: 1px solid #2a1800;
+}
+.dev-section:last-child { border-bottom: none; }
+.dev-section-title {
+  color: #ff7020;
+  font-size: 8px;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+.dev-btn-row { display: flex; flex-wrap: wrap; gap: 5px; }
+
+button.dev-btn {
+  font: 8px/1 monospace;
+  padding: 4px 8px;
+  cursor: pointer;
+  border: 1px solid #503010;
+  background: #1a0e00;
+  color: #c08040;
+  letter-spacing: 0.5px;
+}
+button.dev-btn:hover { background: #2a1800; border-color: #ff8030; color: #ffa050; }
+button.dev-btn.active { background: #1a2a00; border-color: #60c020; color: #80e030; }
+button.dev-btn.danger { border-color: #a01010; color: #e04040; }
+button.dev-btn.danger:hover { background: #2a0000; border-color: #ff2020; }
+button.dev-btn.realm { border-color: #2050a0; color: #5090e0; }
+button.dev-btn.realm:hover { background: #0a1830; border-color: #60a0ff; color: #80c0ff; }
+button.dev-btn.realm.current { background: #0a1830; border-color: #60a0ff; color: #ffffff; }
+
+.dev-flag-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid #1a1000;
+  flex-wrap: wrap;
+}
+.dev-flag-row:last-child { border-bottom: none; }
+.dev-flag-label { color: #907050; font-size: 7px; min-width: 160px; }
+button.dev-flag-btn {
+  font: 7px/1 monospace; padding: 2px 6px; cursor: pointer;
+  border: 1px solid #402000; background: #120800; color: #704020;
+}
+button.dev-flag-btn:hover { background: #200e00; }
+button.dev-flag-btn.on { border-color: #40c040; background: #0a1a00; color: #60e060; }
+
+.dev-dump {
+  font-size: 6px; color: #504030; line-height: 2;
+  max-height: 120px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all;
+}
+`;
+
+// ── Realm definitions ─────────────────────────────────────
+
+const REALMS = [
+  {
+    id: 'world', label: '🌍 EARTH',
+    setup() {
+      if (!G.bought) _grantBuyIn();
+      G.px  = 2450; G.py = GND; G.pZ = 0;
+      G.camX = Math.max(0, G.px - 390);
+    },
+  },
+  {
+    id: 'chamber', label: '⚰ CRYPT',
+    setup() {
+      if (!G.bought) _grantBuyIn();
+      Flags.set('seven_heavens_done', true);
+      Flags.set('crypt_entered', true);
+      _ensurePlayerPyramid();
+    },
+  },
+  {
+    id: 'council', label: '🌌 COUNCIL',
+    setup() {
+      if (!G.bought) _grantBuyIn();
+      _unlockCouncil();
+    },
+  },
+];
+
+// ── Flag toggles ──────────────────────────────────────────
+
+const FLAG_GROUPS = [
+  {
+    label: 'Quest gates',
+    flags: [
+      { key: 'seven_heavens_done',  label: 'Seven Heavens done', side: _sideEffectSH  },
+      { key: 'cosmic_upline_done',  label: 'Cosmic Upline done', side: _sideEffectCU  },
+      { key: 'tier_omega_done',     label: 'Tier Omega done',    side: null           },
+      { key: 'tier_omega_accepted', label: 'Tier Omega accepted',side: null           },
+    ],
+  },
+  {
+    label: 'Council',
+    flags: [
+      { key: 'archon_spoken',       label: 'Archon spoken'        },
+      { key: 'council_entered',     label: 'Council entered'      },
+    ],
+  },
+  {
+    label: 'Crypt / Chief',
+    flags: [
+      { key: 'crypt_entered',    label: 'Crypt entered'      },
+      { key: 'chief_spoken',     label: 'Chief spoken'       },
+      { key: 'upline_accepted',  label: 'Upline accepted'    },
+    ],
+  },
+];
+
+function _sideEffectSH() {
+  // Mirror the quest-completion side-effects (minus the modal)
+  if (G.pyramids.length === 0) _ensurePlayerPyramid();
+}
+
+function _sideEffectCU() {
+  Flags.set('seven_heavens_done', true);
+}
+
+// ── State cheat helpers ───────────────────────────────────
+
+function _grantBuyIn() {
+  G.bought = true;
+  G.invested = 10;
+  G.invitesLeft = 4;
+  _ensurePlayerPyramid();
+  updateStats(); updateSlots();
+  log('[DEV] Granted buy-in.', '');
+}
+
+function _ensurePlayerPyramid() {
+  if (!G.pyramids.find(p => p.isPlayer)) {
+    const pp = mkPyr('player', 2450, 'YOU', true, 0);
+    G.pyramids.push(pp);
+    addLayer('player', 0, 'YOU');
+  }
+}
+
+function _unlockCouncil() {
+  _ensurePlayerPyramid();
+  Flags.set('seven_heavens_done', true);
+  Flags.set('cosmic_upline_done', true);
+  Flags.set('upline_accepted', true);
+  Flags.set('chief_spoken', true);
+  Flags.set('crypt_entered', true);
+}
+
+function _grantWealth() {
+  G.bought = true; G.invested = 10;
+  G.earned += 500;
+  _ensurePlayerPyramid();
+  updateStats(); updateSlots();
+  log('[DEV] +$500 earned.', '');
+}
+
+function _addRecruit() {
+  const depth = 1;
+  const id = 'dev_recruit_' + (G.recruits.length + 1);
+  const r = { name: 'DEV_RECRUIT_' + (G.recruits.length + 1), depth, wx: 2450 + G.recruits.length * 80 };
+  G.recruits.push(r);
+  const rp = mkPyr(id, r.wx, r.name, false, 0);
+  G.pyramids.push(rp);
+  addLayer(id, depth, r.name);
+  updateStats();
+  log('[DEV] Added test recruit.', '');
+}
+
+function _growPlayerPyramid() {
+  const pp = G.pyramids.find(p => p.isPlayer);
+  if (!pp) { _ensurePlayerPyramid(); return; }
+  const target = Math.min(pp.layers + 2, 20);
+  while (pp.layers < target) addLayer(pp.id, 1, 'DEV');
+  updateStats();
+  log(`[DEV] Pyramid layers → ${pp.layers}`, '');
+}
+
+function _meetAllGods() {
+  Flags.set('gods_met', 7);
+  for (const g of ['ra','thoth','horus','anubis','shu','nut','amun']) {
+    Flags.set(`${g}_spoken`, true);
+  }
+  log('[DEV] All gods met.', '');
+}
+
+function _resetAll() {
+  // Clear flags
+  Object.keys(Flags._store).forEach(k => delete Flags._store[k]);
+  G.bought = false; G.invested = 0; G.earned = 0; G.invitesLeft = 0;
+  G.recruits = []; G.pyramids = [];
+  earthLayout.reset();
+  G.px = 2450; G.py = GND; G.camX = 1970;
+  updateStats(); updateSlots();
+  RealmManager.transitionTo('world');
+  log('[DEV] Full reset.', '');
+  refreshPanel();
+}
+
+// ── Panel render ──────────────────────────────────────────
+
+function refreshPanel() {
+  // Realm buttons — highlight current
+  const realmContainer = document.getElementById('dev-realms');
+  if (realmContainer) {
+    realmContainer.querySelectorAll('button').forEach(btn => {
+      btn.classList.toggle('current', btn.dataset.realm === RealmManager.currentId);
+    });
+  }
+
+  // Flag buttons — highlight on/off state
+  document.querySelectorAll('button.dev-flag-btn').forEach(btn => {
+    const val = Flags.get(btn.dataset.flag);
+    btn.classList.toggle('on', !!val);
+    btn.textContent = val ? '✓ ON' : '✗ OFF';
+  });
+
+  // Flag dump
+  const dump = document.getElementById('dev-flag-dump');
+  if (dump) {
+    const entries = Object.entries(Flags._store);
+    if (entries.length === 0) {
+      dump.textContent = '(no flags set)';
+    } else {
+      dump.textContent = entries.map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join('\n');
+    }
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────
+
+export function initDevPanel() {
+  // Inject CSS
+  const style = document.createElement('style');
+  style.textContent = PANEL_CSS;
+  document.head.appendChild(style);
+
+  // Toggle button
+  const toggle = document.createElement('button');
+  toggle.id = 'dev-toggle';
+  toggle.textContent = '⚠ DEV';
+  document.body.appendChild(toggle);
+
+  // Panel
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = PANEL_HTML;
+  document.body.appendChild(wrapper.firstElementChild);
+
+  const panel = document.getElementById('dev-panel');
+
+  // ── Realm buttons ───────────────────────────────────────
+  const realmRow = document.getElementById('dev-realms');
+  for (const r of REALMS) {
+    const btn = document.createElement('button');
+    btn.className = 'dev-btn realm';
+    btn.dataset.realm = r.id;
+    btn.textContent = r.label;
+    btn.onclick = () => {
+      r.setup();
+      RealmManager.transitionTo(r.id);
+      log(`[DEV] Teleported to ${r.id}.`, '');
+      refreshPanel();
+    };
+    realmRow.appendChild(btn);
+  }
+
+  // ── Flag toggles ────────────────────────────────────────
+  const flagsContainer = document.getElementById('dev-flags');
+  for (const group of FLAG_GROUPS) {
+    const groupEl = document.createElement('div');
+    groupEl.style.cssText = 'margin-bottom:6px';
+
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = 'color:#604020;font-size:6px;letter-spacing:1px;margin-bottom:3px';
+    titleEl.textContent = group.label.toUpperCase();
+    groupEl.appendChild(titleEl);
+
+    for (const f of group.flags) {
+      const row = document.createElement('div');
+      row.className = 'dev-flag-row';
+
+      const label = document.createElement('span');
+      label.className = 'dev-flag-label';
+      label.textContent = f.key;
+
+      const btn = document.createElement('button');
+      btn.className = 'dev-flag-btn';
+      btn.dataset.flag = f.key;
+      btn.textContent = Flags.get(f.key) ? '✓ ON' : '✗ OFF';
+      if (Flags.get(f.key)) btn.classList.add('on');
+      btn.onclick = () => {
+        const newVal = !Flags.get(f.key);
+        Flags.set(f.key, newVal);
+        if (newVal && f.side) f.side();
+        refreshPanel();
+        log(`[DEV] ${f.key} → ${newVal}`, '');
+      };
+
+      row.appendChild(label);
+      row.appendChild(btn);
+      groupEl.appendChild(row);
+    }
+    flagsContainer.appendChild(groupEl);
+  }
+
+  // ── State cheat buttons ─────────────────────────────────
+  const cheats = [
+    { label: '💰 GRANT BUY-IN',     fn: _grantBuyIn          },
+    { label: '💸 +$500 EARNED',     fn: _grantWealth         },
+    { label: '👤 ADD RECRUIT',      fn: _addRecruit          },
+    { label: '🔺 GROW PYRAMID +2',  fn: _growPlayerPyramid   },
+    { label: '🌙 MEET ALL GODS',    fn: _meetAllGods         },
+    { label: '💀 FULL RESET',       fn: _resetAll, danger: true },
+  ];
+
+  const cheatRow = document.getElementById('dev-cheats');
+  for (const c of cheats) {
+    const btn = document.createElement('button');
+    btn.className = 'dev-btn' + (c.danger ? ' danger' : '');
+    btn.textContent = c.label;
+    btn.onclick = () => { c.fn(); refreshPanel(); };
+    cheatRow.appendChild(btn);
+  }
+
+  // ── Toggle logic ────────────────────────────────────────
+  const openPanel  = () => { panel.classList.add('open'); refreshPanel(); };
+  const closePanel = () =>   panel.classList.remove('open');
+  const isOpen     = () =>   panel.classList.contains('open');
+
+  toggle.onclick = () => isOpen() ? closePanel() : openPanel();
+  document.getElementById('dev-close').onclick = closePanel;
+
+  // Backtick key toggles panel
+  document.addEventListener('keydown', e => {
+    if (e.key === '`') { isOpen() ? closePanel() : openPanel(); }
+  });
+
+  // Refresh dump whenever a flag changes
+  window.addEventListener('flag:change', refreshPanel);
+
+  // Keep realm buttons updated on transition
+  const origTransition = RealmManager.transitionTo.bind(RealmManager);
+  RealmManager.transitionTo = (id) => {
+    origTransition(id);
+    if (isOpen()) refreshPanel();
+  };
+
+  log('[DEV] Dev panel loaded. Press ` to toggle.', '');
+}
