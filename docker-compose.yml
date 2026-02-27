@@ -1,0 +1,53 @@
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pyramid
+      POSTGRES_PASSWORD: pyramid
+      POSTGRES_DB: pyramid_scheme
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"       # expose locally so you can connect with psql / pgAdmin
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pyramid -d pyramid_scheme"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI backend ──────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      # Override DATABASE_URL to point at the compose db service
+      DATABASE_URL: postgresql+asyncpg://pyramid:pyramid@db:5432/pyramid_scheme
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount source for hot-reload in dev
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ── Frontend (nginx static) ──────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

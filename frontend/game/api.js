@@ -6,9 +6,11 @@
 //   import { Api } from './api.js';
 //   const data = await Api.post('/buy-in', { fee: 10 });
 
+// Empty string = same origin (nginx proxies /api/* to backend in Docker).
+// Set VITE_API_URL to override, e.g. for local dev without Docker.
 const BASE = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL
   ? import.meta.env.VITE_API_URL
-  : 'http://localhost:8000';
+  : '';
 
 let _token = null;
 

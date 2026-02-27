@@ -4,86 +4,109 @@ A multiplayer browser game about building recruiting empires.
 
 ```
 pyramid-scheme/
-├── frontend/     Vanilla JS canvas game (no build step required)
-└── backend/      FastAPI + PostgreSQL API server
+├── docker-compose.yml   ← spin up everything with one command
+├── frontend/            Vanilla JS canvas game served via nginx
+└── backend/             FastAPI + PostgreSQL API server
 ```
 
 ---
 
-## Quick Start
+## Quick Start — Docker (recommended)
 
-### 1 — Backend
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker + Docker Compose.
+
+```bash
+# 1. Create your backend env file
+cp backend/.env.example backend/.env
+# Edit backend/.env — at minimum generate a SECRET_KEY:
+#   python -c "import secrets; print(secrets.token_hex(32))"
+# DATABASE_URL is automatically overridden by docker-compose — no need to change it.
+
+# 2. Start everything
+docker compose up --build
+
+# 3. Open the game
+open http://localhost:5173
+```
+
+That's it. Docker starts three containers:
+
+| Container  | What it does                           | Local port |
+|------------|----------------------------------------|------------|
+| `db`       | PostgreSQL 16                          | 5432       |
+| `backend`  | FastAPI + auto-runs Alembic migrations | 8000       |
+| `frontend` | nginx serving the static game files    | 5173       |
+
+The frontend nginx config proxies `/api/*` to the backend, so the browser
+only ever talks to one origin. API docs: http://localhost:8000/docs
+
+**Useful commands:**
+
+```bash
+docker compose up --build      # rebuild images and start
+docker compose up              # start without rebuilding
+docker compose down            # stop containers
+docker compose down -v         # stop and delete the database volume
+docker compose logs backend    # tail backend logs
+docker compose logs -f         # tail all logs
+```
+
+---
+
+## Quick Start — Without Docker
+
+### Backend
 
 ```bash
 cd backend
 
-# Create and activate a Python virtual environment
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
 cp .env.example .env
-# Edit .env: set DATABASE_URL and generate a SECRET_KEY:
-#   python -c "import secrets; print(secrets.token_hex(32))"
+# Edit .env: set DATABASE_URL to your local Postgres and generate a SECRET_KEY
 
-# Create the database (PostgreSQL must be running)
-createdb pyramid_scheme
-
-# Run migrations
+createdb pyramid_scheme          # Postgres must be running locally
 alembic upgrade head
-
-# Start the dev server
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs available at: http://localhost:8000/docs
-
----
-
-### 2 — Frontend
-
-The frontend is plain ES modules — no build step needed.
+### Frontend
 
 ```bash
 cd frontend
 
 # Option A: VS Code Live Server
-#   Right-click index.html → "Open with Live Server"
-#   (default port 5500 is already in backend CORS_ORIGINS)
+#   Right-click index.html → "Open with Live Server" (port 5500)
+#   Set VITE_API_URL=http://localhost:8000 or edit BASE in game/api.js
 
-# Option B: Python simple server
+# Option B: Python
 python -m http.server 5173
 
-# Option C: Vite (recommended for dev, enables HMR)
-npm create vite@latest . -- --template vanilla
-# then copy your files in, or just:
+# Option C: Vite (enables HMR)
 npx vite --port 5173
 ```
 
-The frontend talks to the backend at `http://localhost:8000` by default.
-To change this, set `VITE_API_URL` as an environment variable (if using Vite)
-or edit the `BASE` constant at the top of `frontend/game/api.js`.
+When running without Docker, set `VITE_API_URL=http://localhost:8000` so the
+frontend knows where the backend is (nginx isn't doing the proxying).
 
 ---
 
 ## Architecture
 
 ```
-Browser
-  └── frontend/
-        ├── main.js           Boot, auth gate, game loop
-        ├── game/api.js       Fetch wrapper (all server calls)
-        ├── ui/auth.js        Login/register overlay
-        └── ...               Game engine, worlds, UI panels
+Browser → http://localhost:5173
+  └── nginx (frontend container)
+        ├── /          → serves static game files
+        └── /api/*     → proxied to backend:8000
 
-FastAPI server (port 8000)
+FastAPI (backend container, port 8000)
   └── backend/app/
-        ├── main.py           App entry point, CORS, router mounts
+        ├── main.py           App entry, CORS, router mounts
         ├── config.py         Settings from .env
-        ├── database.py       Async SQLAlchemy engine + session dep
+        ├── database.py       Async SQLAlchemy + session dep
         ├── models.py         User, GameState, Recruit, Transaction, GameEvent
         ├── schemas.py        Pydantic request/response shapes
         ├── auth.py           JWT + bcrypt helpers
@@ -92,21 +115,21 @@ FastAPI server (port 8000)
               ├── game.py     GET /api/me, PUT /api/state, POST /api/event
               └── payments.py POST /api/buy-in (Stripe stubbed)
 
-PostgreSQL
+PostgreSQL (db container, port 5432)
   └── Tables: users, game_states, recruits, transactions, game_events
 ```
 
 ---
 
-## Key Frontend Files Changed This Session
+## Key Frontend Files Changed
 
-| File                   | What changed                                      |
-|------------------------|---------------------------------------------------|
-| `game/api.js`          | New — thin fetch wrapper with JWT token mgmt      |
-| `ui/auth.js`           | New — login/register overlay                      |
-| `main.js`              | Auth gate + `/api/me` load before game loop start |
-| `ui/dev-panel.js`      | Bugfix: pyramid objects now use `mkPyr`/`addLayer`|
-| `worlds/earth/draw/pyramids.js` | Bugfix: missing `]` in FLAG_GROUPS      |
+| File                            | What changed                                       |
+|---------------------------------|----------------------------------------------------|
+| `game/api.js`                   | New — fetch wrapper, JWT token mgmt, same-origin BASE |
+| `ui/auth.js`                    | New — login/register overlay                       |
+| `main.js`                       | Auth gate + `/api/me` load before game loop starts |
+| `ui/dev-panel.js`               | Bugfix: pyramid objects now use `mkPyr`/`addLayer` |
+| `worlds/earth/draw/pyramids.js` | Bugfix: missing `]` in FLAG_GROUPS                 |
 
 ---
 
@@ -115,16 +138,21 @@ PostgreSQL
 1. Set `STRIPE_ENABLED=true` in `backend/.env`
 2. Add real `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
 3. Implement `_create_stripe_payment_intent()` in `backend/app/routers/payments.py`
-4. Implement the webhook handler to credit users after `payment_intent.succeeded`
+4. Implement the webhook handler in the same file for `payment_intent.succeeded`
 
 ---
 
 ## Database Migrations
 
-After any change to `backend/app/models.py`:
+After changing `backend/app/models.py`:
 
 ```bash
+# If using Docker:
+docker compose exec backend alembic revision --autogenerate -m "describe change"
+docker compose exec backend alembic upgrade head
+
+# If running locally:
 cd backend
-alembic revision --autogenerate -m "describe your change"
+alembic revision --autogenerate -m "describe change"
 alembic upgrade head
 ```

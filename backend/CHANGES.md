@@ -29,3 +29,14 @@
 - Stripe webhook verification and user crediting
 - Upline payout chain distribution (tree walk on `recruits` table)
 - Soft multiplayer endpoint — serve other players' pyramid positions on world load
+
+## 0.1.1 — Docker support
+
+### Added
+- `Dockerfile` — Python 3.12-slim image; runs `alembic upgrade head` then starts uvicorn with `--reload`
+- `.dockerignore` — excludes `.env`, `.venv`, `__pycache__`, compiled files
+- `docker-compose.yml` (root) — orchestrates `db` (Postgres 16), `backend`, and `frontend` containers
+  - `db` healthcheck gates backend startup so migrations never run against an unready database
+  - `DATABASE_URL` is injected by compose to point at the `db` service, overriding `.env`
+  - Backend source is bind-mounted for hot-reload during development
+  - Postgres data persisted in a named `postgres_data` volume
