@@ -56,8 +56,12 @@ class Recruit(Base):
     recruiter_id: Mapped[int]            = mapped_column(ForeignKey("users.id"), index=True)
     recruit_id:   Mapped[Optional[int]]  = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     recruit_name: Mapped[str]            = mapped_column(String(64))
+    parent_name:  Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)
     depth:        Mapped[int]            = mapped_column(Integer)
     payout:       Mapped[float]          = mapped_column(Float)
+    # Stores visual layout info needed to reconstruct pyramids on login:
+    # { pid, rootPid, zLayer, wx }
+    meta:         Mapped[dict]           = mapped_column(JSON, default=dict)
     created_at:   Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=utcnow)
 
     recruiter: Mapped[User] = relationship("User", back_populates="recruits_made",

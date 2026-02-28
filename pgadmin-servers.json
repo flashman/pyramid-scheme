@@ -1,0 +1,15 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Pyramid Scheme DB",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "pyramid_scheme",
+      "Username": "pyramid",
+      "Password": "pyramid",
+      "SSLMode": "prefer",
+      "SavePassword": true
+    }
+  }
+}

@@ -1,5 +1,20 @@
 # Backend Changelog
 
+## 0.2.0 — Recruit persistence & pgAdmin
+
+### Added
+- **`GET /api/recruits`** — returns all recruit records for the authenticated user, sorted by creation time. Used by the frontend on login to restore the pyramid scene.
+- **`POST /api/recruits`** — persist a single recruit immediately when they join. Updates `game_states.earned` as a side-effect so `/api/me` stays consistent without requiring a separate `PUT /state` call.
+- **`Recruit.meta`** (JSON column) — stores visual layout data (`pid`, `rootPid`, `zLayer`, `wx`) alongside each recruit. This lets the frontend reconstruct exact pyramid positions on the next login without replaying random slot assignments.
+- **Alembic migration `0002`** — adds `meta` JSON column to `recruits`; also ensures `parent_name` (from migration `0001`) exists on databases that may have skipped it.
+- **pgAdmin** service in `docker-compose.yml` — browse the database at `http://localhost:5050`. Runs in desktop/single-user mode (no login required). The `pyramid_scheme` database is pre-registered via `pgadmin-servers.json`.
+
+### Changed
+- `Recruit` SQLAlchemy model now includes `parent_name` and `meta` fields (both nullable for backward compatibility).
+- `RecruitCreate` / `RecruitResponse` / `RecruitListResponse` Pydantic schemas added to `schemas.py`.
+
+---
+
 ## 0.1.0 — Initial scaffold
 
 ### Added

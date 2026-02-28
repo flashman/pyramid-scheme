@@ -29,16 +29,21 @@ docker compose up --build
 open http://localhost:5173
 ```
 
-That's it. Docker starts three containers:
+That's it. Docker starts four containers:
 
 | Container  | What it does                           | Local port |
 |------------|----------------------------------------|------------|
 | `db`       | PostgreSQL 16                          | 5432       |
 | `backend`  | FastAPI + auto-runs Alembic migrations | 8000       |
 | `frontend` | nginx serving the static game files    | 5173       |
+| `pgadmin`  | pgAdmin 4 — browse/query the DB        | 5050       |
 
 The frontend nginx config proxies `/api/*` to the backend, so the browser
 only ever talks to one origin. API docs: http://localhost:8000/docs
+
+**pgAdmin** is at http://localhost:5050 — no login required (desktop mode).
+The `pyramid_scheme` database is pre-registered; expand
+*Servers → Pyramid Scheme DB* in the left panel.
 
 **Useful commands:**
 
@@ -113,10 +118,14 @@ FastAPI (backend container, port 8000)
         └── routers/
               ├── auth.py     POST /api/auth/register, /login
               ├── game.py     GET /api/me, PUT /api/state, POST /api/event
+              │               GET /api/recruits, POST /api/recruits
               └── payments.py POST /api/buy-in (Stripe stubbed)
 
 PostgreSQL (db container, port 5432)
   └── Tables: users, game_states, recruits, transactions, game_events
+
+pgAdmin (pgadmin container, port 5050)
+  └── Pre-connected to the pyramid_scheme database
 ```
 
 ---

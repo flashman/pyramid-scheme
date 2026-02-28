@@ -52,5 +52,26 @@ services:
     depends_on:
       - backend
 
+  # ── pgAdmin (DB browser) ─────────────────────────────────
+  # Open http://localhost:5050 — no login required (desktop mode).
+  # The pyramid_scheme database is pre-registered automatically.
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pyramid-scheme.com
+      PGADMIN_DEFAULT_PASSWORD: pyramid
+      PGADMIN_CONFIG_SERVER_MODE: "False"        # desktop / single-user mode
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  pgadmin_data:

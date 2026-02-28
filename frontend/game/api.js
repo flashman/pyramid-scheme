@@ -75,4 +75,33 @@ export const Api = {
 
   /** Trigger the buy-in flow (Stripe stubbed server-side for now). */
   buyIn(fee) { return Api.post('/api/buy-in', { fee }); },
+
+  /** Fetch the full recruit history for the current user. */
+  loadRecruits() { return Api.get('/api/recruits'); },
+
+  /**
+   * Persist a single recruit record immediately after it joins.
+   * Includes the visual layout data (pid, rootPid, zLayer, wx) so the
+   * scene can be reconstructed exactly on next login.
+   */
+  saveRecruit(rec) {
+    return Api.post('/api/recruits', {
+      name:        rec.name,
+      depth:       rec.depth,
+      payout:      rec.payoutToPlayer,
+      parent_name: rec.parentName || null,
+      meta: {
+        pid:     rec.pid,
+        rootPid: rec.rootPid,
+        zLayer:  rec.zLayer,
+        wx:      rec.wx,          // stored so restore skips slot-counter replay
+      },
+    });
+  },
+
+  /**
+   * Sync the full Flags store and key economic fields to the server.
+   * Called debounced from main.js on flag:change and other state mutations.
+   */
+  syncState(snapshot) { return Api.put('/api/state', snapshot); },
 };

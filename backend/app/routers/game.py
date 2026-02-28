@@ -3,8 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import User, GameState, GameEvent
-from app.schemas import MeResponse, SaveStateRequest, LogEventRequest
+from app.models import User, GameState, GameEvent, Recruit
+from app.schemas import MeResponse, SaveStateRequest, LogEventRequest, RecruitCreate, RecruitResponse, RecruitListResponse
 from app.auth import get_current_user
 
 router = APIRouter()
@@ -93,3 +93,79 @@ async def log_event(
     db.add(event)
     await db.commit()
     return {"ok": True}
+
+
+# ── GET /api/recruits ─────────────────────────────────────
+# Returns all recruits the current user has made, sorted by
+# creation order so the client can replay visual layout correctly.
+
+@router.get("/recruits", response_model=RecruitListResponse)
+async def list_recruits(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Recruit)
+        .where(Recruit.recruiter_id == current_user.id)
+        .order_by(Recruit.created_at)
+    )
+    rows = result.scalars().all()
+    return RecruitListResponse(
+        recruits=[
+            RecruitResponse(
+                id=r.id,
+                name=r.recruit_name,
+                depth=r.depth,
+                payout=r.payout,
+                parent_name=r.parent_name,
+                meta=r.meta or {},
+                created_at=r.created_at,
+            )
+            for r in rows
+        ]
+    )
+
+
+# ── POST /api/recruits ────────────────────────────────────
+# Persist a single recruit event.  Called each time a new
+# recruit joins so the record exists even if the player
+# closes the tab before the periodic state save fires.
+
+@router.post("/recruits", response_model=RecruitResponse, status_code=201)
+async def create_recruit(
+    body: RecruitCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    rec = Recruit(
+        recruiter_id=current_user.id,
+        recruit_name=body.name,
+        parent_name=body.parent_name,
+        depth=body.depth,
+        payout=body.payout,
+        meta=body.meta,
+    )
+    db.add(rec)
+
+    # Also update the user's earned total in game_state so /api/me stays
+    # consistent even if the client never sends an explicit PUT /state.
+    result = await db.execute(
+        select(GameState).where(GameState.user_id == current_user.id)
+    )
+    state = result.scalar_one_or_none()
+    if state:
+        state.earned = (state.earned or 0) + body.payout
+        state.invites_left = max(0, (state.invites_left or 0))
+
+    await db.commit()
+    await db.refresh(rec)
+
+    return RecruitResponse(
+        id=rec.id,
+        name=rec.recruit_name,
+        depth=rec.depth,
+        payout=rec.payout,
+        parent_name=rec.parent_name,
+        meta=rec.meta or {},
+        created_at=rec.created_at,
+    )

@@ -2,7 +2,35 @@
 
 ---
 
+## v1.23 — Backend state sync
+
+> *Wires the frontend to the backend so game state is preserved across sessions. Recruited pyramids, flags, buy-in, and earned totals now all survive a page reload.*
+
+### `game/recruits.js`
+
+- **`addRecruit`** now stores `wx` (world-x) on the recruit record and calls `Api.saveRecruit(rec)` immediately after each recruit joins. Fire-and-forget; guest mode skips silently.
+- **`buyIn`** now calls `Api.buyIn(CFG.entryFee)` against the real `/api/buy-in` endpoint. The stub path on the backend credits `invites_left` server-side so it survives a reload.
+- **`restoreRecruits(serverRecruits)`** (new export) — silently rebuilds `G.recruits` and `G.pyramids` from the array returned by `/api/recruits`. No animations, modals, or sub-recruit scheduling — purely reconstructs the scene. Called once during `init()` after auth.
+- `import { Api }` added at the top (previously `api.js` was unused in this file).
+
+### `game/api.js`
+
+- **`Api.loadRecruits()`** — `GET /api/recruits`
+- **`Api.saveRecruit(rec)`** — `POST /api/recruits` with name, depth, payout, parent_name and meta `{ pid, rootPid, zLayer, wx }`
+- **`Api.syncState(snapshot)`** — `PUT /api/state`; replaces the old `saveState` name for clarity
+
+### `main.js`
+
+- **Flag restore on login**: server-side `me.flags` object is merged into `Flags._store` before the game loop starts. Server is the source of truth.
+- **Pyramid/recruit restore**: if `G.bought` is true after loading `/api/me`, the player capstone pyramid is re-placed and `/api/recruits` is fetched; `restoreRecruits()` rebuilds the scene silently.
+- **Debounced state sync** (`scheduleSyncState`): a 1.5-second debounced `PUT /api/state` fires whenever a `flag:change`, `recruit`, or `buyin` event is emitted. Consolidates rapid multi-flag events into a single network call.
+- **`beforeunload` beacon**: on tab close, `navigator.sendBeacon` fires a final state snapshot to `/api/state` for reliability.
+- **`import { Flags }`** from `engine/flags.js` — needed to read `Flags._store` for sync payloads.
+
+---
+
 ## v1.22 — Terrain / Data / Draw Separation
+
 
 > *No gameplay changes. game/pyramids.js is now a pure data layer; pyramid geometry and physics move to worlds/earth/terrain.js; draw side-effects decouple via event; PhysicsRealm gets a terrain interface.*
 

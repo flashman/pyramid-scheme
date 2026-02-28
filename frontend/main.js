@@ -7,8 +7,9 @@ import { X, CW, CH }              from './engine/canvas.js';
 import { COL }                    from './engine/colors.js';
 import { G }                      from './game/state.js';
 import { spawnParts, depthHex }   from './draw/utils.js';
-import { say, buyIn, recruitFriend } from './game/recruits.js';
+import { say, buyIn, recruitFriend, restoreRecruits } from './game/recruits.js';
 import { registerAllQuests }      from './game/quests.js';
+import { Flags }                  from './engine/flags.js';
 import { WorldRealm }             from './worlds/earth/WorldRealm.js';
 import { ChamberRealm }           from './worlds/crypt/ChamberRealm.js';
 import { CouncilRealm }           from './worlds/council/CouncilRealm.js';
@@ -122,6 +123,25 @@ function gameLoop(ts) {
   requestAnimationFrame(gameLoop);
 }
 
+// ── State sync helpers ────────────────────────────────────
+// Debounced flag/state push — consolidates rapid flag:change storms
+// (e.g. quest completion firing 4 flags at once) into a single PUT.
+
+let _syncTimer = null;
+function scheduleSyncState() {
+  if (!Api.hasToken()) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => {
+    Api.syncState({
+      bought:       G.bought,
+      invested:     G.invested,
+      earned:       G.earned,
+      invites_left: G.invitesLeft,
+      flags:        Flags._store,
+    }).catch(() => {/* non-fatal */});
+  }, 1500);
+}
+
 // ── Init ──────────────────────────────────────────────────
 async function init() {
   renderPayoutTable();
@@ -134,16 +154,77 @@ async function init() {
     Api.setToken(token);
     G.isGuest = false;
 
-    // Load saved state from server and merge into G.
+    // ── Load saved state from server and merge into G ──
     const me = await Api.loadMe();
     if (me && !me.error) {
       if (me.invested     != null) G.invested    = me.invested;
       if (me.earned       != null) G.earned      = me.earned;
       if (me.bought       != null) G.bought      = me.bought;
-      if (me.invites_left != null) G.invitesLeft = me.invites_left;  // snake_case from server
+      if (me.invites_left != null) G.invitesLeft = me.invites_left;
       if (me.username)             G.username    = me.username;
+
+      // Restore flags (server is source of truth)
+      if (me.flags && typeof me.flags === 'object') {
+        for (const [k, v] of Object.entries(me.flags)) {
+          // Use internal store directly to avoid triggering sync-back loop
+          Flags._store[k] = v;
+        }
+      }
+
       log(`Welcome back, ${me.username}!`, 'hi');
     }
+
+    // ── Restore pyramids and recruits from server ──────
+    if (G.bought) {
+      // Re-place the player's own capstone pyramid first
+      const { mkPyr, addLayer } = await import('./game/pyramids.js');
+      const { GND } = await import('./worlds/earth/constants.js');
+      if (!G.pyramids.find(p => p.isPlayer)) {
+        const pyr = mkPyr('player', 2520, 'YOU', true);
+        G.pyramids.unshift(pyr);
+        addLayer('player', 1, 'YOU');
+        G.px = 2450; G.py = GND; G.camX = 2450 - CW/2; G.facing = 1;
+        document.getElementById('bi').disabled = true;
+        document.getElementById('rb').disabled = false;
+        const il = document.getElementById('il');
+        if (il) il.style.display = 'block';
+      }
+
+      const recruitsData = await Api.loadRecruits();
+      if (recruitsData && recruitsData.recruits) {
+        restoreRecruits(recruitsData.recruits);
+        if (recruitsData.recruits.length > 0) {
+          log(`Restored ${recruitsData.recruits.length} recruit(s) from the server.`, '');
+        }
+      }
+    }
+
+    // ── Wire state sync on meaningful events ──────────
+    // Flag changes (quest completions, crypt unlock, milestones, etc.)
+    Events.on('flag:change', scheduleSyncState);
+
+    // Sync after recruit (earned total changed)
+    Events.on('recruit', scheduleSyncState);
+
+    // Sync invites_left after buy-in (the /api/buy-in call updates server-
+    // side, but we also sync the full state so flags are consistent)
+    Events.on('buyin', scheduleSyncState);
+
+    // Last-chance sync before the tab closes
+    window.addEventListener('beforeunload', () => {
+      if (Api.hasToken()) {
+        // Use sendBeacon for reliability on tab close
+        const payload = JSON.stringify({
+          bought:       G.bought,
+          invested:     G.invested,
+          earned:       G.earned,
+          invites_left: G.invitesLeft,
+          flags:        Flags._store,
+        });
+        navigator.sendBeacon('/api/state', new Blob([payload], { type: 'application/json' }));
+      }
+    });
+
   } else {
     G.isGuest = true;
     log('Playing as guest — progress will not be saved.', '');

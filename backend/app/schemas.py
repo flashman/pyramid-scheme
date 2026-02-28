@@ -50,7 +50,35 @@ class LogEventRequest(BaseModel):
     payload: dict[str, Any] = {}
 
 
-# ── Payments ──────────────────────────────────────────────
+# ── Recruits ──────────────────────────────────────────────
+
+class RecruitCreate(BaseModel):
+    name:        str
+    depth:       int
+    payout:      float
+    parent_name: str | None = None
+    # Visual layout data so the client can reconstruct pyramids on next login
+    meta:        dict[str, Any] = {}   # { pid, rootPid, zLayer, wx }
+
+
+class RecruitResponse(BaseModel):
+    id:          int
+    name:        str
+    depth:       int
+    payout:      float
+    parent_name: str | None
+    meta:        dict[str, Any]
+    created_at:  datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RecruitListResponse(BaseModel):
+    recruits: list[RecruitResponse]
+
+
+
 
 class BuyInRequest(BaseModel):
     fee: float = Field(..., gt=0)

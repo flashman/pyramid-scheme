@@ -13,6 +13,7 @@ import { getTier, pickName, nextId }                      from './tiers.js';
 import { showModal }                                      from '../ui/modal.js';
 import { updateStats, updateSlots, addFriendUI, log }     from '../ui/panels.js';
 import { CW }                                             from '../engine/canvas.js';
+import { Api }                                            from './api.js';
 
 export function say(msg, ticks) { G.speech = msg; G.speakT = ticks; }
 
@@ -69,27 +70,28 @@ export function addRecruit(name, depth, parentRec) {
 
   const fid = nextId();
   let pid;
+  let wx;   // ← stored on rec so restoreRecruits can skip slot-counter replay
 
   if (depth === 1) {
-    const wx = earthLayout.nextX(1);
+    wx = earthLayout.nextX(1);
     pid = 'f' + fid;
     G.pyramids.push(mkPyr(pid, wx, name, false, 0));
     addLayer(pid, 1, name);
     addLayer('player', 1, name);
   } else if (depth === 2) {
     pid = parentRec ? parentRec.pid : null;
-    const midWx = earthLayout.nextX(2);
+    wx = earthLayout.nextX(2);
     const midId = 'mid' + fid;
-    G.pyramids.push(mkPyr(midId, midWx, name, false, 1));
+    G.pyramids.push(mkPyr(midId, wx, name, false, 1));
     addLayer(midId, depth, name);
     if (pid) { const fp = G.pyramids.find(p => p.id === pid); if (fp) addLayer(pid, depth, name); }
     addLayer('player', depth, name);
     pid = midId;
   } else {
     pid = parentRec ? parentRec.pid : null;
-    const farWx = earthLayout.nextX(3);
+    wx = earthLayout.nextX(3);
     const farId = 'far' + fid;
-    G.pyramids.push(mkPyr(farId, farWx, name, false, 2));
+    G.pyramids.push(mkPyr(farId, wx, name, false, 2));
     addLayer(farId, depth, name);
     if (pid) { const fp = G.pyramids.find(p => p.id === pid); if (fp) addLayer(pid, depth, name); }
     if (rootPid && rootPid !== pid) {
@@ -104,6 +106,7 @@ export function addRecruit(name, depth, parentRec) {
     id: fid, name, depth, pid,
     rootPid: depth === 1 ? pid : rootPid,
     zLayer,
+    wx,                               // ← layout position for server persistence
     parentName: parentRec ? parentRec.name : null,
     payoutToPlayer: payout,
   };
@@ -111,6 +114,11 @@ export function addRecruit(name, depth, parentRec) {
   G.earned += payout;
 
   Events.emit('recruit', rec);
+
+  // ── Persist to server (fire-and-forget; guest mode skips) ──
+  if (Api.hasToken()) {
+    Api.saveRecruit(rec).catch(() => {/* network errors are non-fatal */});
+  }
 
   addFriendUI(rec);
   const icon = depth === 1 ? '🏺' : depth <= 3 ? '🔸' : '🔹';
@@ -190,6 +198,11 @@ export function buyIn() {
   Events.emit('buyin', { rebuy });
   QuestManager.check();
 
+  // ── Persist buy-in to server ──────────────────────────
+  if (Api.hasToken()) {
+    Api.buyIn(CFG.entryFee).catch(() => {/* non-fatal */});
+  }
+
   if (rebuy) {
     log('★ Bought 4 more scrolls for $' + CFG.entryFee + '!', 'hi');
     updateStats();
@@ -228,4 +241,59 @@ export function unlockCrypt() {
   showModal('⚡ THE CRYPT OPENS ⚡',
     'AMUN has spoken.\n\nDeep within your pyramid\nsomething ancient stirs.\n\n' +
     'Walk in front of the pyramid\n(press ↓) then approach\nthe glowing door and press [↑].');
+}
+
+// ── restoreRecruits ───────────────────────────────────────
+// Silently rebuilds G.recruits + G.pyramids from server data
+// without triggering animations, sounds, modals, or sub-recruit
+// scheduling.  Called once during init() after /api/recruits loads.
+//
+// Each server record has: { id, name, depth, payout, parent_name, meta }
+// meta: { pid, rootPid, zLayer, wx }
+
+export function restoreRecruits(serverRecruits) {
+  if (!serverRecruits || !serverRecruits.length) return;
+
+  for (const sr of serverRecruits) {
+    const { name, depth, payout, parent_name: parentName, meta = {} } = sr;
+    const { pid, rootPid, zLayer, wx } = meta;
+
+    if (!pid || wx == null) continue;  // skip records with incomplete layout data
+
+    // Rebuild the pyramid entry if it doesn't already exist
+    const existingPyr = G.pyramids.find(p => p.id === pid);
+    if (!existingPyr) {
+      const pyrZLayer = zLayer ?? (depth === 1 ? 0 : depth === 2 ? 1 : 2);
+      G.pyramids.push(mkPyr(pid, wx, name, false, pyrZLayer));
+    }
+
+    // Add pyramid layers (addLayer is idempotent-ish — safe to call per recruit)
+    addLayer(pid, depth, name);
+    addLayer('player', depth, name);
+
+    // For depth > 1, also add a layer on the parent pyramid if we can find it
+    if (depth >= 2 && rootPid && rootPid !== pid) {
+      addLayer(rootPid, depth, name);
+    }
+
+    // Rebuild the in-memory recruit record
+    const rec = {
+      id:            sr.id,
+      name,
+      depth,
+      pid,
+      rootPid:       rootPid ?? pid,
+      zLayer:        zLayer ?? (depth === 1 ? 0 : depth === 2 ? 1 : 2),
+      wx,
+      parentName,
+      payoutToPlayer: payout,
+    };
+    G.recruits.push(rec);
+
+    // Rebuild friend panel entry silently
+    addFriendUI(rec);
+  }
+
+  updateStats();
+  updateSlots();
 }
