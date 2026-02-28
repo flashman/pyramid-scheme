@@ -2,15 +2,15 @@
 // Thin API client. All server calls go through here so the
 // base URL and auth token are managed in one place.
 //
-// Usage:
-//   import { Api } from './api.js';
-//   const data = await Api.post('/buy-in', { fee: 10 });
+// BASE URL resolution:
+//   - Docker (nginx proxy):  BASE = ''  (same origin, nginx routes /api/* to backend)
+//   - Local dev w/ Vite:     set VITE_API_URL=http://localhost:8000
+//   - Local dev w/o Vite:    set window.API_BASE = 'http://localhost:8000' in index.html
+//                            or edit the fallback below directly
 
-// Empty string = same origin (nginx proxies /api/* to backend in Docker).
-// Set VITE_API_URL to override, e.g. for local dev without Docker.
-const BASE = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL
-  ? import.meta.env.VITE_API_URL
-  : '';
+const BASE = (typeof window !== 'undefined' && window.API_BASE)
+  || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL)
+  || '';
 
 let _token = null;
 

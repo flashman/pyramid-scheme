@@ -7,14 +7,16 @@ import { X, CW, CH }              from './engine/canvas.js';
 import { COL }                    from './engine/colors.js';
 import { G }                      from './game/state.js';
 import { spawnParts, depthHex }   from './draw/utils.js';
-import { say }                    from './game/recruits.js';
+import { say, buyIn, recruitFriend } from './game/recruits.js';
 import { registerAllQuests }      from './game/quests.js';
 import { WorldRealm }             from './worlds/earth/WorldRealm.js';
 import { ChamberRealm }           from './worlds/crypt/ChamberRealm.js';
 import { CouncilRealm }           from './worlds/council/CouncilRealm.js';
 import { renderPayoutTable }      from './ui/config-editor.js';
+import { openConfig, closeConfig, validateConfig, applyConfig } from './ui/config-editor.js';
 import { updateStats, updateSlots, log } from './ui/panels.js';
-import { initDevPanel }               from './ui/dev-panel.js';
+import { initDevPanel }           from './ui/dev-panel.js';
+import { closeModal }             from './ui/modal.js';
 import { GND }                    from './worlds/earth/constants.js';
 import { LH }                     from './worlds/constants.js';
 import { requireAuth }            from './ui/auth.js';
@@ -86,9 +88,6 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { G.keys[e.key] = false; });
 
 // ── Expose UI callbacks referenced by inline HTML handlers ──
-import { buyIn, recruitFriend } from './game/recruits.js';
-import { openConfig, closeConfig, validateConfig, applyConfig } from './ui/config-editor.js';
-import { closeModal } from './ui/modal.js';
 window.buyIn          = buyIn;
 window.recruitFriend  = recruitFriend;
 window.openConfig     = openConfig;
@@ -138,11 +137,11 @@ async function init() {
     // Load saved state from server and merge into G.
     const me = await Api.loadMe();
     if (me && !me.error) {
-      if (me.invested    != null) G.invested    = me.invested;
-      if (me.earned      != null) G.earned      = me.earned;
-      if (me.bought      != null) G.bought      = me.bought;
-      if (me.invitesLeft != null) G.invitesLeft = me.invitesLeft;
-      if (me.username)            G.username    = me.username;
+      if (me.invested     != null) G.invested    = me.invested;
+      if (me.earned       != null) G.earned      = me.earned;
+      if (me.bought       != null) G.bought      = me.bought;
+      if (me.invites_left != null) G.invitesLeft = me.invites_left;  // snake_case from server
+      if (me.username)             G.username    = me.username;
       log(`Welcome back, ${me.username}!`, 'hi');
     }
   } else {
