@@ -52,6 +52,13 @@ export const Api = {
     return _parse(res);
   },
 
+  async del(path) {
+    const res = await fetch(BASE + path, {
+      method: 'DELETE', headers: _headers(),
+    });
+    return _parse(res);
+  },
+
   async patch(path, body = {}) {
     const res = await fetch(BASE + path, {
       method: 'PATCH', headers: _headers(), body: JSON.stringify(body),

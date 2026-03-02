@@ -52,6 +52,17 @@ services:
     depends_on:
       - backend
 
+  # ── Mailhog (dev email catcher) ─────────────────────────
+  # Catches ALL outgoing SMTP — no real emails are sent.
+  # View caught emails at http://localhost:8025
+  # The backend's default SMTP_HOST points here automatically in debug mode.
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP (backend sends here)
+      - "8025:8025"   # Web UI (view caught emails)
+
   # ── pgAdmin (DB browser) ─────────────────────────────────
   # Open http://localhost:5050 — no login required (desktop mode).
   # The pyramid_scheme database is pre-registered automatically.

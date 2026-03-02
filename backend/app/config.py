@@ -18,24 +18,28 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5500",
     ]
 
-    # ── Email ─────────────────────────────────────────────
-    # email_dev_mode=true logs invite URLs to console; no SMTP config needed.
-    # Set to false and configure SMTP_* to send real emails.
-    email_dev_mode: bool = True
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_tls: bool = True
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = "noreply@pyramidscheme.gg"
+    # ── Debug / dev sim ───────────────────────────────────
+    # Enables /api/dev/* endpoints and routes email through Mailhog.
+    # Never set true in production.
+    debug: bool = True
 
-    # URL of the frontend — embedded in invite email links.
+    # ── Email ─────────────────────────────────────────────
+    # In debug mode these default to Mailhog (docker service).
+    # In production set DEBUG=false and provide real SMTP credentials.
+    smtp_host:     str  = "mailhog"   # Docker service name; use "localhost" outside Docker
+    smtp_port:     int  = 1025        # Mailhog SMTP port (no auth, no TLS)
+    smtp_tls:      bool = False
+    smtp_user:     str  = ""
+    smtp_password: str  = ""
+    smtp_from:     str  = "noreply@pyramidscheme.gg"
+
+    # URL embedded in invite email links
     frontend_url: str = "http://localhost:5173"
 
     # ── Stripe (stubbed) ──────────────────────────────────
-    stripe_secret_key: str = "sk_test_stub"
-    stripe_webhook_secret: str = "whsec_stub"
-    stripe_enabled: bool = False
+    stripe_secret_key:     str  = "sk_test_stub"
+    stripe_webhook_secret: str  = "whsec_stub"
+    stripe_enabled:        bool = False
 
     class Config:
         env_file = ".env"

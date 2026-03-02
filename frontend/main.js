@@ -18,7 +18,7 @@ import { CouncilRealm }           from './worlds/council/CouncilRealm.js';
 import { renderPayoutTable }      from './ui/config-editor.js';
 import { openConfig, closeConfig, validateConfig, applyConfig } from './ui/config-editor.js';
 import { updateStats, updateSlots, log } from './ui/panels.js';
-import { initDevPanel }           from './ui/dev-panel.js';
+import { initDevPanel, devPanelSetAuthMode } from './ui/dev-panel.js';
 import { closeModal }             from './ui/modal.js';
 import { GND }                    from './worlds/earth/constants.js';
 import { LH }                     from './worlds/constants.js';
@@ -235,6 +235,15 @@ async function init() {
         ? G.recruits.find(r => r.name === evt.parent_name)
         : null;
       addRecruit(evt.name, evt.depth, parentRec, { dbId: evt.db_recruit_id });
+
+      // Echo back to the dev sim log if the panel is open
+      const simLog = document.getElementById('dev-sim-log');
+      if (simLog) {
+        const line = document.createElement('div');
+        line.style.color = '#40d080';
+        line.textContent = `[${new Date().toLocaleTimeString()}] ✓ ${evt.name} joined at D${evt.depth} (+$${evt.payout.toFixed(2)})`;
+        simLog.prepend(line);
+      }
     });
 
     // Server pushed an authoritative state snapshot (e.g. after buy-in).
@@ -259,6 +268,11 @@ async function init() {
     Api.getInvites().then(data => {
       if (data.invites) updateInvitePanel(data.invites);
     }).catch(() => {});
+
+    // ── Dev panel: check if backend debug mode is on ───
+    Api.get('/health').then(h => {
+      devPanelSetAuthMode(h.debug === true);
+    }).catch(() => devPanelSetAuthMode(false));
 
   } else {
     G.isGuest = true;

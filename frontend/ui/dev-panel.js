@@ -1,11 +1,13 @@
 // ── FILE: ui/dev-panel.js ─────────────────────────────────
-// Developer panel for testing — realm teleports, flag toggles, state cheats.
-// Toggle with the [DEV] button or backtick key.
+// Developer panel for testing — realm teleports, flag toggles,
+// state cheats, and (when authenticated) backend recruit simulation.
+// Toggle with the [⚠ DEV] button or backtick key.
 
 import { G }               from '../game/state.js';
 import { earthLayout }     from '../game/recruits.js';
 import { Flags }           from '../engine/flags.js';
 import { RealmManager }    from '../engine/realm.js';
+import { Api }             from '../game/api.js';
 import { updateStats, updateSlots, log } from './panels.js';
 import { GND }             from '../worlds/earth/constants.js';
 import { mkPyr, addLayer } from '../game/pyramids.js';
@@ -17,6 +19,40 @@ const PANEL_HTML = `
   <div id="dev-header">
     <span>⚠ DEV PANEL</span>
     <button id="dev-close" title="Close (backtick)">✕</button>
+  </div>
+
+  <div class="dev-section" id="dev-sim-section" style="display:none">
+    <div class="dev-section-title">🤖 SIMULATE RECRUITS
+      <span id="dev-sim-mode-badge" style="margin-left:8px;font-size:6px;
+        color:#40d080;border:1px solid #40d080;padding:1px 5px">BACKEND</span>
+    </div>
+    <div style="color:#604020;font-size:6px;margin-bottom:8px;line-height:1.8">
+      Fires the real chain-walk on the server — DB writes, WS events,
+      payout credits — just like a real user buying in.
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+      <label style="color:#907050;font-size:6px;letter-spacing:1px">DEPTH</label>
+      <select id="dev-sim-depth" style="font:7px monospace;background:#0d0800;
+        color:#d0a060;border:1px solid #503010;padding:2px 4px">
+        <option value="1">D1 — direct recruit</option>
+        <option value="2">D2 — under your D1</option>
+        <option value="3">D3 — under your D2</option>
+      </select>
+      <label style="color:#907050;font-size:6px;letter-spacing:1px">DELAY</label>
+      <select id="dev-sim-delay" style="font:7px monospace;background:#0d0800;
+        color:#d0a060;border:1px solid #503010;padding:2px 4px">
+        <option value="2">2 s</option>
+        <option value="5" selected>5 s</option>
+        <option value="10">10 s</option>
+        <option value="0">instant</option>
+      </select>
+    </div>
+    <div class="dev-btn-row">
+      <button class="dev-btn" id="dev-sim-btn">► SIM RECRUIT</button>
+      <button class="dev-btn danger" id="dev-sim-clear">🗑 CLEAR SIMS</button>
+    </div>
+    <div id="dev-sim-log" style="margin-top:8px;font-size:6px;color:#506050;
+      line-height:2;max-height:80px;overflow-y:auto"></div>
   </div>
 
   <div class="dev-section">
@@ -116,6 +152,7 @@ button.dev-btn {
   letter-spacing: 0.5px;
 }
 button.dev-btn:hover { background: #2a1800; border-color: #ff8030; color: #ffa050; }
+button.dev-btn:disabled { opacity: 0.4; cursor: default; }
 button.dev-btn.active { background: #1a2a00; border-color: #60c020; color: #80e030; }
 button.dev-btn.danger { border-color: #a01010; color: #e04040; }
 button.dev-btn.danger:hover { background: #2a0000; border-color: #ff2020; }
@@ -204,10 +241,8 @@ const FLAG_GROUPS = [
 ];
 
 function _sideEffectSH() {
-  // Mirror the quest-completion side-effects (minus the modal)
   if (G.pyramids.length === 0) _ensurePlayerPyramid();
 }
-
 function _sideEffectCU() {
   Flags.set('seven_heavens_done', true);
 }
@@ -248,16 +283,16 @@ function _grantWealth() {
   log('[DEV] +$500 earned.', '');
 }
 
-function _addRecruit() {
+function _addLocalRecruit() {
   const depth = 1;
-  const id = 'dev_recruit_' + (G.recruits.length + 1);
-  const r = { name: 'DEV_RECRUIT_' + (G.recruits.length + 1), depth, wx: 2450 + G.recruits.length * 80 };
+  const id    = 'dev_recruit_' + (G.recruits.length + 1);
+  const r     = { name: 'DEV_' + (G.recruits.length + 1), depth, wx: 2450 + G.recruits.length * 80 };
   G.recruits.push(r);
   const rp = mkPyr(id, r.wx, r.name, false, 0);
   G.pyramids.push(rp);
   addLayer(id, depth, r.name);
   updateStats();
-  log('[DEV] Added test recruit.', '');
+  log('[DEV] Added local recruit (no server write).', '');
 }
 
 function _growPlayerPyramid() {
@@ -278,7 +313,6 @@ function _meetAllGods() {
 }
 
 function _resetAll() {
-  // Clear flags
   Object.keys(Flags._store).forEach(k => delete Flags._store[k]);
   G.bought = false; G.invested = 0; G.earned = 0; G.invitesLeft = 0;
   G.recruits = []; G.pyramids = [];
@@ -290,10 +324,77 @@ function _resetAll() {
   refreshPanel();
 }
 
+// ── Simulation helpers ────────────────────────────────────
+
+let _simBusy = false;
+
+function _simLog(msg, colour = '#506050') {
+  const logEl = document.getElementById('dev-sim-log');
+  if (!logEl) return;
+  const line = document.createElement('div');
+  line.style.color = colour;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.prepend(line);
+  // Cap log at 20 lines
+  while (logEl.children.length > 20) logEl.lastChild.remove();
+}
+
+async function _runSimRecruit() {
+  if (_simBusy) return;
+  if (!Api.hasToken()) {
+    _simLog('Not authenticated — log in first.', '#e04040');
+    return;
+  }
+  if (!G.bought) {
+    _simLog('Buy in first before simulating recruits.', '#e04040');
+    return;
+  }
+
+  const depth = parseInt(document.getElementById('dev-sim-depth').value, 10);
+  const delay = parseFloat(document.getElementById('dev-sim-delay').value);
+  const btn   = document.getElementById('dev-sim-btn');
+
+  _simBusy      = true;
+  btn.disabled  = true;
+  btn.textContent = '⏳ SENDING…';
+
+  try {
+    const result = await Api.post('/api/dev/sim-recruit', {
+      target_depth:  depth,
+      delay_seconds: delay,
+    });
+
+    if (result.ok) {
+      _simLog(`${result.message}`, '#a0c080');
+      _simLog(`Watching for WS event in ~${delay}s…`, '#506050');
+    } else {
+      _simLog(`Error: ${result.detail || JSON.stringify(result)}`, '#e04040');
+    }
+  } catch (e) {
+    _simLog(`Request failed: ${e.message}`, '#e04040');
+  } finally {
+    // Re-enable after the expected delay + a small buffer
+    setTimeout(() => {
+      _simBusy        = false;
+      btn.disabled    = false;
+      btn.textContent = '► SIM RECRUIT';
+    }, (delay + 1) * 1000);
+  }
+}
+
+async function _clearSimRecruits() {
+  if (!Api.hasToken()) return;
+  try {
+    const result = await Api.del('/api/dev/sim-users');
+    _simLog(`Cleared ${result.deleted ?? '?'} sim recruit row(s).`, '#c08040');
+  } catch (e) {
+    _simLog(`Clear failed: ${e.message}`, '#e04040');
+  }
+}
+
 // ── Panel render ──────────────────────────────────────────
 
 function refreshPanel() {
-  // Realm buttons — highlight current
   const realmContainer = document.getElementById('dev-realms');
   if (realmContainer) {
     realmContainer.querySelectorAll('button').forEach(btn => {
@@ -301,47 +402,68 @@ function refreshPanel() {
     });
   }
 
-  // Flag buttons — highlight on/off state
   document.querySelectorAll('button.dev-flag-btn').forEach(btn => {
     const val = Flags.get(btn.dataset.flag);
     btn.classList.toggle('on', !!val);
     btn.textContent = val ? '✓ ON' : '✗ OFF';
   });
 
-  // Flag dump
   const dump = document.getElementById('dev-flag-dump');
   if (dump) {
     const entries = Object.entries(Flags._store);
-    if (entries.length === 0) {
-      dump.textContent = '(no flags set)';
-    } else {
-      dump.textContent = entries.map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join('\n');
-    }
+    dump.textContent = entries.length === 0
+      ? '(no flags set)'
+      : entries.map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join('\n');
+  }
+}
+
+// ── Public: called from main.js after auth ────────────────
+
+/**
+ * Call after login to show the simulation section and wire WS feedback.
+ * @param {boolean} hasDebugEndpoint — true if /api/health returned debug:true
+ */
+export function devPanelSetAuthMode(hasDebugEndpoint) {
+  const simSection = document.getElementById('dev-sim-section');
+  if (!simSection) return;
+
+  if (hasDebugEndpoint) {
+    simSection.style.display = 'block';
+    _simLog('Backend debug mode active — sim recruits enabled.', '#40d080');
+  } else {
+    simSection.style.display = 'block';
+    document.getElementById('dev-sim-mode-badge').textContent = 'PROD';
+    document.getElementById('dev-sim-mode-badge').style.color = '#e04040';
+    document.getElementById('dev-sim-mode-badge').style.borderColor = '#e04040';
+    document.getElementById('dev-sim-btn').disabled = true;
+    document.getElementById('dev-sim-btn').title = '/api/dev/* not available in production';
+    _simLog('Production mode — simulation disabled.', '#e04040');
   }
 }
 
 // ── Init ──────────────────────────────────────────────────
 
 export function initDevPanel() {
-  // Inject CSS
   const style = document.createElement('style');
   style.textContent = PANEL_CSS;
   document.head.appendChild(style);
 
-  // Toggle button
   const toggle = document.createElement('button');
   toggle.id = 'dev-toggle';
   toggle.textContent = '⚠ DEV';
   document.body.appendChild(toggle);
 
-  // Panel
   const wrapper = document.createElement('div');
   wrapper.innerHTML = PANEL_HTML;
   document.body.appendChild(wrapper.firstElementChild);
 
   const panel = document.getElementById('dev-panel');
 
-  // ── Realm buttons ───────────────────────────────────────
+  // ── Simulation buttons ───────────────────────────────────
+  document.getElementById('dev-sim-btn').addEventListener('click', _runSimRecruit);
+  document.getElementById('dev-sim-clear').addEventListener('click', _clearSimRecruits);
+
+  // ── Realm buttons ────────────────────────────────────────
   const realmRow = document.getElementById('dev-realms');
   for (const r of REALMS) {
     const btn = document.createElement('button');
@@ -357,12 +479,11 @@ export function initDevPanel() {
     realmRow.appendChild(btn);
   }
 
-  // ── Flag toggles ────────────────────────────────────────
+  // ── Flag toggles ─────────────────────────────────────────
   const flagsContainer = document.getElementById('dev-flags');
   for (const group of FLAG_GROUPS) {
     const groupEl = document.createElement('div');
     groupEl.style.cssText = 'margin-bottom:6px';
-
     const titleEl = document.createElement('div');
     titleEl.style.cssText = 'color:#604020;font-size:6px;letter-spacing:1px;margin-bottom:3px';
     titleEl.textContent = group.label.toUpperCase();
@@ -371,11 +492,9 @@ export function initDevPanel() {
     for (const f of group.flags) {
       const row = document.createElement('div');
       row.className = 'dev-flag-row';
-
       const label = document.createElement('span');
       label.className = 'dev-flag-label';
       label.textContent = f.key;
-
       const btn = document.createElement('button');
       btn.className = 'dev-flag-btn';
       btn.dataset.flag = f.key;
@@ -388,7 +507,6 @@ export function initDevPanel() {
         refreshPanel();
         log(`[DEV] ${f.key} → ${newVal}`, '');
       };
-
       row.appendChild(label);
       row.appendChild(btn);
       groupEl.appendChild(row);
@@ -396,11 +514,11 @@ export function initDevPanel() {
     flagsContainer.appendChild(groupEl);
   }
 
-  // ── State cheat buttons ─────────────────────────────────
+  // ── State cheat buttons ──────────────────────────────────
   const cheats = [
     { label: '💰 GRANT BUY-IN',     fn: _grantBuyIn          },
     { label: '💸 +$500 EARNED',     fn: _grantWealth         },
-    { label: '👤 ADD RECRUIT',      fn: _addRecruit          },
+    { label: '👤 ADD LOCAL REC',    fn: _addLocalRecruit     },
     { label: '🔺 GROW PYRAMID +2',  fn: _growPlayerPyramid   },
     { label: '🌙 MEET ALL GODS',    fn: _meetAllGods         },
     { label: '💀 FULL RESET',       fn: _resetAll, danger: true },
@@ -415,23 +533,19 @@ export function initDevPanel() {
     cheatRow.appendChild(btn);
   }
 
-  // ── Toggle logic ────────────────────────────────────────
-  const openPanel  = () => { panel.classList.add('open'); refreshPanel(); };
+  // ── Toggle logic ──────────────────────────────────────────
+  const openPanel  = () => { panel.classList.add('open');    refreshPanel(); };
   const closePanel = () =>   panel.classList.remove('open');
   const isOpen     = () =>   panel.classList.contains('open');
 
   toggle.onclick = () => isOpen() ? closePanel() : openPanel();
   document.getElementById('dev-close').onclick = closePanel;
-
-  // Backtick key toggles panel
   document.addEventListener('keydown', e => {
     if (e.key === '`') { isOpen() ? closePanel() : openPanel(); }
   });
 
-  // Refresh dump whenever a flag changes
   window.addEventListener('flag:change', refreshPanel);
 
-  // Keep realm buttons updated on transition
   const origTransition = RealmManager.transitionTo.bind(RealmManager);
   RealmManager.transitionTo = (id) => {
     origTransition(id);

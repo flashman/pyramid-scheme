@@ -1,5 +1,12 @@
 # Backend Changelog
 
+## 0.3.1 — Migration fix (fresh DB)
+
+### Fixed
+- **Alembic migration `0003`** — failed on a fresh database with `relation "users" does not exist` when attempting to create the `invites` table with a FK before `users` existed. Added the same early-return guard used by migrations 0001/0002: if `users` is not yet in the DB, exit immediately and let SQLAlchemy's `create_all()` build all tables from the current models (which already include `users.email`, `users.recruiter_id`, and `invites`). The migration only applies DDL changes when upgrading an *existing* database that predates these columns.
+
+---
+
 ## 0.3.0 — Real invite flow + WebSocket push
 
 ### Added
