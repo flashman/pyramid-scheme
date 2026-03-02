@@ -18,16 +18,29 @@ class User(Base):
 
     id:            Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
     username:      Mapped[str]      = mapped_column(String(32), unique=True, index=True, nullable=False)
+    email:         Mapped[Optional[str]] = mapped_column(String(128), unique=True, nullable=True, index=True)
     password_hash: Mapped[str]      = mapped_column(String(128), nullable=False)
     balance:       Mapped[float]    = mapped_column(Float, default=0.0)
     is_active:     Mapped[bool]     = mapped_column(Boolean, default=True)
     created_at:    Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    # Self-referential FK: who directly recruited this user. Null = organic / root.
+    recruiter_id:  Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+
     game_state:    Mapped[Optional[GameState]]   = relationship("GameState",   back_populates="user", uselist=False)
-    transactions:  Mapped[list[Transaction]]     = relationship("Transaction", back_populates="user")
+    transactions:  Mapped[list[Transaction]]     = relationship("Transaction", back_populates="user",
+                                                                foreign_keys="[Transaction.user_id]")
     recruits_made: Mapped[list[Recruit]]         = relationship("Recruit",     back_populates="recruiter",
                                                                 foreign_keys="[Recruit.recruiter_id]")
     events:        Mapped[list[GameEvent]]       = relationship("GameEvent",   back_populates="user")
+    invites_sent:  Mapped[list[Invite]]          = relationship("Invite",      back_populates="inviter",
+                                                                foreign_keys="[Invite.inviter_id]")
+
+    recruiter: Mapped[Optional[User]] = relationship(
+        "User", remote_side="User.id", foreign_keys="[User.recruiter_id]",
+    )
 
 
 # ── GameState ─────────────────────────────────────────────
@@ -47,9 +60,31 @@ class GameState(Base):
     user: Mapped[User] = relationship("User", back_populates="game_state")
 
 
+# ── Invite ────────────────────────────────────────────────
+
+class Invite(Base):
+    """One row per email invited. used_at + invitee_id are set when they register."""
+    __tablename__ = "invites"
+
+    id:            Mapped[int]           = mapped_column(Integer, primary_key=True)
+    inviter_id:    Mapped[int]           = mapped_column(ForeignKey("users.id"), index=True)
+    invitee_email: Mapped[str]           = mapped_column(String(128), nullable=False, index=True)
+    token:         Mapped[str]           = mapped_column(String(64), unique=True, index=True, nullable=False)
+    used_at:       Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    invitee_id:    Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at:    Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    inviter: Mapped[User]           = relationship("User", back_populates="invites_sent",
+                                                   foreign_keys="[Invite.inviter_id]")
+    invitee: Mapped[Optional[User]] = relationship("User", foreign_keys="[Invite.invitee_id]")
+
+
 # ── Recruit ───────────────────────────────────────────────
 
 class Recruit(Base):
+    """Created server-side during buy-in for every ancestor in the upline chain.
+    meta (visual layout: pid/rootPid/zLayer/wx) is patched by the frontend after
+    slot assignment via PATCH /api/recruits/{id}/meta."""
     __tablename__ = "recruits"
 
     id:           Mapped[int]            = mapped_column(Integer, primary_key=True)
@@ -59,8 +94,6 @@ class Recruit(Base):
     parent_name:  Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)
     depth:        Mapped[int]            = mapped_column(Integer)
     payout:       Mapped[float]          = mapped_column(Float)
-    # Stores visual layout info needed to reconstruct pyramids on login:
-    # { pid, rootPid, zLayer, wx }
     meta:         Mapped[dict]           = mapped_column(JSON, default=dict)
     created_at:   Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -81,7 +114,8 @@ class Transaction(Base):
     meta:       Mapped[dict]          = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    user: Mapped[User] = relationship("User", back_populates="transactions")
+    user: Mapped[User] = relationship("User", back_populates="transactions",
+                                      foreign_keys="[Transaction.user_id]")
 
 
 # ── GameEvent ─────────────────────────────────────────────

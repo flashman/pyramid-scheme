@@ -95,3 +95,31 @@ export function log(msg, cls='') {
   d.className='le '+cls; d.textContent=msg; b.prepend(d);
   if (b.children.length>30) b.lastChild.remove();
 }
+
+/**
+ * Renders the invite list panel from an array of invite objects.
+ * Each invite: { invitee_email, accepted, created_at }
+ */
+export function updateInvitePanel(invites = []) {
+  const panel = document.getElementById('invites-panel');
+  const list  = document.getElementById('invite-list');
+  if (!panel || !list) return;
+
+  if (!invites.length) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  list.innerHTML = invites.map(inv => {
+    const statusCol  = inv.accepted ? '#40d080' : '#8a6a20';
+    const statusText = inv.accepted ? '✓ JOINED' : '⏳ PENDING';
+    const emailShort = inv.invitee_email.length > 22
+      ? inv.invitee_email.slice(0, 20) + '…'
+      : inv.invitee_email;
+    return `<div class="fe" style="flex-direction:column;align-items:flex-start;padding:3px 0">
+      <span class="fn" style="color:#d0a060;font-size:5px">${emailShort}</span>
+      <span style="color:${statusCol};font-size:4px;letter-spacing:1px">${statusText}</span>
+    </div>`;
+  }).join('');
+}

@@ -1,12 +1,11 @@
 // ── FILE: game/api.js ────────────────────────────────────
-// Thin API client. All server calls go through here so the
+// Thin HTTP client. All server calls go through here so the
 // base URL and auth token are managed in one place.
 //
 // BASE URL resolution:
-//   - Docker (nginx proxy):  BASE = ''  (same origin, nginx routes /api/* to backend)
+//   - Docker (nginx proxy):  BASE = ''  (same origin, nginx routes /api/*)
 //   - Local dev w/ Vite:     set VITE_API_URL=http://localhost:8000
-//   - Local dev w/o Vite:    set window.API_BASE = 'http://localhost:8000' in index.html
-//                            or edit the fallback below directly
+//   - Local dev w/o Vite:    window.API_BASE = 'http://localhost:8000'
 
 const BASE = (typeof window !== 'undefined' && window.API_BASE)
   || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL)
@@ -41,18 +40,21 @@ export const Api = {
 
   async post(path, body = {}) {
     const res = await fetch(BASE + path, {
-      method:  'POST',
-      headers: _headers(),
-      body:    JSON.stringify(body),
+      method: 'POST', headers: _headers(), body: JSON.stringify(body),
     });
     return _parse(res);
   },
 
   async put(path, body = {}) {
     const res = await fetch(BASE + path, {
-      method:  'PUT',
-      headers: _headers(),
-      body:    JSON.stringify(body),
+      method: 'PUT', headers: _headers(), body: JSON.stringify(body),
+    });
+    return _parse(res);
+  },
+
+  async patch(path, body = {}) {
+    const res = await fetch(BASE + path, {
+      method: 'PATCH', headers: _headers(), body: JSON.stringify(body),
     });
     return _parse(res);
   },
@@ -62,46 +64,38 @@ export const Api = {
   /** Fetch the current user's saved state. */
   loadMe() { return Api.get('/api/me'); },
 
-  /** Persist a snapshot of the relevant parts of G. */
-  saveState(snapshot) { return Api.put('/api/state', snapshot); },
+  /** Persist a full state snapshot. */
+  syncState(snapshot) { return Api.put('/api/state', snapshot); },
 
   /**
-   * Fire-and-forget event log — recruits, milestones, flag changes.
-   * The backend records these for the leaderboard / audit trail.
+   * Fire-and-forget event log — milestones, flag changes, realm transitions.
    */
   logEvent(type, payload = {}) {
     return Api.post('/api/event', { type, payload });
   },
 
-  /** Trigger the buy-in flow (Stripe stubbed server-side for now). */
+  /** Trigger the buy-in flow. */
   buyIn(fee) { return Api.post('/api/buy-in', { fee }); },
 
   /** Fetch the full recruit history for the current user. */
   loadRecruits() { return Api.get('/api/recruits'); },
 
   /**
-   * Persist a single recruit record immediately after it joins.
-   * Includes the visual layout data (pid, rootPid, zLayer, wx) so the
-   * scene can be reconstructed exactly on next login.
+   * Update the visual layout (wx, pid, zLayer) of a server-side Recruit row
+   * after the frontend assigns a slot.  Called for real recruits that arrived
+   * via WebSocket (which have a db_recruit_id).
    */
-  saveRecruit(rec) {
-    return Api.post('/api/recruits', {
-      name:        rec.name,
-      depth:       rec.depth,
-      payout:      rec.payoutToPlayer,
-      parent_name: rec.parentName || null,
-      meta: {
-        pid:     rec.pid,
-        rootPid: rec.rootPid,
-        zLayer:  rec.zLayer,
-        wx:      rec.wx,          // stored so restore skips slot-counter replay
-      },
+  patchRecruitMeta(dbId, { pid, rootPid, zLayer, wx }) {
+    return Api.patch(`/api/recruits/${dbId}/meta`, {
+      pid, root_pid: rootPid, z_layer: zLayer, wx,
     });
   },
 
-  /**
-   * Sync the full Flags store and key economic fields to the server.
-   * Called debounced from main.js on flag:change and other state mutations.
-   */
-  syncState(snapshot) { return Api.put('/api/state', snapshot); },
+  // ── Invite helpers ────────────────────────────────────
+
+  /** Send an invite scroll to an email address. */
+  sendInvite(email) { return Api.post('/api/invites', { email }); },
+
+  /** Fetch the list of invites the current user has sent. */
+  getInvites() { return Api.get('/api/invites'); },
 };

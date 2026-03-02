@@ -1,13 +1,16 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Any
+import re
 
 
 # ── Auth ──────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=32)
-    password: str = Field(..., min_length=6, max_length=128)
+    username:     str = Field(..., min_length=3, max_length=32)
+    password:     str = Field(..., min_length=6, max_length=128)
+    email:        str | None = None
+    invite_token: str | None = None   # hex UUID from invite link ?invite=TOKEN
 
 
 class LoginRequest(BaseModel):
@@ -23,13 +26,14 @@ class TokenResponse(BaseModel):
 # ── Game state ────────────────────────────────────────────
 
 class MeResponse(BaseModel):
-    username:    str
-    bought:      bool
-    invested:    float
-    earned:      float
-    invites_left:int
-    flags:       dict
-    balance:     float
+    username:     str
+    email:        str | None
+    bought:       bool
+    invested:     float
+    earned:       float
+    invites_left: int
+    flags:        dict
+    balance:      float
 
     class Config:
         from_attributes = True
@@ -50,16 +54,36 @@ class LogEventRequest(BaseModel):
     payload: dict[str, Any] = {}
 
 
+# ── Invites ───────────────────────────────────────────────
+
+class SendInviteRequest(BaseModel):
+    email: str = Field(..., min_length=5, max_length=128)
+
+    @property
+    def email_lower(self) -> str:
+        return self.email.strip().lower()
+
+    def validate_email(self) -> bool:
+        return bool(re.match(r"[^@]+@[^@]+\.[^@]+", self.email))
+
+
+class InviteResponse(BaseModel):
+    id:               int
+    invitee_email:    str
+    token:            str
+    accepted:         bool
+    created_at:       datetime
+    new_invites_left: int | None = None   # populated on POST only
+
+    class Config:
+        from_attributes = True
+
+
+class InviteListResponse(BaseModel):
+    invites: list[InviteResponse]
+
+
 # ── Recruits ──────────────────────────────────────────────
-
-class RecruitCreate(BaseModel):
-    name:        str
-    depth:       int
-    payout:      float
-    parent_name: str | None = None
-    # Visual layout data so the client can reconstruct pyramids on next login
-    meta:        dict[str, Any] = {}   # { pid, rootPid, zLayer, wx }
-
 
 class RecruitResponse(BaseModel):
     id:          int
@@ -78,16 +102,23 @@ class RecruitListResponse(BaseModel):
     recruits: list[RecruitResponse]
 
 
+class PatchRecruitMetaRequest(BaseModel):
+    """Client sends visual layout data after slot assignment."""
+    pid:     str
+    root_pid: str | None = None
+    z_layer: int
+    wx:      float
 
+
+# ── Payments ──────────────────────────────────────────────
 
 class BuyInRequest(BaseModel):
     fee: float = Field(..., gt=0)
 
 
 class BuyInResponse(BaseModel):
-    success:           bool
-    stub:              bool
-    client_secret:     str | None = None   # populated when Stripe is live
-    message:           str
-    new_balance:       float
-    new_invites_left:  int
+    success:          bool
+    stub:             bool
+    message:          str
+    new_balance:      float
+    new_invites_left: int

@@ -7,7 +7,9 @@ import { X, CW, CH }              from './engine/canvas.js';
 import { COL }                    from './engine/colors.js';
 import { G }                      from './game/state.js';
 import { spawnParts, depthHex }   from './draw/utils.js';
-import { say, buyIn, recruitFriend, restoreRecruits } from './game/recruits.js';
+import { say, buyIn, recruitFriend, restoreRecruits, addRecruit } from './game/recruits.js';
+import { gameSocket }              from './game/ws.js';
+import { updateInvitePanel }       from './ui/panels.js';
 import { registerAllQuests }      from './game/quests.js';
 import { Flags }                  from './engine/flags.js';
 import { WorldRealm }             from './worlds/earth/WorldRealm.js';
@@ -206,14 +208,12 @@ async function init() {
     // Sync after recruit (earned total changed)
     Events.on('recruit', scheduleSyncState);
 
-    // Sync invites_left after buy-in (the /api/buy-in call updates server-
-    // side, but we also sync the full state so flags are consistent)
+    // Sync invites_left after buy-in
     Events.on('buyin', scheduleSyncState);
 
     // Last-chance sync before the tab closes
     window.addEventListener('beforeunload', () => {
       if (Api.hasToken()) {
-        // Use sendBeacon for reliability on tab close
         const payload = JSON.stringify({
           bought:       G.bought,
           invested:     G.invested,
@@ -224,6 +224,41 @@ async function init() {
         navigator.sendBeacon('/api/state', new Blob([payload], { type: 'application/json' }));
       }
     });
+
+    // ── WebSocket: connect and wire real-time events ───
+    gameSocket.connect(token);
+
+    // A real user bought in somewhere up (or down) the chain — add their
+    // pyramid to our world and credit our earnings.
+    Events.on('ws:recruit_joined', (evt) => {
+      const parentRec = evt.parent_name
+        ? G.recruits.find(r => r.name === evt.parent_name)
+        : null;
+      addRecruit(evt.name, evt.depth, parentRec, { dbId: evt.db_recruit_id });
+    });
+
+    // Server pushed an authoritative state snapshot (e.g. after buy-in).
+    Events.on('ws:state_update', (evt) => {
+      if (evt.bought       != null) G.bought      = evt.bought;
+      if (evt.earned       != null) G.earned      = evt.earned;
+      if (evt.invites_left != null) G.invitesLeft = evt.invites_left;
+      if (evt.invested     != null) G.invested    = evt.invested;
+      updateStats();
+      updateSlots();
+    });
+
+    // An invitee registered (but hasn't bought in yet).
+    Events.on('ws:invite_accepted', (evt) => {
+      log(`✓ ${evt.email} registered as ${evt.recruit_username}!`, 'hi');
+      Api.getInvites().then(data => {
+        if (data.invites) updateInvitePanel(data.invites);
+      }).catch(() => {});
+    });
+
+    // Load and render invite panel on login
+    Api.getInvites().then(data => {
+      if (data.invites) updateInvitePanel(data.invites);
+    }).catch(() => {});
 
   } else {
     G.isGuest = true;

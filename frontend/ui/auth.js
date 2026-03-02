@@ -130,6 +130,11 @@ const HTML = `
 // ── Logic ────────────────────────────────────────────────
 
 export function requireAuth() {
+  // Read invite token from URL before showing the overlay.
+  // If present, auto-switch to the register tab.
+  const _urlParams   = new URLSearchParams(window.location.search);
+  const _inviteToken = _urlParams.get('invite') || null;
+
   return new Promise((resolve) => {
     // Inject styles
     const style = document.createElement('style');
@@ -152,6 +157,14 @@ export function requireAuth() {
     const demoBtn  = document.getElementById('auth-demo');
 
     let mode = 'login'; // 'login' | 'register'
+
+    // Auto-switch to register when arriving via an invite link
+    if (_inviteToken) {
+      mode = 'register';
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'register'));
+      confirmW.style.display = 'block';
+      submit.textContent = '► FOUND YOUR DYNASTY';
+    }
 
     function setError(msg) { errEl.textContent = msg; }
     function clearError()  { errEl.textContent = '';  }
@@ -190,7 +203,10 @@ export function requireAuth() {
       submit.textContent = '► CONSULTING THE GODS...';
 
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const result = await Api.post(endpoint, { username, password });
+      const payload  = mode === 'login'
+        ? { username, password }
+        : { username, password, invite_token: _inviteToken || undefined };
+      const result = await Api.post(endpoint, payload);
 
       if (result.access_token) {
         _dismiss(overlay);

@@ -30,6 +30,14 @@ def create_access_token(user_id: int, username: str) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
 
+def decode_token(token: str) -> dict | None:
+    """Decode and verify a JWT without raising.  Returns payload or None."""
+    try:
+        return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    except JWTError:
+        return None
+
+
 # ── Current-user dependency ───────────────────────────────
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -43,10 +51,13 @@ async def get_current_user(
         detail="Invalid or expired token.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    payload = decode_token(token)
+    if not payload:
+        raise credentials_exc
+
     try:
-        payload  = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        user_id  = int(payload.get("sub"))
-    except (JWTError, TypeError, ValueError):
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
         raise credentials_exc
 
     result = await db.execute(select(User).where(User.id == user_id))

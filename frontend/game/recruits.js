@@ -11,7 +11,8 @@ import { Flags, QuestManager }                            from '../engine/flags.
 import { Events }                                         from '../engine/events.js';
 import { getTier, pickName, nextId }                      from './tiers.js';
 import { showModal }                                      from '../ui/modal.js';
-import { updateStats, updateSlots, addFriendUI, log }     from '../ui/panels.js';
+import { showPrompt }                                     from '../ui/modal.js';
+import { updateStats, updateSlots, addFriendUI, log, updateInvitePanel } from '../ui/panels.js';
 import { CW }                                             from '../engine/canvas.js';
 import { Api }                                            from './api.js';
 
@@ -58,7 +59,7 @@ export function checkMilestone() {
   }
 }
 
-export function addRecruit(name, depth, parentRec) {
+export function addRecruit(name, depth, parentRec, opts = {}) {
   if (!G.bought) return;
   const payout = payoutAtDepth(depth);
   if (!payout) return;
@@ -70,7 +71,7 @@ export function addRecruit(name, depth, parentRec) {
 
   const fid = nextId();
   let pid;
-  let wx;   // ← stored on rec so restoreRecruits can skip slot-counter replay
+  let wx;
 
   if (depth === 1) {
     wx = earthLayout.nextX(1);
@@ -105,19 +106,22 @@ export function addRecruit(name, depth, parentRec) {
   const rec = {
     id: fid, name, depth, pid,
     rootPid: depth === 1 ? pid : rootPid,
-    zLayer,
-    wx,                               // ← layout position for server persistence
+    zLayer, wx,
     parentName: parentRec ? parentRec.name : null,
     payoutToPlayer: payout,
+    dbId: opts.dbId || null,   // set for real server-created recruits
   };
   G.recruits.push(rec);
   G.earned += payout;
 
   Events.emit('recruit', rec);
 
-  // ── Persist to server (fire-and-forget; guest mode skips) ──
-  if (Api.hasToken()) {
-    Api.saveRecruit(rec).catch(() => {/* network errors are non-fatal */});
+  // Patch visual layout back to server for real recruits (arrived via WS).
+  // Guest / mock recruits have no dbId and are local-only.
+  if (Api.hasToken() && rec.dbId) {
+    Api.patchRecruitMeta(rec.dbId, {
+      pid: rec.pid, rootPid: rec.rootPid, zLayer: rec.zLayer, wx: rec.wx,
+    }).catch(() => {});
   }
 
   addFriendUI(rec);
@@ -153,6 +157,10 @@ export function addRecruit(name, depth, parentRec) {
 // scheduleSubRecruits(rec) is the Earth shorthand (addFn = addRecruit).
 
 export function scheduleSubRecruitsFor(rec, addFn) {
+  // Mock cascading sub-recruits are guest/demo only.
+  // Real users get sub-recruits when their invitees' chains actually buy in.
+  if (Api.hasToken()) return;
+
   const d = rec.depth;
   const spawnProb = Math.max(0, 0.92 - d * 0.13);
   if (Math.random() > spawnProb || !payoutAtDepth(d + 1)) return;
@@ -169,11 +177,43 @@ export function scheduleSubRecruits(rec) {
 
 export function recruitFriend() {
   if (!G.bought || G.invitesLeft <= 0) { log('No scrolls left!', ''); return; }
-  G.invitesLeft--;
-  updateSlots();
-  const name = pickName();
-  log(`📜 Scroll sent to ${name}...`);
-  setTimeout(() => addRecruit(name, 1, null), 800 + Math.random()*2200);
+
+  if (!Api.hasToken()) {
+    // ── Guest / demo mode: mock recruit with random name ──
+    G.invitesLeft--;
+    updateSlots();
+    const name = pickName();
+    log(`📜 Scroll sent to ${name}...`);
+    setTimeout(() => addRecruit(name, 1, null), 800 + Math.random() * 2200);
+    return;
+  }
+
+  // ── Authenticated mode: real email invite ─────────────
+  showPrompt('📜 SEND SCROLL', 'Enter your recruit\'s email address:', 'pharaoh@example.com')
+    .then(async (email) => {
+      if (!email) return;   // user cancelled
+
+      const result = await Api.sendInvite(email);
+
+      if (result.detail || result.error) {
+        log(`✗ ${result.detail || result.error}`, 'r');
+        return;
+      }
+
+      // Server decrements invites_left — trust its count
+      if (result.new_invites_left != null) {
+        G.invitesLeft = result.new_invites_left;
+        updateSlots();
+      }
+
+      log(`📜 Scroll sent to ${email}`, 'hi');
+      say('SCROLL SENT!', 120);
+
+      // Refresh invite panel
+      Api.getInvites().then(data => {
+        if (data.invites) updateInvitePanel(data.invites);
+      }).catch(() => {});
+    });
 }
 
 export function buyIn() {

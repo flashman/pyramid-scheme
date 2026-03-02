@@ -4,20 +4,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 from app.routers import auth, game, payments
+from app.routers import invites as invites_router
+from app.routers import ws as ws_router
 
-# ── Create tables on startup (use Alembic for prod migrations) ──
+
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
 
+
 app = FastAPI(
     title="Pyramid Scheme API",
-    version="0.1.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
-# ── CORS ──────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -26,10 +28,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routers ───────────────────────────────────────────────
-app.include_router(auth.router,     prefix="/api/auth",     tags=["auth"])
-app.include_router(game.router,     prefix="/api",          tags=["game"])
-app.include_router(payments.router, prefix="/api",          tags=["payments"])
+# ── HTTP routers ──────────────────────────────────────────
+app.include_router(auth.router,             prefix="/api/auth",  tags=["auth"])
+app.include_router(game.router,             prefix="/api",       tags=["game"])
+app.include_router(payments.router,         prefix="/api",       tags=["payments"])
+app.include_router(invites_router.router,   prefix="/api",       tags=["invites"])
+
+# ── WebSocket (no prefix — path is exactly /ws) ───────────
+app.include_router(ws_router.router, tags=["websocket"])
 
 
 @app.get("/health")
