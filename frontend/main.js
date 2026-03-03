@@ -258,8 +258,7 @@ async function init() {
     }).catch(() => {});
 
     // ── Dev panel: check if backend debug mode is on ───
-    Api.get('/health').then(h => {
-      console.log("health check" + h);
+    Api.get('/api/health').then(h => {
       devPanelSetAuthMode(h.debug === true);
     }).catch(() => devPanelSetAuthMode(false));
 

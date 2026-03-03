@@ -50,6 +50,6 @@ if settings.debug:
     )
 
 
-@app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok", "debug": settings.debug}
