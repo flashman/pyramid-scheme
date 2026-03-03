@@ -33,7 +33,6 @@
   --btn-disabled-text: #503010;
   --btn-green:         #006000;
   --btn-green-hover:   #008000;
-  --cfg-btn-hover:     #2a1000;
 
   /* Text / accents */
   --subtitle:    #c06000;
@@ -89,16 +88,6 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 #pt-table tr.pt-fee td{color:var(--red)!important}
 #pt-table tr.pt-fee td:last-child{color:var(--red)}
 .pt-sep{border-top:1px dashed var(--brown-mid);margin:2px 0}
-.cfg-btn{background:var(--bg-dark);border:1px solid var(--amber-dark);color:var(--tan);font-family:'Press Start 2P',monospace;font-size:4px;padding:2px 3px;cursor:pointer;margin-top:4px}
-.cfg-btn:hover{background:var(--cfg-btn-hover);color:var(--gold)}
-#cfg-panel{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-modal);border:3px solid var(--gold-dim);padding:14px;z-index:200;min-width:280px}
-#cfg-panel.show{display:block}
-#cfg-panel h3{color:var(--gold);font-size:8px;margin-bottom:10px;text-align:center}
-.cfg-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.cfg-row label{color:var(--tan);font-size:5px;flex:1}
-.cfg-row input{background:var(--bg-input);border:2px solid var(--amber-dark);color:var(--gold);font-family:'Press Start 2P',monospace;font-size:5px;width:60px;padding:2px 4px;text-align:right}
-.cfg-note{color:var(--tan-muted);font-size:4px;margin-bottom:8px;line-height:2;text-align:center}
-#cfg-valid{font-size:5px;text-align:center;margin-bottom:6px;min-height:10px}
 .db-row{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}
 .db-chip{font-size:4px;padding:2px 3px;border:1px solid var(--brown-mid)}
 #mo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.88);z-index:100;align-items:center;justify-content:center}

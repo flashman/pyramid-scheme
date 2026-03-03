@@ -54,15 +54,23 @@ async def save_state(
         state = GameState(user_id=current_user.id)
         db.add(state)
 
-    if body.bought       is not None: state.bought       = body.bought
-    if body.invested     is not None: state.invested     = body.invested
-    if body.earned       is not None: state.earned       = body.earned
-    if body.invites_left is not None: state.invites_left = body.invites_left
-    if body.flags        is not None:
+    # Only flags are client-settable. bought / earned / invites_left are
+    # mutated server-side only (buy-in flow, chain walk).
+    if body.flags is not None:
         state.flags = {**(state.flags or {}), **body.flags}
 
     await db.commit()
     return {"ok": True}
+
+
+# ── GET /api/config ───────────────────────────────────────
+# Single source of truth for payout parameters.
+# Frontend reads from here instead of duplicating the values locally.
+
+@router.get("/config")
+async def get_config():
+    from app.payout import PAYOUT_CONFIG
+    return {"payout": PAYOUT_CONFIG}
 
 
 # ── POST /api/event ───────────────────────────────────────

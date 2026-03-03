@@ -40,11 +40,9 @@ class MeResponse(BaseModel):
 
 
 class SaveStateRequest(BaseModel):
-    bought:       bool  | None = None
-    invested:     float | None = None
-    earned:       float | None = None
-    invites_left: int   | None = None
-    flags:        dict  | None = None
+    # Only client-driven fields are accepted here.
+    # bought, earned, invites_left are server-only — mutated by buy-in / chain walk.
+    flags: dict | None = None
 
 
 # ── Events ────────────────────────────────────────────────

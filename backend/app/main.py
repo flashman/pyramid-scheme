@@ -4,7 +4,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import engine, Base
 from app.routers import auth, game, payments
 from app.routers import invites as invites_router
 from app.routers import ws as ws_router
@@ -13,14 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Schema is managed exclusively by Alembic (run via docker-compose command).
+    # create_all is intentionally absent — using both would cause drift.
     yield
 
 
 app = FastAPI(
     title="Pyramid Scheme API",
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 

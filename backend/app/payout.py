@@ -1,11 +1,12 @@
 """
 Server-side payout math.
-Mirrors frontend game/config.js — must stay in sync with CFG defaults there.
+PAYOUT_CONFIG is the single source of truth for all payout parameters.
+GET /api/config serves this to the frontend so values never need to be
+duplicated in frontend/game/config.js.
 """
 from __future__ import annotations
 
-# These defaults must match CFG in frontend/game/config.js
-_DEFAULT = {
+PAYOUT_CONFIG: dict = {
     "d1_payout":    4.0,
     "decay":        0.5,
     "min_payout":   0.01,
@@ -15,7 +16,7 @@ _DEFAULT = {
 
 
 def payout_at_depth(depth: int, cfg: dict | None = None) -> float:
-    c = cfg or _DEFAULT
+    c = cfg or PAYOUT_CONFIG
     p = c["d1_payout"] * (c["decay"] ** (depth - 1))
     return round(p, 2) if p >= c["min_payout"] else 0.0
 

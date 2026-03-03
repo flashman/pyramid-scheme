@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,7 +8,7 @@ from app.models import User, GameState, Transaction
 from app.schemas import BuyInRequest, BuyInResponse
 from app.auth import get_current_user
 from app.chain import run_buyin_chain
-from app.payout import payout_at_depth, max_pay_depth
+from app.payout import payout_at_depth, max_pay_depth, PAYOUT_CONFIG
 from app.ws import manager
 
 router = APIRouter()
@@ -22,6 +22,14 @@ async def buy_in(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Reject any fee that doesn't match the server-authoritative entry cost.
+    # This prevents clients from submitting an arbitrarily low fee.
+    expected_fee = PAYOUT_CONFIG["entry_fee"]
+    if round(body.fee, 2) != expected_fee:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid fee. Expected {expected_fee}.",
+        )
     gs_res = await db.execute(select(GameState).where(GameState.user_id == current_user.id))
     state  = gs_res.scalar_one_or_none()
     if not state:
@@ -91,4 +99,8 @@ async def _create_stripe_payment_intent(amount: float, user: User) -> str:
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(db: AsyncSession = Depends(get_db)):
+    # TODO (before enabling Stripe): verify the webhook signature.
+    # Without this, anyone can POST fake payment events.
+    # Use stripe.WebhookEvent.construct_from(await request.body(), STRIPE_WEBHOOK_SECRET)
+    # and return 400 on signature failure.
     return {"received": True}

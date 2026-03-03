@@ -16,7 +16,7 @@ import { WorldRealm }             from './worlds/earth/WorldRealm.js';
 import { ChamberRealm }           from './worlds/crypt/ChamberRealm.js';
 import { CouncilRealm }           from './worlds/council/CouncilRealm.js';
 import { renderPayoutTable }      from './ui/config-editor.js';
-import { openConfig, closeConfig, validateConfig, applyConfig } from './ui/config-editor.js';
+import { loadConfig }             from './game/config.js';
 import { updateStats, updateSlots, log } from './ui/panels.js';
 import { initDevPanel, devPanelSetAuthMode } from './ui/dev-panel.js';
 import { closeModal }             from './ui/modal.js';
@@ -93,10 +93,6 @@ document.addEventListener('keyup', e => { G.keys[e.key] = false; });
 // ── Expose UI callbacks referenced by inline HTML handlers ──
 window.buyIn          = buyIn;
 window.recruitFriend  = recruitFriend;
-window.openConfig     = openConfig;
-window.closeConfig    = closeConfig;
-window.validateConfig = validateConfig;
-window.applyConfig    = applyConfig;
 window.closeModal     = closeModal;
 
 // ── Game loop ─────────────────────────────────────────────
@@ -134,19 +130,14 @@ function scheduleSyncState() {
   if (!Api.hasToken()) return;
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => {
-    Api.syncState({
-      bought:       G.bought,
-      invested:     G.invested,
-      earned:       G.earned,
-      invites_left: G.invitesLeft,
-      flags:        Flags._store,
-    }).catch(() => {/* non-fatal */});
+    // Only sync client-driven state. bought/earned/invites_left are
+    // server-owned and rejected by PUT /api/state.
+    Api.syncState({ flags: Flags._store }).catch(() => {/* non-fatal */});
   }, 1500);
 }
 
 // ── Init ──────────────────────────────────────────────────
 async function init() {
-  renderPayoutTable();
   initDevPanel();
 
   // Show auth overlay and wait for login, register, or guest dismissal.
@@ -156,7 +147,9 @@ async function init() {
     Api.setToken(token);
     G.isGuest = false;
 
-    // ── Load saved state from server and merge into G ──
+    // Fetch server-owned payout config first, then render the table.
+    await loadConfig(Api);
+    renderPayoutTable();
     const me = await Api.loadMe();
     if (me && !me.error) {
       if (me.invested     != null) G.invested    = me.invested;
@@ -214,13 +207,8 @@ async function init() {
     // Last-chance sync before the tab closes
     window.addEventListener('beforeunload', () => {
       if (Api.hasToken()) {
-        const payload = JSON.stringify({
-          bought:       G.bought,
-          invested:     G.invested,
-          earned:       G.earned,
-          invites_left: G.invitesLeft,
-          flags:        Flags._store,
-        });
+        // Only flags are client-settable; bought/earned/invites_left are server-owned.
+        const payload = JSON.stringify({ flags: Flags._store });
         navigator.sendBeacon('/api/state', new Blob([payload], { type: 'application/json' }));
       }
     });
@@ -271,6 +259,7 @@ async function init() {
 
     // ── Dev panel: check if backend debug mode is on ───
     Api.get('/health').then(h => {
+      console.log("health check" + h);
       devPanelSetAuthMode(h.debug === true);
     }).catch(() => devPanelSetAuthMode(false));
 

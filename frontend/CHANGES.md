@@ -2,7 +2,45 @@
 
 ---
 
-## v1.24 — Real invite flow + WebSocket push
+## v1.25 — Backend owns payout config; client-side rate editor removed
+
+> *Payout parameters are no longer user-configurable in the frontend. The ⚙ TUNE RATES panel has been removed. On login, the frontend fetches the authoritative values from `GET /api/config` and uses them for all display and calculations.*
+
+### `game/config.js`
+- Mutable `CFG` export removed entirely.
+- New `loadConfig(Api)` — async, fetches `GET /api/config`, populates internal `_cfg`. Call once after login.
+- New `getCFG()` — returns a read-only snapshot of `_cfg`. Use wherever `CFG.*` was used before.
+- `payoutAtDepth()`, `maxPayDepth()`, `totalPool()` unchanged in API; now read from `_cfg` instead of the old exported object.
+
+### `ui/config-editor.js`
+- `openConfig`, `closeConfig`, `validateConfig`, `applyConfig` all deleted.
+- Only `renderPayoutTable()` remains. Updated to call `getCFG()` for platform fee and entry fee display rows.
+
+### `game/recruits.js`
+- Import updated: `CFG` → `getCFG`.
+- All `CFG.entryFee` / `CFG.platformFee` usages replaced with `getCFG().entryFee` / `getCFG().platformFee`.
+
+### `main.js`
+- Dead imports (`openConfig`, `closeConfig`, `validateConfig`, `applyConfig`) removed.
+- Dead `window.*` assignments for those functions removed.
+- `init()` now calls `await loadConfig(Api)` then `renderPayoutTable()` after login (before loading game state). Guest path falls through to `updateStats()` as before.
+- `scheduleSyncState()` now only sends `{ flags }` — `bought`, `earned`, `invested`, `invites_left` were removed (server-owned, rejected by `PUT /api/state`).
+- `beforeunload` beacon updated to match: only sends `{ flags }`.
+
+### `index.html`
+- `⚙ TUNE RATES` button removed from the payout rates panel.
+- Entire `#cfg-panel` div removed.
+
+### `style.css`
+- Removed dead rules: `.cfg-btn`, `.cfg-btn:hover`, `#cfg-panel`, `#cfg-panel.show`, `#cfg-panel h3`, `.cfg-row`, `.cfg-row label`, `.cfg-row input`, `.cfg-note`, `#cfg-valid`.
+- Removed `--cfg-btn-hover` CSS variable.
+
+### `ui/modal.js`
+- Removed orphaned `Escape` key handler that hid `#cfg-panel` (element no longer exists).
+
+---
+
+
 
 > *Removes mock recruits for authenticated users. Recruits now arrive in real-time via WebSocket when real users in your downline buy in. The SEND SCROLL button sends an actual invite email.*
 

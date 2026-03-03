@@ -23,7 +23,6 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Escape') {
-    document.getElementById('cfg-panel').style.display = 'none';
     _dismissPrompt(null);
   }
 });

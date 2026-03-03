@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Integer, String, Float, Boolean, DateTime, ForeignKey, JSON
+from sqlalchemy import Integer, String, Numeric, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -20,7 +20,7 @@ class User(Base):
     username:      Mapped[str]      = mapped_column(String(32), unique=True, index=True, nullable=False)
     email:         Mapped[Optional[str]] = mapped_column(String(128), unique=True, nullable=True, index=True)
     password_hash: Mapped[str]      = mapped_column(String(128), nullable=False)
-    balance:       Mapped[float]    = mapped_column(Float, default=0.0)
+    balance:       Mapped[float]    = mapped_column(Numeric(10, 2), default=0.0)
     is_active:     Mapped[bool]     = mapped_column(Boolean, default=True)
     created_at:    Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -51,8 +51,8 @@ class GameState(Base):
     id:           Mapped[int]            = mapped_column(Integer, primary_key=True)
     user_id:      Mapped[int]            = mapped_column(ForeignKey("users.id"), unique=True, index=True)
     bought:       Mapped[bool]           = mapped_column(Boolean, default=False)
-    invested:     Mapped[float]          = mapped_column(Float, default=0.0)
-    earned:       Mapped[float]          = mapped_column(Float, default=0.0)
+    invested:     Mapped[float]          = mapped_column(Numeric(10, 2), default=0.0)
+    earned:       Mapped[float]          = mapped_column(Numeric(10, 2), default=0.0)
     invites_left: Mapped[int]            = mapped_column(Integer, default=0)
     flags:        Mapped[dict]           = mapped_column(JSON, default=dict)
     updated_at:   Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -93,7 +93,7 @@ class Recruit(Base):
     recruit_name: Mapped[str]            = mapped_column(String(64))
     parent_name:  Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)
     depth:        Mapped[int]            = mapped_column(Integer)
-    payout:       Mapped[float]          = mapped_column(Float)
+    payout:       Mapped[float]          = mapped_column(Numeric(10, 2))
     meta:         Mapped[dict]           = mapped_column(JSON, default=dict)
     created_at:   Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -109,7 +109,7 @@ class Transaction(Base):
     id:         Mapped[int]           = mapped_column(Integer, primary_key=True)
     user_id:    Mapped[int]           = mapped_column(ForeignKey("users.id"), index=True)
     type:       Mapped[str]           = mapped_column(String(32))
-    amount:     Mapped[float]         = mapped_column(Float)
+    amount:     Mapped[float]         = mapped_column(Numeric(10, 2))
     ref_id:     Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     meta:       Mapped[dict]          = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)

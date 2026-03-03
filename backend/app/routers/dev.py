@@ -13,6 +13,7 @@ DELETE /api/dev/sim-users
   recruit_name starting with the sim prefix).  Convenience cleanup.
 """
 import asyncio
+import logging
 import random
 import string
 
@@ -28,6 +29,8 @@ from app.chain import run_buyin_chain
 from app.ws import manager
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 SIM_PREFIX = "🤖 "   # visually distinct in the UI
 
@@ -121,7 +124,10 @@ async def sim_recruit(
     # returns immediately while the WS event fires after the delay.
     async def _delayed():
         await asyncio.sleep(body.delay_seconds)
-        await _do_sim(first_recruiter_id, sim_name)
+        try:
+            await _do_sim(first_recruiter_id, sim_name)
+        except Exception:
+            logger.exception("sim-recruit background task failed for %s", sim_name)
 
     asyncio.create_task(_delayed())
 
@@ -144,6 +150,7 @@ async def clear_sim_recruits(
         .where(
             Recruit.recruiter_id == current_user.id,
             Recruit.recruit_id.is_(None),
+            Recruit.recruit_name.like(f"{SIM_PREFIX}%"),
         )
         .returning(Recruit.id)
     )

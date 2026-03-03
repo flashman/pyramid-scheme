@@ -106,18 +106,13 @@ docker compose exec backend alembic history
 ```
 
 Migration files:
-- `0001` — add `parent_name` to recruits
-- `0002` — add `meta` JSON to recruits
-- `0003` — add `users.email`, `users.recruiter_id`, create `invites` table
-
-> **Fresh vs. existing database:** Migrations 0001–0003 all detect whether the base tables exist and exit early if not, letting SQLAlchemy's `create_all()` build the full schema from current models. This means `alembic upgrade head` is safe to run on both a brand-new database and an existing one.
+- `0001_initial_schema` — full schema from scratch (squashed from earlier incremental migrations)
 
 ---
 
 ## Troubleshooting
 
-**`relation "users" does not exist` during migration**
-This happened in versions before 0.3.1 — update to the latest zip and wipe the DB volume:
+**Starting fresh (wipe all data)**
 ```bash
 docker compose down -v   # removes the db volume
 docker compose up --build

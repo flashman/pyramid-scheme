@@ -33,7 +33,7 @@
       <table id="pt-table">
         <tbody id="pt-body"></tbody>
       </table>
-      <button class="cfg-btn" onclick="openConfig()">⚙ TUNE RATES</button>
+
     </div>
     <div class="pb">
       <div class="pt">▶ ACTIVITY</div>
@@ -106,26 +106,6 @@
   </div>
 </div>
 
-<!-- Config editor -->
-<div id="cfg-panel">
-  <h3>⚙ TUNE PAYOUT RATES</h3>
-  <div class="cfg-note">
-    Rule: platformFee + Σ(all payouts) = entryFee<br>
-    D1 payout × (1/(1-decay)) = pool<br>
-    Math must balance or scheme collapses!
-  </div>
-  <div class="cfg-row"><label>ENTRY FEE ($)</label><input id="cfg-fee" type="number" step="1" min="1" value="10"></div>
-  <div class="cfg-row"><label>PLATFORM CUT ($)</label><input id="cfg-cut" type="number" step="0.5" min="0" value="2"></div>
-  <div class="cfg-row"><label>D1 PAYOUT ($)</label><input id="cfg-d1" type="number" step="0.5" min="0.5" value="4"></div>
-  <div class="cfg-row"><label>DECAY FACTOR</label><input id="cfg-dc" type="number" step="0.05" min="0.1" max="0.95" value="0.5"></div>
-  <div class="cfg-row"><label>MIN PAYOUT ($)</label><input id="cfg-min" type="number" step="0.01" min="0.001" value="0.01"></div>
-  <div id="cfg-valid"></div>
-  <div style="display:flex;gap:8px">
-    <button class="btn" style="font-size:5px;padding:5px" onclick="validateConfig()">CHECK MATH</button>
-    <button class="btn g" style="font-size:5px;padding:5px" onclick="applyConfig()">APPLY</button>
-    <button class="btn" style="font-size:5px;padding:5px;background:#3a0000;border-color:#f02020" onclick="closeConfig()">CANCEL</button>
-  </div>
-</div>
 
 <div id="mo"><div id="md">
   <h2 id="mh">GLORIOUS!</h2>

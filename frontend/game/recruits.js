@@ -1,7 +1,7 @@
 // ── FILE: game/recruits.js ───────────────────────────────
 
 import { G }                                               from './state.js';
-import { CFG, payoutAtDepth, maxPayDepth }                 from './config.js';
+import { getCFG, payoutAtDepth, maxPayDepth }                 from './config.js';
 import { GND, Z_LAYERS, F_SLOTS, F_SLOTS_MID, F_SLOTS_FAR } from '../worlds/earth/constants.js';
 import { LH }                                              from '../worlds/constants.js';
 import { mkPyr, addLayer, pyrEarnings, PyramidLayout }    from './pyramids.js';
@@ -219,7 +219,7 @@ export function recruitFriend() {
 export function buyIn() {
   if (G.bought && G.invitesLeft > 0) { showModal('ALREADY IN!', 'Keep recruiting, Pharaoh!'); return; }
   const rebuy = G.bought;
-  G.bought = true; G.invested += CFG.entryFee; G.invitesLeft = 4;
+  G.bought = true; G.invested += getCFG().entryFee; G.invitesLeft = 4;
   if (!rebuy) {
     const pyr = mkPyr('player', 2520, 'YOU', true);
     G.pyramids.unshift(pyr);
@@ -240,20 +240,20 @@ export function buyIn() {
 
   // ── Persist buy-in to server ──────────────────────────
   if (Api.hasToken()) {
-    Api.buyIn(CFG.entryFee).catch(() => {/* non-fatal */});
+    Api.buyIn(getCFG().entryFee).catch(() => {/* non-fatal */});
   }
 
   if (rebuy) {
-    log('★ Bought 4 more scrolls for $' + CFG.entryFee + '!', 'hi');
+    log('★ Bought 4 more scrolls for $' + getCFG().entryFee + '!', 'hi');
     updateStats();
     showModal('📜 MORE SCROLLS!',
-      `You paid $${CFG.entryFee} for 4 more invite scrolls.\nKeep building that empire!\n\n${buildPayoutSummary()}`);
+      `You paid $${getCFG().entryFee} for 4 more invite scrolls.\nKeep building that empire!\n\n${buildPayoutSummary()}`);
   } else {
-    log('★ You joined for $' + CFG.entryFee + '! Capstone placed!', 'hi');
+    log('★ You joined for $' + getCFG().entryFee + '! Capstone placed!', 'hi');
     log('Walk ←→ to explore. SPACE near pyramids!', '');
     updateStats();
     showModal('🔺 YOU\'RE IN!',
-      `You paid $${CFG.entryFee}.\n$${CFG.platformFee} platform fee kept.\n$${(CFG.entryFee-CFG.platformFee).toFixed(2)} flows up YOUR recruiter chain!\n\nSend scrolls. Each new join pays:\n${buildPayoutSummary()}\n\n← → Walk. SPACE to inspect pyramids.\nClimb by walking into them!`);
+      `You paid $${getCFG().entryFee}.\n$${getCFG().platformFee} platform fee kept.\n$${(getCFG().entryFee-getCFG().platformFee).toFixed(2)} flows up YOUR recruiter chain!\n\nSend scrolls. Each new join pays:\n${buildPayoutSummary()}\n\n← → Walk. SPACE to inspect pyramids.\nClimb by walking into them!`);
   }
 }
 

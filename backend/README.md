@@ -32,15 +32,21 @@ Interactive API docs: http://localhost:8000/docs
 
 ## Endpoints
 
-| Method | Path                  | Auth | Description                        |
-|--------|-----------------------|------|------------------------------------|
-| POST   | /api/auth/register    | —    | Create account, returns JWT        |
-| POST   | /api/auth/login       | —    | Login, returns JWT                 |
-| GET    | /api/me               | ✓    | Fetch player state                 |
-| PUT    | /api/state            | ✓    | Save player state                  |
-| POST   | /api/event            | ✓    | Log a game event (recruit, etc.)   |
-| POST   | /api/buy-in           | ✓    | Buy-in (Stripe stubbed)            |
-| POST   | /api/stripe/webhook   | —    | Stripe webhook (stubbed)           |
+| Method | Path                       | Auth | Description                                  |
+|--------|----------------------------|------|----------------------------------------------|
+| POST   | /api/auth/register         | —    | Create account, returns JWT                  |
+| POST   | /api/auth/login            | —    | Login, returns JWT                           |
+| GET    | /api/me                    | ✓    | Fetch player state                           |
+| PUT    | /api/state                 | ✓    | Save flags (only client-owned field)         |
+| GET    | /api/config                | —    | Payout parameters (server source of truth)   |
+| POST   | /api/event                 | ✓    | Log a game event (recruit, milestone…)       |
+| POST   | /api/buy-in                | ✓    | Buy-in, walks upline chain                   |
+| GET    | /api/recruits              | ✓    | List recruits for current user               |
+| PATCH  | /api/recruits/{id}/meta    | ✓    | Patch visual layout after slot assignment    |
+| POST   | /api/invites               | ✓    | Send invite email, decrement scrolls         |
+| GET    | /api/invites               | ✓    | List invites sent by current user            |
+| POST   | /api/stripe/webhook        | —    | Stripe webhook (stubbed — see TODO)          |
+| WS     | /ws?token=JWT              | JWT  | Real-time event stream                       |
 
 ---
 
