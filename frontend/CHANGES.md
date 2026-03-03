@@ -2,7 +2,42 @@
 
 ---
 
+## v1.26 — Session persistence & user profile
+
+### `game/api.js`
+- `setToken(t)` now also writes the token to `localStorage` under the key `ps_auth_token`. Token persists across page refreshes.
+- `clearToken()` now also removes the token from `localStorage`.
+- New `restoreToken()` — reads the stored token, validates it against `GET /api/me`, returns the token string if valid, `null` otherwise (invalid/expired tokens are cleared automatically).
+- New profile helpers: `getProfile()`, `changeUsername()`, `changePassword()`, `changeEmail()` — wrappers for the new `PATCH /api/profile/*` endpoints.
+
+### `ui/auth.js`
+- `requireAuth()` is now `async`. Before showing the login overlay, it attempts `Api.restoreToken()`. If a valid stored session is found, the overlay is skipped entirely and the token is returned immediately — no login required on refresh.
+- Invite-link arrivals (`?invite=TOKEN`) still force the register tab as before; session restore is skipped in that case to avoid confusion.
+
+### `ui/profile.js` (new)
+- New `openProfile(Api, G, onLogout)` — renders a full-screen modal for account management:
+  - **Account section** — read-only display of username, email, and member-since date.
+  - **Finances section** — read-only balance, total earned, total invested, net P&L, and recruit count (fetched live from `GET /api/profile`).
+  - **Change username** — updates the username; swaps the stored JWT for the new token returned by the server (keeps the username claim in sync).
+  - **Change email** — update or clear email address.
+  - **Change password** — requires current password; validated client-side before submitting.
+  - **Log out** — clears token from memory and `localStorage`, then reloads the page.
+- Consistent with existing game aesthetic (dark background, gold monospace, `--gold` / `--tan` palette).
+
+### `main.js`
+- Imports and exposes `window.openProfile`.
+- After successful login the `◈ PROFILE` button in the title bar is made visible.
+
+### `index.html`
+- Added `◈ PROFILE` button (`#profile-btn`) to the right side of the title bar. Hidden until the user is authenticated.
+
+### `style.css`
+- `#title-bar` gains `position: relative` to anchor the absolutely-positioned profile button.
+
+---
+
 ## v1.25 — Backend owns payout config; client-side rate editor removed
+
 
 > *Payout parameters are no longer user-configurable in the frontend. The ⚙ TUNE RATES panel has been removed. On login, the frontend fetches the authoritative values from `GET /api/config` and uses them for all display and calculations.*
 

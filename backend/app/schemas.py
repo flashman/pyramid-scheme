@@ -120,3 +120,32 @@ class BuyInResponse(BaseModel):
     message:          str
     new_balance:      float
     new_invites_left: int
+
+
+# ── Profile ───────────────────────────────────────────────
+
+class ProfileResponse(BaseModel):
+    id:         int
+    username:   str
+    email:      str | None
+    balance:    float
+    earned:     float
+    invested:   float
+    recruits:   int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password:     str = Field(..., min_length=6, max_length=128)
+
+
+class ChangeUsernameRequest(BaseModel):
+    new_username: str = Field(..., min_length=3, max_length=32)
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: str | None = Field(default=None, max_length=128)

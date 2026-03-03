@@ -7,6 +7,7 @@ from app.config import settings
 from app.routers import auth, game, payments
 from app.routers import invites as invites_router
 from app.routers import ws as ws_router
+from app.routers import profile as profile_router
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ app.include_router(auth.router,           prefix="/api/auth", tags=["auth"])
 app.include_router(game.router,           prefix="/api",      tags=["game"])
 app.include_router(payments.router,       prefix="/api",      tags=["payments"])
 app.include_router(invites_router.router, prefix="/api",      tags=["invites"])
+app.include_router(profile_router.router, prefix="/api",      tags=["profile"])
 
 # ── WebSocket ─────────────────────────────────────────────
 app.include_router(ws_router.router, tags=["websocket"])

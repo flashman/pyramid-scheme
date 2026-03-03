@@ -1,6 +1,19 @@
 # Backend Changelog
 
+## 0.5.0 — Session persistence & user profile
+
+### Added
+- **`GET /api/profile`** — returns the authenticated user's full profile: `id`, `username`, `email`, `balance`, `earned`, `invested`, `recruits` count, and `created_at`. Useful for populating the new profile modal.
+- **`PATCH /api/profile/password`** — change password. Requires `current_password` (verified against stored hash) and `new_password` (min 6 chars). Returns `{ ok: true }`.
+- **`PATCH /api/profile/username`** — change username (uniqueness enforced). Returns `{ ok, new_token, username }` — the new JWT contains the updated username claim so the client can swap tokens without re-logging in.
+- **`PATCH /api/profile/email`** — change or clear email address (uniqueness enforced). Returns `{ ok, email }`.
+- **`app/routers/profile.py`** — new router registered at `/api` prefix.
+- **`app/schemas.py`** — added `ProfileResponse`, `ChangePasswordRequest`, `ChangeUsernameRequest`, `ChangeEmailRequest`.
+
+---
+
 ## 0.4.0 — Backend owns payout config; security & schema hardening
+
 
 ### Added
 - **`GET /api/config`** — exposes payout parameters (`entry_fee`, `platform_fee`, `d1_payout`, `decay`, `min_payout`) from `app/payout.py`. Frontend fetches this on login instead of using its own local copy, making the backend the single source of truth.

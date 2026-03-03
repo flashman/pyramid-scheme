@@ -129,11 +129,19 @@ const HTML = `
 
 // ── Logic ────────────────────────────────────────────────
 
-export function requireAuth() {
+export async function requireAuth() {
   // Read invite token from URL before showing the overlay.
   // If present, auto-switch to the register tab.
   const _urlParams   = new URLSearchParams(window.location.search);
   const _inviteToken = _urlParams.get('invite') || null;
+
+  // ── Try to restore an existing session ──────────────
+  // Skip the auth overlay entirely if a valid stored token exists.
+  // Don't attempt restore when arriving via an invite link (force register).
+  if (!_inviteToken) {
+    const restored = await Api.restoreToken();
+    if (restored) return restored;
+  }
 
   return new Promise((resolve) => {
     // Inject styles

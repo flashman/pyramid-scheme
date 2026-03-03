@@ -24,6 +24,7 @@ import { GND }                    from './worlds/earth/constants.js';
 import { LH }                     from './worlds/constants.js';
 import { requireAuth }            from './ui/auth.js';
 import { Api }                    from './game/api.js';
+import { openProfile }            from './ui/profile.js';
 
 // ── Realms ────────────────────────────────────────────────
 RealmManager
@@ -94,6 +95,7 @@ document.addEventListener('keyup', e => { G.keys[e.key] = false; });
 window.buyIn          = buyIn;
 window.recruitFriend  = recruitFriend;
 window.closeModal     = closeModal;
+window.openProfile    = () => openProfile(Api, G, () => window.location.reload());
 
 // ── Game loop ─────────────────────────────────────────────
 function gameLoop(ts) {
@@ -146,6 +148,10 @@ async function init() {
   if (token) {
     Api.setToken(token);
     G.isGuest = false;
+
+    // Show profile button in title bar
+    const profBtn = document.getElementById('profile-btn');
+    if (profBtn) profBtn.style.display = 'inline-block';
 
     // Fetch server-owned payout config first, then render the table.
     await loadConfig(Api);

@@ -45,7 +45,7 @@
 
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg-page);display:flex;flex-direction:column;align-items:center;min-height:100vh;font-family:'Press Start 2P',monospace;overflow-x:hidden}
-#title-bar{width:100%;background:var(--bg-dark);border-bottom:4px solid var(--gold-dim);padding:8px 0;text-align:center}
+#title-bar{width:100%;background:var(--bg-dark);border-bottom:4px solid var(--gold-dim);padding:8px 0;text-align:center;position:relative}
 #title-bar h1{color:var(--gold);font-size:15px;text-shadow:3px 3px 0 var(--amber-dark)}
 #title-bar .sub{color:var(--subtitle);font-size:6px;margin-top:3px}
 #game-wrapper{display:flex;width:100%;max-width:1140px;padding:8px;gap:0}
