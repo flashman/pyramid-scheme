@@ -15,6 +15,7 @@ import { Flags }                  from './engine/flags.js';
 import { WorldRealm }             from './worlds/earth/WorldRealm.js';
 import { ChamberRealm }           from './worlds/crypt/ChamberRealm.js';
 import { CouncilRealm }           from './worlds/council/CouncilRealm.js';
+import { OasisRealm }            from './worlds/oasis/OasisRealm.js';
 import { renderPayoutTable }      from './ui/config-editor.js';
 import { loadConfig }             from './game/config.js';
 import { updateStats, updateSlots, log } from './ui/panels.js';
@@ -30,7 +31,8 @@ import { openProfile }            from './ui/profile.js';
 RealmManager
   .register(new WorldRealm())
   .register(new ChamberRealm())
-  .register(new CouncilRealm());
+  .register(new CouncilRealm())
+  .register(new OasisRealm());
 
 // ── Quests ────────────────────────────────────────────────
 registerAllQuests();

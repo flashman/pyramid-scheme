@@ -2,6 +2,52 @@
 
 ---
 
+## v1.29 — The Sphinx & Oasis realm (full)
+
+> *A distant landmark shimmers on the horizon as you walk east. Press `[↑]` at the desert's edge to enter the Oasis — a golden-hour pocket of ancient life where a colossal sphinx speaks only in riddles. Solve them and the passage beyond begins to glow.*
+
+### `worlds/oasis/constants.js` (new)
+- World-space layout: `OASIS_FLOOR` (440), `OASIS_WORLD_W` (3000), `POOL_WX` (80), `POOL_WIDTH` (500), `SPHINX_WX` (1800), `POOL_FLOOR` (468, used when wading), `PASSAGE_WX` (1720, the hidden archway between the sphinx's paws).
+
+### `worlds/oasis/riddles.js` (new)
+- `RiddleManager` — canvas-rendered riddle system. No HTML elements; entirely self-contained.
+- Pool of 12 thematic riddles with single-word answers and accepted synonyms. Each correct answer delivers a lore response tying the riddle to the pyramid-scheme theme.
+- State machine: `reading` (typewriter) → `typing` (player types) → `wrong` / `correct` (lore response). Three attempts before the answer is gently revealed.
+- Tracks solved count via `Flags.inc('sphinx_riddles_solved')`.
+- **UI:** Rendered as a bottom dialogue panel (162px, flush sides, gold top-border) matching the `#dlg` aesthetic. The top 2/3 of the screen receives a soft darkener so the sphinx remains visible while answering. No more full-screen overlay.
+
+### `worlds/oasis/OasisRealm.js` (new)
+- `PhysicsRealm` subclass — full scrolling world with gravity, camera tracking, and jump (`Z` key). World is 3000px wide.
+- Player enters from world-x 60. Walking back to the west edge auto-returns to the main world.
+- **Pool wading:** entering `POOL_WX..POOL_WX+POOL_WIDTH` reduces movement speed to 55%, lowers the floor to `POOL_FLOOR` (player sinks slightly), reduces jump power, and spawns a blue water-droplet particle burst on entry and every jump.
+- **Hidden passage (`[↑]`):** once `sphinx_riddles_solved ≥ 1`, pressing `[↑]` near `PASSAGE_WX` triggers a gold-blaze → darkness passage transition back to the world, incrementing `Flags.passage_crossed`.
+- `[SPACE]` within 220px of `SPHINX_WX` starts a riddle.
+- Transition renderer `_passageTransRender(progress)` — radial gold blaze-in, then full-dark fade-out.
+
+### `worlds/oasis/draw/oasis.js` (new)
+- Full scrolling scene. Sky, stars, horizon dunes drawn screen-space; all ground objects under `X.translate(-camX, 0)`.
+- Pool (500px wide) with animated ripple rings. Accepts player world-x and riddles-solved count:
+  - **Player splash ripples** — expanding ellipse rings + V-shaped wake centered on player when wading.
+  - **Prophetic reflection** — 0 riddles: plain gold-sky reflection. 1+: impossible nighttime stars appear in the water. 2+: archway shimmer reflected. 3+: full golden-gate radial glow in the water.
+- Five palm trees with per-tree sway phase, trunk segments, frond leaflets.
+- Full-detail pixel-art sphinx (lion body, nemes headdress with alternating blue/gold stripes, uraeus cobra, kohl eye, royal beard, historically-accurate missing nose tip, ancient-power aura glow).
+- **Hidden passage** — dark archway void between the front paws, drawn when `sphinx_riddles_solved ≥ 1`. Interior glow scales with riddles solved. Floating light motes appear at 2+. Sand-spill glow from the passage mouth at 1+.
+- `[↑] ENTER THE PASSAGE` hint pulses when player is within 160px of `PASSAGE_WX` and has solved ≥1 riddle.
+
+### `worlds/earth/WorldRealm.js`
+- **Removed** auto-entry trigger in `update()`. Player is now clamped at the east edge.
+- Added `_oasisGateNear()` helper: `pZ === 0 && |px - OASIS_ENTRY_X| < 220`.
+- `render()`: pulsing `[↑] ENTER THE OASIS` hint appears when near the gate.
+- `ArrowUp` handler: highest-priority branch now checks `_oasisGateNear()` → `scheduleTransition('oasis', { duration: 1200, render: _oasisTransRender })`.
+- `_oasisTransRender(progress)` — heat-ripple band sweep + warm golden fade.
+
+### `worlds/earth/draw/background.js`
+- `_drawDistantSphinx()` — detailed parallax silhouette (paws, body, haunch, nemes headdress with stripes, cobra, head, eye). Parallax at 0.08× ground speed. Fades in from camX 2000.
+- **Scale fix:** distant sphinx now drawn at 35% via `ctx.scale()` transform anchored to its base — it was previously full-size (looming). Blur filter scales with distance (far = 2.2px blur; close = sharp).
+- Base Y fixed to sit on the sand horizon line (`desertTop + 72`) rather than floating above it.
+
+---
+
 ## v1.27 — Movement speed, jump key & physics fix
 
 ### `engine/realm.js`

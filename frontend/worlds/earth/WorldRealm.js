@@ -9,6 +9,7 @@ import { X, CW, CH }                      from '../../engine/canvas.js';
 import { COL }                            from '../../engine/colors.js';
 import { GND, WORLD_W, Z_LAYERS }         from './constants.js';
 import { SPEED, SPDHALF, LH }             from '../constants.js';
+import { OASIS_ENTRY_X }              from '../oasis/constants.js';
 import { spawnParts }                     from '../../draw/utils.js';
 import {
   surfAt, surfAtExcluding, canStep,
@@ -22,6 +23,35 @@ import { drawPyr }                        from './draw/pyramids.js';
 import { drawPharaoh }                    from '../../draw/pharaoh.js';
 import { drawParts, drawHUD, drawMinimap } from '../../draw/hud.js';
 import { log }                            from '../../ui/panels.js';
+
+// ── Oasis heat-shimmer transition renderer ────────────────
+// A warm golden haze that bleaches the screen as you step east.
+function _oasisTransRender(progress) {
+  const p = Math.min(1, progress * 1.4);
+  // Heat ripple bands
+  const numBands = 8;
+  for (let i = 0; i < numBands; i++) {
+    const bandY = (((i / numBands) + progress * 0.7) % 1) * CH;
+    const bandA = (1 - Math.abs(i / numBands - 0.5) * 2) * 0.18 * p;
+    X.save();
+    X.globalAlpha = bandA;
+    X.fillStyle = '#e8c060';
+    X.fillRect(0, bandY, CW, 18);
+    X.restore();
+  }
+  // Golden fade-to-white
+  X.save();
+  X.globalAlpha = Math.min(1, p * p * 1.1);
+  const hg = X.createLinearGradient(0, 0, 0, CH);
+  hg.addColorStop(0, '#d08020');
+  hg.addColorStop(0.5, '#f0d090');
+  hg.addColorStop(1, '#d08020');
+  X.fillStyle = hg;
+  X.fillRect(0, 0, CW, CH);
+  X.restore();
+}
+
+const OASIS_GATE_RANGE = 220;  // world-px around OASIS_ENTRY_X to show prompt
 
 // ── Launch transition animation renderer ─────────────────
 // Passed to RealmManager.scheduleTransition() as the `render` callback.
@@ -131,6 +161,10 @@ export class WorldRealm extends PhysicsRealm {
 
   // ── Positional helpers ────────────────────────────────
 
+  _oasisGateNear() {
+    return G.pZ === 0 && Math.abs(G.px - OASIS_ENTRY_X) < OASIS_GATE_RANGE;
+  }
+
   _cryptDoorNear() {
     const pp = G.pyramids.find(p => p.isPlayer);
     return G.pZ === -1 && G.py >= GND - 2 && pp && Math.abs(G.px - pp.wx) < 55;
@@ -196,6 +230,12 @@ export class WorldRealm extends PhysicsRealm {
     this.registry.updateEntities(ts);
     G.nearEntity = this.registry.update(G.px, G.py - 24);
     G.nearPyr    = nearbyFriendPyr(G.px);
+
+    // ── Oasis gate: clamp player at the east edge ─────────
+    // Don't auto-enter — player must press [↑] at the gate.
+    if (G.pZ === 0 && G.px > OASIS_ENTRY_X + OASIS_GATE_RANGE) {
+      G.px = OASIS_ENTRY_X + OASIS_GATE_RANGE;
+    }
   }
 
   // ── Render ────────────────────────────────────────────
@@ -218,19 +258,31 @@ export class WorldRealm extends PhysicsRealm {
 
     if (!RealmManager.isTransitioning && this._capstoneTipNear()) {
       const pp = G.pyramids.find(p => p.isPlayer);
-      const sx = Math.round(pp.wx - G.camX);
-      const ty = Math.round(GND - pp.layers * LH - G.camY) - 14;
+      const sx = pp ? Math.round(pp.wx - G.camX): CW / 2 ;
+      const ty = pp ?  Math.round(GND - pp.layers * LH - G.camY) - 14: CH / 2;
       X.save();
       X.globalAlpha = 0.65 + 0.35 * Math.abs(Math.sin(Date.now() / 480));
       X.fillStyle = COL.GOLD_BRIGHT; X.font = '6px monospace'; X.textAlign = 'center';
       X.fillText('[↑] ASCEND', sx, ty);
       X.textAlign = 'left'; X.restore();
     }
+
+    if (!RealmManager.isTransitioning && this._oasisGateNear()) {
+      const gx = Math.round(OASIS_ENTRY_X - G.camX);
+      X.save();
+      X.globalAlpha = 0.65 + 0.35 * Math.abs(Math.sin(Date.now() / 460));
+      X.fillStyle = '#f0c020'; X.font = '6px monospace'; X.textAlign = 'center';
+      X.fillText('[↑] ENTER THE OASIS', Math.max(80, Math.min(CW - 80, gx)), CH / 2 - 20);
+      X.textAlign = 'left'; X.restore();
+    }
+
   }
+
+
 
   // ── Input ─────────────────────────────────────────────
 
-  onKeyDown(key) {
+  onKeyDown(key){
     if (RealmManager.isTransitioning) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
 
@@ -248,6 +300,15 @@ export class WorldRealm extends PhysicsRealm {
     }
 
     if (key === 'ArrowUp' && G.bought) {
+      if (this._oasisGateNear()) {
+        RealmManager.scheduleTransition('oasis', {
+          duration: 1200,
+          render:   _oasisTransRender,
+        });
+        G.shake = 6;
+        log('The east wind pulls you forward.', '');
+        return true;
+      }
       if (Flags.get('crypt_open') && this._cryptDoorNear()) {
         RealmManager.transitionTo('chamber');
       } else if (this._capstoneTipNear()) {

@@ -26,10 +26,14 @@ Then open **http://localhost:8000** in your browser.
 |--------|-----|
 | Walk left / right | `← →` or `A / D` |
 | Step in front of pyramids (foreground layer) | `↓` |
-| Return to surface layer / enter doors / ascend | `↑` |
+| Return to surface layer / enter doors / ascend / enter oasis / enter passage | `↑` |
 | Interact / inspect / confirm dialogue | `Space` |
+| Speak to sphinx | `Space` (near sphinx) |
+| Answer riddle | Type + `Enter` |
 | Navigate dialogue choices | `↑ ↓` |
 | Skip dialogue text | `Space` (while text is printing) |
+| Jump (world + oasis) | `Z` |
+| Sprint | `Shift + ← →` |
 
 **The loop:**
 1. Click **BUY IN** ($10) to place your capstone and receive 4 invite scrolls.
@@ -40,6 +44,9 @@ Then open **http://localhost:8000** in your browser.
 6. Reach Pharaoh + meet all 7 gods → unlock the crypt beneath your pyramid.
 7. Speak to Sector Chief Ω-7 in the crypt. Accept the cosmic upline.
 8. Ascend from your capstone to the Galactic Council. Meet the Grand Archon. Accept Tier Omega.
+9. Walk east to the edge of the desert. Press `[↑]` to enter the Oasis.
+10. Wade through the pool (watch the reflection change). Walk to the great sphinx and press `[Space]` to receive a riddle.
+11. Answer correctly — with each solved riddle the passage between the sphinx's paws glows brighter. Solve at least one and press `[↑]` at the archway to step through.
 
 ---
 
@@ -103,11 +110,19 @@ pyramid-scheme/
     │   └── draw/
     │       └── chamber.js  # Crypt interior: stone walls, torches, hieroglyphs
     │
-    └── council/            # Galactic Council station (end-game)
-        ├── CouncilRealm.js # Council movement + Grand Archon Ω-1 dialogue
-        ├── constants.js    # Floor Y, NPC positions, Earth portal X
+    ├── council/            # Galactic Council station (end-game)
+    │   ├── CouncilRealm.js # Council movement + Grand Archon Ω-1 dialogue
+    │   ├── constants.js    # Floor Y, NPC positions, Earth portal X
+    │   └── draw/
+    │       └── council.js  # Space station interior: stars, columns, cosmic FX
+    │
+    └── oasis/              # The Oasis — east of the desert (sphinx realm)
+        ├── OasisRealm.js   # PhysicsRealm: scrolling world, pool wading, passage entry
+        ├── constants.js    # OASIS_FLOOR, POOL_WX/WIDTH/FLOOR, SPHINX_WX, PASSAGE_WX
+        ├── riddles.js      # RiddleManager: 12 riddles, typewriter, bottom-bar panel UI
         └── draw/
-            └── council.js  # Space station interior: stars, columns, cosmic FX
+            └── oasis.js    # Golden-hour sky, pool w/ prophetic reflection + player splash,
+                            #   palms, full-detail sphinx, hidden passage archway
 ```
 
 ---
@@ -184,9 +199,9 @@ See `worlds/WORLD_TEMPLATE.md` for a step-by-step guide. In short:
 
 - **Proper frontend/backend split** — move game state to a server, enable persistent sessions and real multiplayer recruitment chains.
 - Leaderboard / live recruit feed.
-- Additional realms and story content.
-- Mobile touch controls.
+- The passage beyond the sphinx — a second oasis, deeper desert, or stranger realm.
 - Sound effects and music.
+- Mobile touch controls.
 
 ---
 
