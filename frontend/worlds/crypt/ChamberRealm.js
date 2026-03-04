@@ -1,16 +1,16 @@
 // ── FILE: worlds/crypt/ChamberRealm.js ──────────────────
 
 import { G }                         from '../../game/state.js';
-import { Realm, RealmManager }       from '../../engine/realm.js';
-import { InteractableRegistry }      from '../../engine/interactables.js';
-import { NPC }                       from '../../engine/entity.js';
-import { Dialogue, DialogueManager } from '../../engine/dialogue.js';
-import { Flags, QuestManager }       from '../../engine/flags.js';
-import { Events }                    from '../../engine/events.js';
-import { SPEED }                     from '../constants.js';
-import { CHAMBER_FLOOR, CHIEF_X }   from './constants.js';
-import { drawChamber }               from './draw/chamber.js';
-import { log }                       from '../../ui/panels.js';
+import { RealmManager }               from '../../engine/realm.js';
+import { FlatRealm }                  from '../FlatRealm.js';
+import { InteractableRegistry }       from '../../engine/interactables.js';
+import { NPC }                        from '../../engine/entity.js';
+import { Dialogue, DialogueManager }  from '../../engine/dialogue.js';
+import { Flags, QuestManager }        from '../../engine/flags.js';
+import { Events }                     from '../../engine/events.js';
+import { CHAMBER_FLOOR, CHIEF_X }    from './constants.js';
+import { drawChamber }                from './draw/chamber.js';
+import { log }                        from '../../ui/panels.js';
 
 function _buildChiefDialogue() {
   return new Dialogue({
@@ -77,13 +77,10 @@ function _buildChiefDialogue() {
   });
 }
 
-export class ChamberRealm extends Realm {
+export class ChamberRealm extends FlatRealm {
   constructor() {
-    super('chamber', 'THE CRYPT');
-    this.px      = 120;
-    this.facing  = 1;
-    this.frame   = 0;
-    this.moving  = false;
+    super('chamber', 'THE CRYPT', { floor: CHAMBER_FLOOR, minX: 40, maxX: 740 });
+    this.px = 120;
 
     this.registry = new InteractableRegistry();
     this.chief    = new NPC('chief', CHIEF_X, CHAMBER_FLOOR, 'SECTOR CHIEF Ω-7', _buildChiefDialogue());
@@ -95,8 +92,7 @@ export class ChamberRealm extends Realm {
     this.px     = 120;
     this.facing = 1;
     this.moving = false;
-    this.frame  = 0;
-    G.shake = 6;
+    this.frame  = 0;    G.shake = 6;
     Flags.set('crypt_entered', true);
     QuestManager.check();
     log('⚡ You step through the crypt door...', 'hi');
@@ -109,14 +105,7 @@ export class ChamberRealm extends Realm {
 
   update(ts) {
     if (DialogueManager.isActive()) return;
-    let cdx = 0;
-    const speed = G.keys['Shift'] ? SPEED * 2 : SPEED;
-    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { cdx = -speed; this.facing = -1; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { cdx =  speed; this.facing =  1; }
-    this.moving = cdx !== 0;
-    this.px = Math.max(40, Math.min(780 - 40, this.px + cdx));
-    if (this.moving && ts - G.legT > 120) { G.legT = ts; this.frame = 1 - this.frame; }
-    else if (!this.moving) this.frame = 0;
+    this._walkStep(ts);
     this.registry.update(this.px, CHAMBER_FLOOR);
   }
 

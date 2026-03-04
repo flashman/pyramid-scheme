@@ -4,16 +4,16 @@
 // Grand Archon, supreme administrator of the cosmic pyramid scheme.
 
 import { G }                         from '../../game/state.js';
-import { Realm, RealmManager }       from '../../engine/realm.js';
-import { InteractableRegistry }      from '../../engine/interactables.js';
-import { NPC }                       from '../../engine/entity.js';
-import { Dialogue, DialogueManager } from '../../engine/dialogue.js';
-import { Flags, QuestManager }       from '../../engine/flags.js';
-import { SPEED }                     from '../constants.js';
-import { CW, X, CH }                 from '../../engine/canvas.js';
+import { RealmManager }               from '../../engine/realm.js';
+import { FlatRealm }                  from '../FlatRealm.js';
+import { InteractableRegistry }       from '../../engine/interactables.js';
+import { NPC }                        from '../../engine/entity.js';
+import { Dialogue, DialogueManager }  from '../../engine/dialogue.js';
+import { Flags, QuestManager }        from '../../engine/flags.js';
+import { CW }                         from '../../engine/canvas.js';
 import { COUNCIL_FLOOR, COUNCIL_ARCHON_X, COUNCIL_PORTAL_X } from './constants.js';
-import { drawCouncil }               from './draw/council.js';
-import { log }                       from '../../ui/panels.js';
+import { drawCouncil }                from './draw/council.js';
+import { log }                        from '../../ui/panels.js';
 
 function _buildArchonDialogue() {
   return new Dialogue({
@@ -136,14 +136,9 @@ function _buildArchonDialogue() {
   });
 }
 
-// ── CouncilRealm ─────────────────────────────────────────
-export class CouncilRealm extends Realm {
+export class CouncilRealm extends FlatRealm {
   constructor() {
-    super('council', 'GALACTIC COUNCIL');
-    this.px      = COUNCIL_PORTAL_X + 80;
-    this.facing  = 1;
-    this.frame   = 0;
-    this.moving  = false;
+    super('council', 'GALACTIC COUNCIL', { floor: COUNCIL_FLOOR, minX: 60, maxX: CW - 60 });
 
     this.registry = new InteractableRegistry();
     this.archon   = new NPC('archon', COUNCIL_ARCHON_X, COUNCIL_FLOOR,
@@ -173,17 +168,7 @@ export class CouncilRealm extends Realm {
   update(ts) {
     if (DialogueManager.isActive()) return;
     if (RealmManager.isTransitioning) return;
-
-    let cdx = 0;
-    const speed = G.keys['Shift'] ? SPEED * 2 : SPEED;
-    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { cdx = -speed; this.facing = -1; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { cdx =  speed; this.facing =  1; }
-    this.moving = cdx !== 0;
-    this.px = Math.max(60, Math.min(CW - 60, this.px + cdx));
-
-    if (this.moving && ts - G.legT > 120) { G.legT = ts; this.frame = 1 - this.frame; }
-    else if (!this.moving) this.frame = 0;
-
+    this._walkStep(ts);
     this.registry.update(this.px, COUNCIL_FLOOR);
   }
 

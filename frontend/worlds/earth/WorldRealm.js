@@ -9,7 +9,8 @@ import { X, CW, CH }                      from '../../engine/canvas.js';
 import { COL }                            from '../../engine/colors.js';
 import { GND, WORLD_W, Z_LAYERS }         from './constants.js';
 import { SPEED, SPDHALF, LH }             from '../constants.js';
-import { OASIS_ENTRY_X }              from '../oasis/constants.js';
+import { OASIS_ENTRY_X }                  from '../oasis/constants.js';
+import { oasisTransRender, launchTransRender } from '../transitions.js';
 import { spawnParts }                     from '../../draw/utils.js';
 import {
   surfAt, surfAtExcluding, canStep,
@@ -24,91 +25,7 @@ import { drawPharaoh }                    from '../../draw/pharaoh.js';
 import { drawParts, drawHUD, drawMinimap } from '../../draw/hud.js';
 import { log }                            from '../../ui/panels.js';
 
-// ── Oasis heat-shimmer transition renderer ────────────────
-// A warm golden haze that bleaches the screen as you step east.
-function _oasisTransRender(progress) {
-  const p = Math.min(1, progress * 1.4);
-  // Heat ripple bands
-  const numBands = 8;
-  for (let i = 0; i < numBands; i++) {
-    const bandY = (((i / numBands) + progress * 0.7) % 1) * CH;
-    const bandA = (1 - Math.abs(i / numBands - 0.5) * 2) * 0.18 * p;
-    X.save();
-    X.globalAlpha = bandA;
-    X.fillStyle = '#e8c060';
-    X.fillRect(0, bandY, CW, 18);
-    X.restore();
-  }
-  // Golden fade-to-white
-  X.save();
-  X.globalAlpha = Math.min(1, p * p * 1.1);
-  const hg = X.createLinearGradient(0, 0, 0, CH);
-  hg.addColorStop(0, '#d08020');
-  hg.addColorStop(0.5, '#f0d090');
-  hg.addColorStop(1, '#d08020');
-  X.fillStyle = hg;
-  X.fillRect(0, 0, CW, CH);
-  X.restore();
-}
-
 const OASIS_GATE_RANGE = 220;  // world-px around OASIS_ENTRY_X to show prompt
-
-// ── Launch transition animation renderer ─────────────────
-// Passed to RealmManager.scheduleTransition() as the `render` callback.
-
-function _launchAnimRender(progress) {
-  const pp  = G.pyramids.find(p => p.isPlayer);
-  const cx  = pp ? Math.round(pp.wx - G.camX) : CW / 2;
-  const cy  = pp ? Math.round(GND - pp.layers * LH - G.camY) : CH / 2;
-  const elapsed = progress * 2600;
-
-  if (elapsed < 1000) {
-    const pct = elapsed / 1000;
-    for (let r = 0; r < 7; r++) {
-      const rp = ((r / 7) + pct * 1.8) % 1;
-      X.save(); X.globalAlpha = (1 - rp) * 0.55;
-      X.strokeStyle = r % 2 === 0 ? COL.GOLD : COL.GOLD_BRIGHT;
-      X.lineWidth = 2;
-      X.beginPath(); X.arc(cx, cy, rp * 360 + 8, 0, Math.PI * 2); X.stroke();
-      X.restore();
-    }
-    X.save(); X.globalAlpha = 0.25 + 0.2 * pct;
-    const cg = X.createRadialGradient(cx, cy, 0, cx, cy, 70);
-    cg.addColorStop(0, COL.GOLD_BRIGHT); cg.addColorStop(1, 'transparent');
-    X.fillStyle = cg; X.fillRect(cx - 70, cy - 70, 140, 140); X.restore();
-  } else if (elapsed < 2200) {
-    const pct = (elapsed - 1000) / 1200;
-    X.save(); X.globalAlpha = Math.min(1, pct * 1.4);
-    X.fillStyle = '#000000'; X.fillRect(0, 0, CW, CH); X.restore();
-    for (let line = 0; line < 24; line++) {
-      const angle  = (line / 24) * Math.PI * 2;
-      const startR = 6 + pct * 40;
-      const len    = 60 + pct * 500;
-      X.save();
-      X.globalAlpha = (0.7 - pct * 0.3) * (line % 3 === 0 ? 1.0 : 0.45);
-      X.strokeStyle = line % 4 === 0 ? COL.GOLD_BRIGHT : line % 4 === 1 ? '#aa44ff' : '#ffffff';
-      X.lineWidth   = line % 5 === 0 ? 2 : 1;
-      X.beginPath();
-      X.moveTo(cx + Math.cos(angle) * startR,       cy + Math.sin(angle) * startR);
-      X.lineTo(cx + Math.cos(angle) * (startR+len), cy + Math.sin(angle) * (startR+len));
-      X.stroke(); X.restore();
-    }
-    if (pct > 0.4) {
-      X.save(); X.globalAlpha = (pct - 0.4) * 0.8;
-      X.fillStyle = '#ffffff';
-      for (let s = 0; s < 30; s++) {
-        const a = (s / 30) * Math.PI * 2;
-        const d = 80 + ((s * 37) % 200);
-        X.fillRect(Math.round(cx + Math.cos(a) * d), Math.round(cy + Math.sin(a) * d), 2, 2);
-      }
-      X.restore();
-    }
-  } else {
-    const pct = Math.min(1, (elapsed - 2200) / 400);
-    X.save(); X.globalAlpha = pct;
-    X.fillStyle = '#ffffff'; X.fillRect(0, 0, CW, CH); X.restore();
-  }
-}
 
 // ── WorldRealm ────────────────────────────────────────────
 
@@ -279,7 +196,6 @@ export class WorldRealm extends PhysicsRealm {
   }
 
 
-
   // ── Input ─────────────────────────────────────────────
 
   onKeyDown(key){
@@ -303,7 +219,7 @@ export class WorldRealm extends PhysicsRealm {
       if (this._oasisGateNear()) {
         RealmManager.scheduleTransition('oasis', {
           duration: 1200,
-          render:   _oasisTransRender,
+          render:   oasisTransRender,
         });
         G.shake = 6;
         log('The east wind pulls you forward.', '');
@@ -314,7 +230,7 @@ export class WorldRealm extends PhysicsRealm {
       } else if (this._capstoneTipNear()) {
         RealmManager.scheduleTransition('council', {
           duration: 2600,
-          render:   _launchAnimRender,
+          render:   launchTransRender,
         });
         G.shake = 12;
         spawnParts(G.px, G.py - 10, COL.GOLD_BRIGHT, 50);

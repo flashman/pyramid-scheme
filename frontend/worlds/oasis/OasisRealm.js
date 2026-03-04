@@ -12,13 +12,12 @@ import { OASIS_FLOOR, OASIS_WORLD_W,
          POOL_FLOOR,
          SPHINX_WX, PASSAGE_WX,
          POOL_WX, POOL_WIDTH }       from './constants.js';
+import { vaultTransRender }          from '../transitions.js';
 import { drawOasis }                 from './draw/oasis.js';
 import { RiddleManager }             from './riddles.js';
 import { log }                       from '../../ui/panels.js';
 
 const INTERACT_RANGE = 220;  // world-px from SPHINX_WX center to trigger riddle
-
-// ── Splash particle burst ─────────────────────────────────
 // Spawns water droplets stored in G.particles (world-space).
 function _spawnSplash(wx, wy) {
   for (let i = 0; i < 14; i++) {
@@ -33,31 +32,6 @@ function _spawnSplash(wx, wy) {
   }
 }
 
-// ── Passage transition renderer ───────────────────────────
-// Golden blaze, then darkness, like stepping through a veil.
-function _passageTransRender(progress) {
-  const p = Math.min(1, progress);
-  if (p < 0.5) {
-    // Blaze in
-    X.save();
-    X.globalAlpha = p * 2;
-    const cg = X.createRadialGradient(CW / 2, CH / 2, 0, CW / 2, CH / 2, CW * 0.7);
-    cg.addColorStop(0.0, '#ffffff');
-    cg.addColorStop(0.3, '#f8e870');
-    cg.addColorStop(0.7, '#c06010');
-    cg.addColorStop(1.0, '#060200');
-    X.fillStyle = cg;
-    X.fillRect(0, 0, CW, CH);
-    X.restore();
-  } else {
-    // Fade to dark
-    X.save();
-    X.globalAlpha = (p - 0.5) * 2;
-    X.fillStyle = '#020100';
-    X.fillRect(0, 0, CW, CH);
-    X.restore();
-  }
-}
 
 export class OasisRealm extends PhysicsRealm {
   constructor() {
@@ -77,23 +51,31 @@ export class OasisRealm extends PhysicsRealm {
     this._wasInPool = false;
   }
 
-  onEnter() {
-    this.px       = 60;
+  onEnter(fromId) {
+    // Coming back up from the vault — spawn near the staircase, facing west.
+    const fromVault = fromId === 'vault';
+    this.px       = fromVault ? PASSAGE_WX + 20 : 60;
     this.py       = OASIS_FLOOR;
     this.pvy      = 0;
-    this.camX     = 0;
-    this.facing   = 1;
+    this.camX     = fromVault
+      ? Math.max(0, Math.min(OASIS_WORLD_W - 800, PASSAGE_WX - 400))
+      : 0;
+    this.facing   = fromVault ? -1 : 1;
     this.moving   = false;
     this.frame    = 0;
     this._wasInPool = false;
-    G.shake     = 3;
+    G.shake     = fromVault ? 4 : 3;
     Flags.set('oasis_entered', true);
-    log('✦ The air stills. An oasis opens before you.', 'hi');
-    if (!Flags.get('sphinx_spoken')) {
-      setTimeout(() => {
-        log('A colossal stone face watches from the east.', '');
-        log('Walk toward it and press [SPACE] to speak.', '');
-      }, 800);
+    if (fromVault) {
+      log('✦ You climb back into the light.', 'hi');
+    } else {
+      log('✦ The air stills. An oasis opens before you.', 'hi');
+      if (!Flags.get('sphinx_spoken')) {
+        setTimeout(() => {
+          log('A colossal stone face watches from the east.', '');
+          log('Walk toward it and press [SPACE] to speak.', '');
+        }, 800);
+      }
     }
   }
 
@@ -176,7 +158,7 @@ export class OasisRealm extends PhysicsRealm {
         G.shake = 8;
         RealmManager.scheduleTransition('vault', {
           duration: 1400,
-          render:   _passageTransRender,
+          render:   vaultTransRender,
         });
         Flags.inc('passage_crossed');
         return true;

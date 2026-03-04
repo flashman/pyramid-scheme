@@ -1,21 +1,21 @@
 // ── FILE: worlds/oasis/VaultRealm.js ────────────────────
 // The sealed chamber beneath the great sphinx.
-// Contains the Dream Stele of Thutmose IV — and its implications.
+// This place is wrong. Something has been happening here for a long time.
 
 import { G }                         from '../../game/state.js';
-import { Realm, RealmManager }       from '../../engine/realm.js';
+import { RealmManager }              from '../../engine/realm.js';
+import { FlatRealm }                 from '../FlatRealm.js';
 import { InteractableRegistry }      from '../../engine/interactables.js';
 import { NPC }                       from '../../engine/entity.js';
 import { Dialogue, DialogueManager } from '../../engine/dialogue.js';
 import { Flags, QuestManager }       from '../../engine/flags.js';
-import { SPEED }                     from '../constants.js';
+import { vaultTransRender }          from '../transitions.js';
 import { VAULT_FLOOR, STELE_X }      from './constants.js';
 import { drawVault }                 from './draw/vault.js';
 import { log }                       from '../../ui/panels.js';
 
 // ── Dream Stele inscription ───────────────────────────────
 // Based on the real stele of Thutmose IV (~1400 BC), repurposed.
-// The stele records the sphinx's promise — and what it omits.
 
 function _buildSteleDialogue() {
   return new Dialogue({
@@ -62,13 +62,10 @@ function _buildSteleDialogue() {
   });
 }
 
-export class VaultRealm extends Realm {
+export class VaultRealm extends FlatRealm {
   constructor() {
-    super('vault', 'BENEATH THE SPHINX');
-    this.px      = 350;
-    this.facing  = 1;
-    this.frame   = 0;
-    this.moving  = false;
+    super('vault', 'BENEATH THE SPHINX', { floor: VAULT_FLOOR, minX: 40, maxX: 740 });
+    this.px       = 190;  // near the staircase entrance
 
     this.registry = new InteractableRegistry();
     this._stele   = new NPC('stele', STELE_X, VAULT_FLOOR, 'DREAM STELE', _buildSteleDialogue());
@@ -77,35 +74,29 @@ export class VaultRealm extends Realm {
   }
 
   onEnter(fromId) {
-    this.px     = 350;
+    this.px     = 190;
     this.facing = 1;
     this.moving = false;
     this.frame  = 0;
-    G.shake = 5;
+    G.shake = 6;
     Flags.set('vault_entered', true);
     log('✦ You descend beneath the sphinx.', 'hi');
     if (!Flags.get('stele_read')) {
       setTimeout(() => {
-        log('A great stone stands at the center.', '');
+        log('Something has been done here. Repeatedly.', '');
+        log('A great stone stands at the far end.', '');
         log('Press [SPACE] to read the inscription.', '');
       }, 900);
     }
   }
 
   onExit() {
-    G.shake = 3;
+    G.shake = 4;
   }
 
   update(ts) {
     if (DialogueManager.isActive()) return;
-    let dx = 0;
-    const speed = G.keys['Shift'] ? SPEED * 2 : SPEED;
-    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { dx = -speed; this.facing = -1; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  speed; this.facing =  1; }
-    this.moving = dx !== 0;
-    this.px = Math.max(40, Math.min(740, this.px + dx));
-    if (this.moving && ts - G.legT > 120) { G.legT = ts; this.frame = 1 - this.frame; }
-    else if (!this.moving) this.frame = 0;
+    this._walkStep(ts);
     this.registry.update(this.px, VAULT_FLOOR);
   }
 
@@ -117,7 +108,10 @@ export class VaultRealm extends Realm {
   onKeyDown(key) {
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
     if (key === 'ArrowUp') {
-      RealmManager.transitionTo('oasis');
+      RealmManager.scheduleTransition('oasis', {
+        duration: 1000,
+        render: vaultTransRender,
+      });
       return true;
     }
     if (key === ' ') return this.registry.interact();

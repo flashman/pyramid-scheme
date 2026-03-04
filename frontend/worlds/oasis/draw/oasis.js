@@ -315,6 +315,13 @@ function drawSphinx(cx, fy, t, riddlesSolved) {
   const GOLD     = '#f0c020';
   const BLUE     = '#1848a0';
 
+  // ── Full stone undercoat ─────────────────────────────────
+  // Painted first so that any pixel gap between individual parts
+  // shows sphinx-stone rather than sky or sand.  Covers the entire
+  // lower footprint (paws + body + haunches) in one pass.
+  X.fillStyle = STONE;
+  X.fillRect(s(cx - 215), s(fy - 175), 455, 175);
+
   // Shadow on sand
   X.save();
   X.globalAlpha = 0.40;
