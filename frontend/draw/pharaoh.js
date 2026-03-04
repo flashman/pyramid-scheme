@@ -6,7 +6,7 @@ import { X, CW, CH }                from '../engine/canvas.js';
 import { COL }                      from '../engine/colors.js';
 import { CHAMBER_FLOOR }            from '../worlds/crypt/constants.js';
 import { COUNCIL_FLOOR }            from '../worlds/council/constants.js';
-import { OASIS_FLOOR }             from '../worlds/oasis/constants.js';
+import { OASIS_FLOOR, VAULT_FLOOR } from '../worlds/oasis/constants.js';
 import { getTier }                  from '../game/tiers.js';
 
 export function drawPharaoh(pose) {
@@ -104,6 +104,13 @@ export function drawCouncilPharaoh(realm) {
 export function drawOasisPharaoh(realm) {
   drawPharaoh({
     px: realm.px, py: OASIS_FLOOR, camX: 0,
+    pZ: 0, facing: realm.facing, frame: realm.frame,
+  });
+}
+
+export function drawVaultPharaoh(realm) {
+  drawPharaoh({
+    px: realm.px, py: VAULT_FLOOR, camX: 0,
     pZ: 0, facing: realm.facing, frame: realm.frame,
   });
 }

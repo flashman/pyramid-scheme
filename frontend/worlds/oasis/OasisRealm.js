@@ -168,13 +168,13 @@ export class OasisRealm extends PhysicsRealm {
       }
     }
 
-    // Enter hidden passage beyond the sphinx
-    if (key === 'ArrowUp') {
+    // Enter vault — descend the staircase between the sphinx paws
+    if (key === 'ArrowDown') {
       const riddlesSolved = Flags.get('sphinx_riddles_solved') || 0;
-      if (riddlesSolved >= 1 && Math.abs(this.px - PASSAGE_WX) < 160) {
-        log('✦ You step through the passage. The desert waits, changed.', 'hi');
+      if (riddlesSolved >= 1 && Math.abs(this.px - PASSAGE_WX) < 100) {
+        log('✦ You descend the stone steps beneath the sphinx.', 'hi');
         G.shake = 8;
-        RealmManager.scheduleTransition('world', {
+        RealmManager.scheduleTransition('vault', {
           duration: 1400,
           render:   _passageTransRender,
         });

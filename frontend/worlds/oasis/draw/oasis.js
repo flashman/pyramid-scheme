@@ -457,70 +457,98 @@ function drawSphinx(cx, fy, t, riddlesSolved) {
   X.fillStyle = STONE;
   X.fillRect(s(cx - 125), s(fy - 210), 18, 12);
 
-  // ── Hidden passage between the paws ─────────────────────
-  // Revealed after solving at least 1 riddle.
-  // The archway is always structurally there — the riddles reveal the light.
+  // ── Solid paw base — always present ──────────────────────
+  // Fills the gap between the front paws and body so the dark background
+  // never shows through, regardless of riddles solved.
+  const pbx = s(cx - 154);
+  const pbw = 90;
+  X.fillStyle = STONE_DK;
+  X.fillRect(pbx, s(fy - 66), pbw, 66);
+  X.fillStyle = STONE;
+  X.fillRect(pbx + 3, s(fy - 64), pbw - 6, 62);
+  X.fillStyle = STONE_LT;
+  X.fillRect(pbx + 3, s(fy - 64), pbw - 6, 5);
+  // Horizontal mortar lines — looks like stone masonry
+  X.fillStyle = STONE_SH;
+  X.fillRect(pbx + 3, s(fy - 42), pbw - 6, 1);
+  X.fillRect(pbx + 3, s(fy - 22), pbw - 6, 1);
+  // Side shadow recesses
+  X.fillStyle = STONE_SH;
+  X.fillRect(pbx, s(fy - 66), 3, 66);
+  X.fillRect(pbx + pbw - 3, s(fy - 66), 3, 66);
+
+  // ── Vault staircase between the paws ─────────────────────
+  // Revealed after solving the first riddle. Descends into the chamber below.
   if (riddlesSolved > 0) {
-    const ax  = s(cx - 148);   // archway left edge (between paw slab and body)
-    const aw  = 72;            // archway width
-    const ah  = 60;            // archway height
-    const ay  = s(fy - ah);   // archway top
+    const ax  = s(cx - 148);
+    const aw  = 72;
 
-    // Dark interior void — the passage itself
-    X.fillStyle = '#050200';
-    X.fillRect(ax, ay, aw, ah);
-
-    // Arch curve at top (rough pixel arch)
-    const archMid = ax + aw / 2;
-    const archR   = aw / 2;
-    X.fillStyle = '#050200';
-    X.beginPath();
-    X.arc(archMid, ay, archR, Math.PI, 0, false);
-    X.fill();
-
-    // Stone lintel above arch
+    // Stone lintel / threshold header
     X.fillStyle = STONE;
-    X.fillRect(ax - 4, ay - 8, aw + 8, 10);
+    X.fillRect(ax - 6, s(fy - 64), aw + 12, 8);
     X.fillStyle = STONE_LT;
-    X.fillRect(ax - 4, ay - 8, aw + 8, 3);
+    X.fillRect(ax - 6, s(fy - 64), aw + 12, 2);
+    X.fillStyle = STONE_DK;
+    X.fillRect(ax - 6, s(fy - 57), aw + 12, 1);
 
-    // Glowing light within the passage — scales with riddles solved
-    const glowA = Math.min(0.85, (riddlesSolved / 3) * 0.85) * (0.88 + 0.12 * Math.sin(t / 700));
+    // Dark shaft opening
+    X.fillStyle = '#050200';
+    X.fillRect(ax, s(fy - 56), aw, 56);
+
+    // Steps — 5, each 10px, narrowing with depth (perspective)
+    for (let step = 0; step < 5; step++) {
+      const indent = step * 5;
+      const sw     = aw - indent * 2;
+      const sx2    = ax + indent;
+      const sy2    = s(fy - 52) + step * 10;
+      // Step riser (front face — lighter)
+      X.fillStyle = step % 2 === 0 ? STONE : STONE_SH;
+      X.fillRect(sx2, sy2, sw, 3);
+      // Step tread (top surface — dark from above)
+      X.fillStyle = STONE_DK;
+      X.fillRect(sx2, sy2 + 3, sw, 7);
+      // Step leading edge shadow
+      X.fillStyle = '#050200';
+      X.fillRect(sx2, sy2 + 9, sw, 1);
+    }
+
+    // Warm amber glow rising from the vault below — grows with riddles solved
+    const glowA = Math.min(0.75, (riddlesSolved / 3) * 0.75)
+                * (0.88 + 0.12 * Math.sin(t / 700));
     X.save();
     X.globalAlpha = glowA;
-    const ig = X.createRadialGradient(archMid, ay + ah * 0.5, 4, archMid, ay + ah * 0.5, archR + 10);
-    ig.addColorStop(0.0, '#ffffff');
-    ig.addColorStop(0.3, '#f8e890');
-    ig.addColorStop(0.7, '#c08820');
-    ig.addColorStop(1.0, 'transparent');
+    const ig = X.createLinearGradient(ax, s(fy - 56), ax, s(fy));
+    ig.addColorStop(0.0, 'transparent');
+    ig.addColorStop(0.5, '#a06018');
+    ig.addColorStop(1.0, '#f0d060');
     X.fillStyle = ig;
-    X.fillRect(ax - 14, ay - 14, aw + 28, ah + 28);
+    X.fillRect(ax, s(fy - 56), aw, 56);
     X.restore();
 
-    // Floating motes / dust in the light
+    // Dust motes rising from below (riddles >= 2)
     if (riddlesSolved >= 2) {
       X.save();
-      for (let m = 0; m < 8; m++) {
-        const mx = archMid + Math.sin(t / 800 + m * 0.9) * (archR * 0.6);
-        const my = ay + (((t / 1200 + m * 0.13) % 1)) * ah;
-        X.globalAlpha = 0.45 * Math.abs(Math.sin(t / 600 + m * 1.7));
+      for (let m = 0; m < 6; m++) {
+        const mxOff = 8 + (m * 11) % (aw - 16);
+        const myPct = 1 - ((t / 1400 + m * 0.16) % 1);
+        const my2   = s(fy) - myPct * 50;
+        if (my2 < s(fy - 56)) continue;
+        X.globalAlpha = 0.5 * myPct * Math.abs(Math.sin(t / 500 + m));
         X.fillStyle = '#ffe0a0';
-        X.fillRect(mx, my, 2, 2);
+        X.fillRect(ax + mxOff, my2, 2, 2);
       }
       X.restore();
     }
 
-    // Glow spill onto sand in front of passage
-    if (riddlesSolved >= 1) {
-      X.save();
-      X.globalAlpha = 0.12 * glowA;
-      const sg = X.createLinearGradient(ax, fy, ax + aw, fy + 30);
-      sg.addColorStop(0, '#f0d060');
-      sg.addColorStop(1, 'transparent');
-      X.fillStyle = sg;
-      X.fillRect(ax - 8, fy, aw + 16, 30);
-      X.restore();
-    }
+    // Glow spill onto sand at staircase opening
+    X.save();
+    X.globalAlpha = 0.10 * glowA;
+    const sg = X.createLinearGradient(ax, s(fy - 6), ax, s(fy + 24));
+    sg.addColorStop(0, '#f0d060');
+    sg.addColorStop(1, 'transparent');
+    X.fillStyle = sg;
+    X.fillRect(ax - 6, s(fy - 6), aw + 12, 30);
+    X.restore();
   }
 
   // ── Ancient power glow ────────────────────────────────────
@@ -578,7 +606,7 @@ function drawPassageHint(worldPx, camX, t, riddlesSolved) {
   if (riddlesSolved < 1) return;
   if (RiddleManager.isActive()) return;
   const passageScreenX = Math.round(PASSAGE_WX - camX);
-  if (Math.abs(worldPx - PASSAGE_WX) > 160) return;
+  if (Math.abs(worldPx - PASSAGE_WX) > 100) return;
 
   const ha = 0.5 + 0.5 * Math.abs(Math.sin(t / 480));
   X.save();
@@ -586,7 +614,7 @@ function drawPassageHint(worldPx, camX, t, riddlesSolved) {
   X.font = '6px monospace';
   X.textAlign = 'center';
   X.fillStyle = '#f8e890';
-  X.fillText('[↑] ENTER THE PASSAGE', Math.max(100, Math.min(CW - 100, passageScreenX)), CH - 210);
+  X.fillText('[↓] DESCEND INTO THE VAULT', Math.max(100, Math.min(CW - 100, passageScreenX)), CH - 210);
   X.textAlign = 'left';
   X.restore();
 }
@@ -613,11 +641,13 @@ export function drawOasis(realm) {
   const playerInPool = realm.px >= POOL_WX && realm.px <= POOL_WX + POOL_WIDTH;
   drawPool(t, playerInPool ? realm.px : undefined, riddlesSolved);
 
-  // Palms clustered around and behind the pool
-  drawPalm(POOL_WX - 18,               OASIS_FLOOR, 1.0, t, 0.0);
-  drawPalm(POOL_WX + 80,               OASIS_FLOOR, 1.2, t, 1.5);
-  drawPalm(POOL_WX + 200,              OASIS_FLOOR, 0.9, t, 2.8);
-  drawPalm(POOL_WX + POOL_WIDTH - 80,  OASIS_FLOOR, 1.1, t, 0.7);
+  // Palms — a few early lone trees on the dry entry stretch, then clustered around pool
+  drawPalm(210,                         OASIS_FLOOR, 0.75, t, 0.8);
+  drawPalm(430,                         OASIS_FLOOR, 0.65, t, 2.2);
+  drawPalm(POOL_WX - 18,               OASIS_FLOOR, 1.0,  t, 0.0);
+  drawPalm(POOL_WX + 80,               OASIS_FLOOR, 1.2,  t, 1.5);
+  drawPalm(POOL_WX + 200,              OASIS_FLOOR, 0.9,  t, 2.8);
+  drawPalm(POOL_WX + POOL_WIDTH - 80,  OASIS_FLOOR, 1.1,  t, 0.7);
   drawPalm(POOL_WX + POOL_WIDTH + 30,  OASIS_FLOOR, 0.85, t, 3.5);
 
   // Sphinx far to the east — pass riddles solved for passage reveal

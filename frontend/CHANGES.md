@@ -2,7 +2,50 @@
 
 ---
 
-## v1.29 — The Sphinx & Oasis realm (full)
+## v1.30 — Vault beneath the sphinx; paw gap fix; pool repositioned
+
+### `worlds/oasis/constants.js`
+- `POOL_WX` moved from 80 → 620. Pool is now a destination you walk to, not a wall at the entry. Player spawns on dry sand at x=60, walks ~560px before reaching the water.
+- `POOL_WIDTH` reduced 500 → 360.
+- Added `VAULT_FLOOR = 436`, `STELE_X = 390` for the new vault realm.
+- `PASSAGE_WX` tightened 1720 → 1680 (centers on the staircase opening).
+
+### `worlds/oasis/draw/oasis.js`
+- **Paw gap fix:** a solid stone masonry base is now always drawn in the area between the sphinx's front paws. Horizontal mortar lines and edge recesses make it read as a continuous stone surface. No dark gap is visible before any riddles are solved.
+- **Staircase replaces archway:** when `riddlesSolved > 0`, the masonry base gives way to a descending staircase — 5 steps narrowing with perspective, warm amber glow rising from below, dust motes at riddles ≥ 2. Looks like it leads somewhere rather than through somewhere.
+- **Pool reflection updated:** archway shimmer in pool replaced with vault-glow shimmer (same riddle thresholds, same prophetic effect).
+- **Two early palms added** at x=210 and x=430 to populate the now-longer dry entry stretch.
+- **Passage hint** updated to `[↓] DESCEND INTO THE VAULT`.
+
+### `worlds/oasis/OasisRealm.js`
+- Passage entry key changed `ArrowUp` → `ArrowDown` (descending a staircase).
+- Transition target changed `'world'` → `'vault'`.
+- Detection range tightened 160 → 100px.
+- Log message updated.
+
+### `worlds/oasis/VaultRealm.js` (new)
+- Flat `Realm` subclass (no physics). Player walks freely left/right (40–740px).
+- Contains the Dream Stele NPC at `STELE_X=390` with 110px interact range.
+- `[SPACE]` triggers the stele dialogue. `[↑]` returns to oasis.
+- Sets `Flags.vault_entered` on entry, `Flags.stele_read` when dialogue completes.
+
+### `worlds/oasis/draw/vault.js` (new)
+- Underground stone chamber: warm amber/brown, low ceiling with block joints, left + right carved stone walls.
+- Ceiling staircase opening (top-left) with oasis light leaking down.
+- Two pairs of flickering torches with per-torch flicker phase.
+- Floor stone slabs with sand drifts at both walls.
+- Hieroglyph panels on walls: eye of Horus, ankh, pyramid, ibis, wavy water lines.
+- **Dream Stele** centered at `STELE_X`: granite tablet with lunette top, four carved register scenes (pharaoh offering, text lines, dream figure, throne glyph). Glows faintly after being read.
+- Scattered clay offerings and canopic jars at stele base.
+
+### `draw/pharaoh.js`
+- Added `drawVaultPharaoh(realm)` — renders player at `VAULT_FLOOR`.
+- Added `VAULT_FLOOR` import from oasis constants.
+
+### `main.js`
+- Imports and registers `VaultRealm`.
+
+
 
 > *A distant landmark shimmers on the horizon as you walk east. Press `[↑]` at the desert's edge to enter the Oasis — a golden-hour pocket of ancient life where a colossal sphinx speaks only in riddles. Solve them and the passage beyond begins to glow.*
 
