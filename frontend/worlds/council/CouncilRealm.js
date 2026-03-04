@@ -175,12 +175,13 @@ export class CouncilRealm extends Realm {
     if (RealmManager.isTransitioning) return;
 
     let cdx = 0;
-    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { cdx = -SPEED; this.facing = -1; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { cdx =  SPEED; this.facing =  1; }
+    const speed = G.keys['Shift'] ? SPEED * 2 : SPEED;
+    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { cdx = -speed; this.facing = -1; }
+    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { cdx =  speed; this.facing =  1; }
     this.moving = cdx !== 0;
     this.px = Math.max(60, Math.min(CW - 60, this.px + cdx));
 
-    if (this.moving && ts - G.legT > 180) { G.legT = ts; this.frame = 1 - this.frame; }
+    if (this.moving && ts - G.legT > 120) { G.legT = ts; this.frame = 1 - this.frame; }
     else if (!this.moving) this.frame = 0;
 
     this.registry.update(this.px, COUNCIL_FLOOR);

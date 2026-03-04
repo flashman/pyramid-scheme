@@ -78,10 +78,12 @@ export class PhysicsRealm extends Realm {
   // Apply one frame of gravity to py/pvy against a surface.
   // Returns the updated { py, pvy }.
   _gravityStep(py, pvy, surfY) {
-    if (py < surfY) {
-      pvy = Math.min(pvy + this.gravity, this.maxFallSpeed);
-      py  = Math.min(py  + pvy, surfY);
-    } else {
+    // Always apply gravity first (this decelerates jumps and accelerates falls).
+    // Only snap to the surface and zero velocity on landing — never on the same
+    // frame a jump was initiated (which would cancel pvy = -9 before it moves).
+    pvy = Math.min(pvy + this.gravity, this.maxFallSpeed);
+    py  = py + pvy;
+    if (py >= surfY) {
       py  = surfY;
       pvy = 0;
     }

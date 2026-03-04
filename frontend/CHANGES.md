@@ -2,6 +2,32 @@
 
 ---
 
+## v1.27 — Movement speed, jump key & physics fix
+
+### `engine/realm.js`
+- **Fixed `_gravityStep` swallowing jump velocity.** Previously, when the player was standing on a surface, the else-branch unconditionally set `pvy = 0` every frame — meaning any jump impulse set in `onKeyDown` (e.g. `G.pvy = -9`) was wiped out before the player could move. Gravity is now always applied first, and the surface snap only fires on actual landing (`py >= surfY` after integration).
+
+
+### `worlds/constants.js`
+- `SPEED` increased from `4` → `5`. Affects all realms (World, Crypt, Council).
+
+### `worlds/earth/WorldRealm.js`
+- Walk animation cycle threshold lowered from `180ms` → `120ms` — footstep cadence now matches the faster base speed.
+- Jump moved to **`Z`** key. `ArrowUp` was doing too many things (enter crypt, ascend to council, change z-layer) and was swallowing jump inputs. `Z` is unambiguous and only jumps.
+- `ArrowUp` no longer handles jump at all — its remaining uses (crypt door, capstone ascend, z-layer exit) are unchanged.
+- `Space` restored to interact-only (no jump fallback).
+- **Note:** `Shift + Arrow` sprint (2× speed) was already wired here; no change needed.
+
+### `worlds/crypt/ChamberRealm.js`
+- Added `Shift + Arrow` sprint support (was missing — only the World realm had it).
+- Walk animation cycle threshold lowered from `180ms` → `120ms`.
+
+### `worlds/council/CouncilRealm.js`
+- Added `Shift + Arrow` sprint support (was missing — only the World realm had it).
+- Walk animation cycle threshold lowered from `180ms` → `120ms`.
+
+---
+
 ## v1.26 — Session persistence & user profile
 
 ### `game/api.js`

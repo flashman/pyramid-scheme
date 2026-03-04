@@ -151,9 +151,10 @@ export class WorldRealm extends PhysicsRealm {
     if (!G.bought) return;
 
     // ── Horizontal movement ───────────────────────────────
+    const speed = (G.keys['Shift']) ? SPEED * 2 : SPEED;
     let dx = 0, moving = false;
-    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { dx = -SPEED; G.facing = -1; moving = true; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  SPEED; G.facing =  1; moving = true; }
+    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { dx = -speed; G.facing = -1; moving = true; }
+    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  speed; G.facing =  1; moving = true; }
     G.pmoving = moving;
 
     if (G.pZ === 0) {
@@ -183,7 +184,7 @@ export class WorldRealm extends PhysicsRealm {
     }
 
     // ── Walk animation ────────────────────────────────────
-    if (moving && ts - G.legT > 180) { G.legT = ts; G.pframe = 1 - G.pframe; }
+    if (moving && ts - G.legT > 120) { G.legT = ts; G.pframe = 1 - G.pframe; }
     else if (!moving) G.pframe = 0;
 
     // ── Camera ────────────────────────────────────────────
@@ -262,6 +263,12 @@ export class WorldRealm extends PhysicsRealm {
         G.pZ = 0;
       }
       return true;
+    }
+
+    if ((key === 'z' || key === 'Z') && G.bought && G.pZ === 0) {
+      // ── Jump ───────────────────────────────────────────
+      const surf = this.surfaceAt(G.px);
+      if (G.py >= surf - 1) { G.pvy = -9; return true; }
     }
 
     if (key === ' ') {

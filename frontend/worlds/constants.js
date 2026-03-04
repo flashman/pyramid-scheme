@@ -1,7 +1,7 @@
 // ── FILE: worlds/constants.js ────────────────────────────
 // Shared constants that apply across ALL worlds/realms.
 
-export const SPEED   = 3;
+export const SPEED   = 5;
 export const SPDHALF = 10;
 
 export const LH     = 22;
