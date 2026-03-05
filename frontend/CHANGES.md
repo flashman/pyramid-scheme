@@ -2,7 +2,47 @@
 
 ---
 
-## v1.30 — Vault beneath the sphinx; paw gap fix; pool repositioned
+## v1.31 — Chiptune soundtrack; per-realm themes; sound settings
+
+### `audio/sound.js` (new)
+- New `SoundManager` singleton — procedural chiptune music using the Web Audio API. Zero audio files; every note is synthesised on the fly with oscillators.
+- Five realm-specific themes, each with 3 simultaneous oscillator tracks (melody, bass, and harmony/pad) for a classic 90s RPG/platformer feel:
+  - **world** (`THE DESERT`) — D pentatonic major at 88 bpm. Triangle-wave flute lead over a punchy square bass and sine harmony. Warm, sandy, Egyptian.
+  - **oasis** (`THE OASIS`) — Same tonal centre, slower (76 bpm). Gentler triangle melody with a shimmering water-ripple sine counter-track.
+  - **vault** (`BENEATH THE SPHINX`) — D natural minor at 62 bpm. Sawtooth lead with haunting attack, heavy square bass, and a low sine drone. Ominous underground torch-light.
+  - **chamber** (`THE CRYPT`) — D diminished arpeggio at 138 bpm. Fast square arpeggio + driving sawtooth bass = raw alien techno. Triangle counter-melody adds an eerie hook.
+  - **council** (`GALACTIC COUNCIL`) — C major at 70 bpm. Slow-moving sine pad lead over a triangle bass, plus a detuned shimmer pad for cosmic depth.
+- All sequences are exactly 16 beats (4 bars of 4/4); tracks loop seamlessly with beat-accurate scheduling to avoid gap or overlap artefacts.
+- ADSR-lite envelope on each note (fast attack, hold, quick release) eliminates click artefacts at note boundaries.
+- Browser autoplay-policy handled: the `AudioContext` is created lazily on first use; `SoundManager.resume()` is called on every `keydown` to unblock the context after the first user interaction.
+- Preferences (`enabled`, `volume`) persisted to `localStorage` under the key `ps_audio`.
+
+### `frontend/Dockerfile`
+- Added `COPY audio/ /usr/share/nginx/html/audio/` — the Dockerfile enumerates directories explicitly, so the new `audio/` folder must be listed or nginx returns 404 on the module import and the entire game fails to load.
+
+### `engine/realm.js`
+- Added `import { Events }` from `./events.js`.
+- `RealmManager.transitionTo()` now emits `Events.emit('realm:enter', { id, fromId })` after every realm swap (including animated transitions that ultimately call `transitionTo`). This is the hook point for the music system and any other cross-cutting realm-change listeners.
+
+### `main.js`
+- Imports `SoundManager` from `./audio/sound.js`.
+- `Events.on('realm:enter', ({ id }) => SoundManager.playRealm(id))` — music switches automatically whenever the player moves between realms.
+- `SoundManager.resume()` called inside the existing `keydown` listener so the AudioContext is unblocked on the first key press (satisfies browser autoplay policies without requiring a separate click handler).
+- `SoundManager.playRealm('world')` called at the end of `init()` to start the desert theme immediately on load.
+- `window.toggleSound` exposed — flips `SoundManager.enabled` and updates the sidebar button label.
+
+### `ui/profile.js`
+- Imports `SoundManager`.
+- New **▶ SOUND SETTINGS** section in the profile overlay (inserted above the log-out button):
+  - **MUSIC toggle button** — flips `SoundManager.setEnabled()` and relabels itself `♪ ON` / `✕ OFF`. Also updates the sidebar button to stay in sync.
+  - **VOLUME slider** (`<input type="range">`) — calls `SoundManager.setVolume(pct/100)` on `input`; displays the current percentage alongside the slider.
+
+### `index.html`
+- New **▶ SOUND** panel added to the right sidebar (below CONTROLS):
+  - Quick-mute `♪ MUSIC ON` / `✕ MUSIC OFF` toggle button — calls `window.toggleSound()`.
+  - Sub-caption hints that volume lives in the ◈ PROFILE panel.
+
+
 
 ### `worlds/oasis/constants.js`
 - `POOL_WX` moved from 80 → 620. Pool is now a destination you walk to, not a wall at the entry. Player spawns on dry sand at x=60, walks ~560px before reaching the water.

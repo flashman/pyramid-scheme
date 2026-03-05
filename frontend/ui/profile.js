@@ -6,6 +6,8 @@
 //   import { openProfile } from './ui/profile.js';
 //   openProfile(Api, G, onLogout);
 
+import { SoundManager } from '../audio/sound.js';
+
 const CSS = `
 #profile-overlay {
   position: fixed; inset: 0; z-index: 9000;
@@ -240,6 +242,33 @@ export function openProfile(Api, G, onLogout) {
       </div>
 
       <!-- Danger zone -->
+      <!-- Sound settings -->
+      <div class="prof-section">
+        <div class="prof-section-title">▶ SOUND SETTINGS</div>
+        <div class="prof-stat-row" style="align-items:center;margin-bottom:8px">
+          <span class="prof-stat-label">MUSIC</span>
+          <button id="prof-sound-toggle" class="prof-btn" style="padding:4px 10px;min-width:70px">
+            ${SoundManager.enabled ? '♪ ON' : '✕ OFF'}
+          </button>
+        </div>
+        <div class="prof-stat-row" style="align-items:center">
+          <span class="prof-stat-label">VOLUME</span>
+          <input
+            type="range" id="prof-volume-slider"
+            min="0" max="100"
+            value="${Math.round(SoundManager.volume * 100)}"
+            style="flex:1;margin-left:12px;accent-color:var(--gold,#f0c020);cursor:pointer"
+          >
+        </div>
+        <div class="prof-stat-row" style="margin-top:4px">
+          <span></span>
+          <span id="prof-volume-label" style="color:var(--tan,#b08060);font-size:6px;letter-spacing:1px">
+            ${Math.round(SoundManager.volume * 100)}%
+          </span>
+        </div>
+      </div>
+
+      <!-- Log out -->
       <div class="prof-section">
         <button class="prof-btn danger" id="prof-logout-btn">⚡ LOG OUT</button>
       </div>
@@ -361,6 +390,22 @@ export function openProfile(Api, G, onLogout) {
     } else {
       setMsg('prof-msg-password', res?.detail || res?.error || 'Failed.', false);
     }
+  });
+
+  // ── Sound settings ────────────────────────────────────
+  document.getElementById('prof-sound-toggle').addEventListener('click', () => {
+    SoundManager.setEnabled(!SoundManager.enabled);
+    document.getElementById('prof-sound-toggle').textContent =
+      SoundManager.enabled ? '♪ ON' : '✕ OFF';
+    // Keep sidebar button in sync
+    const sideBtn = document.getElementById('sound-btn');
+    if (sideBtn) sideBtn.textContent = SoundManager.enabled ? '♪ MUSIC ON' : '✕ MUSIC OFF';
+  });
+
+  document.getElementById('prof-volume-slider').addEventListener('input', e => {
+    const pct = parseInt(e.target.value, 10);
+    SoundManager.setVolume(pct / 100);
+    document.getElementById('prof-volume-label').textContent = `${pct}%`;
   });
 
   // ── Log out ───────────────────────────────────────────

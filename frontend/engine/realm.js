@@ -2,7 +2,8 @@
 // Base Realm + PhysicsRealm classes, and RealmManager with
 // built-in transition animation support.
 
-import { CW } from './canvas.js';
+import { CW }     from './canvas.js';
+import { Events } from './events.js';
 
 // ─────────────────────────────────────────────────────────
 // Realm — minimal base class all realms extend.
@@ -141,6 +142,7 @@ export const RealmManager = {
     this.current.onExit();
     this.currentId = id;
     this.current.onEnter(fromId);
+    Events.emit('realm:enter', { id, fromId });
   },
 
   // Schedule a realm swap with an optional overlay animation.

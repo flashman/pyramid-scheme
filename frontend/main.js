@@ -27,6 +27,7 @@ import { LH }                     from './worlds/constants.js';
 import { requireAuth }            from './ui/auth.js';
 import { Api }                    from './game/api.js';
 import { openProfile }            from './ui/profile.js';
+import { SoundManager }           from './audio/sound.js';
 
 // ── Realms ────────────────────────────────────────────────
 RealmManager
@@ -88,11 +89,16 @@ document.addEventListener('keydown', e => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
     e.preventDefault();
   }
+  // Unblock browser autoplay policy on first keypress
+  SoundManager.resume();
   // Don't forward key events during a realm transition animation.
   if (!RealmManager.isTransitioning) {
     RealmManager.current.onKeyDown(e.key);
   }
 });
+
+// ── Music: change theme when the active realm changes ─────
+Events.on('realm:enter', ({ id }) => SoundManager.playRealm(id));
 document.addEventListener('keyup', e => { G.keys[e.key] = false; });
 
 // ── Expose UI callbacks referenced by inline HTML handlers ──
@@ -100,6 +106,13 @@ window.buyIn          = buyIn;
 window.recruitFriend  = recruitFriend;
 window.closeModal     = closeModal;
 window.openProfile    = () => openProfile(Api, G, () => window.location.reload());
+
+// Expose a quick-mute toggle for the sidebar button (no import needed in HTML)
+window.toggleSound = () => {
+  SoundManager.setEnabled(!SoundManager.enabled);
+  const btn = document.getElementById('sound-btn');
+  if (btn) btn.textContent = SoundManager.enabled ? '♪ MUSIC ON' : '✕ MUSIC OFF';
+};
 
 // ── Game loop ─────────────────────────────────────────────
 function gameLoop(ts) {
@@ -282,6 +295,11 @@ async function init() {
   log('Welcome, future Pharaoh!', 'hi');
   log('Click BUY IN to place your capstone!', '');
   Events.emit('game:started', {});
+
+  // Start the desert theme. The AudioContext may be suspended until the first
+  // key/click — SoundManager.resume() handles that transparently.
+  SoundManager.playRealm('world');
+
   requestAnimationFrame(gameLoop);
 }
 

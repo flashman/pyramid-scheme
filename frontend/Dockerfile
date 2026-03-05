@@ -4,6 +4,7 @@ FROM nginx:alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy only the actual game files — not Dockerfiles or configs
+COPY audio/      /usr/share/nginx/html/audio/
 COPY draw/       /usr/share/nginx/html/draw/
 COPY engine/     /usr/share/nginx/html/engine/
 COPY game/       /usr/share/nginx/html/game/
