@@ -6,6 +6,14 @@ A satirical pyramid scheme simulator with a real backend. Users invite friends v
 
 ---
 
+## Legal notice
+
+PYRAMID SCHEME™ is a **game for entertainment purposes only**. It is a satirical simulation — not an investment vehicle, financial product, or solicitation of any kind. Any buy-in pays for game access only. Any rewards from in-game achievements are entirely at the discretion of the operator and are never guaranteed. The company is not liable for any losses incurred through participation.
+
+Players are presented with a full **Terms of Participation** (PSE-TOS-2025-R1) on registration and must actively accept before creating an account.
+
+---
+
 ## Services
 
 | Service   | URL                         | Purpose                              |
@@ -89,9 +97,12 @@ Browser
 - `app/routers/dev.py` — simulation endpoints (gated behind `DEBUG=true`)
 
 **Key frontend files**
+- `audio/sound.js` — procedural Web Audio soundtrack; 5 realm themes; compressor, reverb, vibrato, stereo panning
 - `game/ws.js` — WS client with auto-reconnect + keep-alive
 - `game/recruits.js` — `addRecruit()` handles both real WS arrivals and local guest sim
+- `ui/auth.js` — login/register overlay; ToS gate on registration (PSE-TOS-2025-R1)
 - `ui/dev-panel.js` — dev panel including the sim section
+- `worlds/oasis/riddles.js` — Sphinx riddle system; renders via shared `#dlg` HTML panel
 
 ---
 

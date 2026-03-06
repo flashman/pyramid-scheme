@@ -2,6 +2,67 @@
 
 ---
 
+## v1.35 — Terms of Participation; legal signup gate
+
+### `ui/auth.js`
+- New **Terms of Participation modal** (`#tos-overlay`) injected alongside the auth overlay at startup.
+- Clicking the **REGISTER** tab (or arriving via an invite link) now opens the ToS modal *before* showing the registration form. The form is inaccessible until the player accepts.
+- The ToS document is a fully-scrollable, styled panel containing nine numbered sections:
+  1. **Nature of the Game** — explicitly identifies PYRAMID SCHEME™ as satirical entertainment, not a financial product.
+  2. **Participation Fee** — buy-in pays for game access only; not an investment; non-refundable.
+  3. **Discretionary Rewards** — achievements *may* yield real rewards at the operator's sole discretion; none are guaranteed. Includes a prominent plain-language callout.
+  4. **This Is Not a Pyramid Scheme** — explains the MLM mechanic as players introducing players to the game (analogous to mainstream referral programmes); no recruitment required to recoup fees.
+  5. **Limitation of Liability** — operator not liable for losses; aggregate liability capped at prior 12 months' fees.
+  6. **Participant Representations** — age of majority, entertainment intent, no guarantee expectation, prohibition on misrepresenting the game as an investment.
+  7. **Intellectual Property** — limited personal-use licence.
+  8. **Modifications** — operator may revise terms; continued participation = acceptance.
+  9. **Governing Law & Disputes** — individual binding arbitration; class-action waiver.
+- Checkbox at the bottom of the modal (`#tos-checkbox`) must be ticked before the **I AGREE** button enables. Both the checkbox and button reset each time the modal opens.
+- **Decline** returns the player to the login tab with no registration access.
+- After accepting, a small **☰ review terms of participation** link appears beneath the confirm-password field so players can re-read the terms at any time without losing their form state.
+- On game start, both auth and ToS overlays are removed from the DOM cleanly.
+- Document reference: `PSE-TOS-2025-R1`.
+
+---
+
+## v1.34 — Sphinx dialogue migrated to shared HTML panel
+
+### `worlds/oasis/riddles.js`
+- **Removed all canvas drawing** from `RiddleManager.render()`. The previous implementation drew a bespoke panel directly onto the game canvas (low-resolution text, fixed pixel coordinates, overlay covering the scene).
+- `RiddleManager.render()` now populates the shared `#dlg` / `#dlg-speaker` / `#dlg-text` / `#dlg-choices` / `#dlg-hint` HTML elements — identical to the `DialogueManager` used by every other NPC in the game. Sizing, typography, gold border, and inner inset line are all inherited from `style.css` with no extra code.
+- Speaker label set to `THE SPHINX`.
+- Phase-specific text colours applied via `textEl.style.color` (`#e8d090` correct, `#d06020` wrong, default amber for reading).
+- Answer input rendered inline in `#dlg-choices` as a `.dlg-choice` div with a blinking block cursor, matching the visual language of the choice-selection UI.
+- `#dlg` panel is explicitly hidden (`classList.remove('active')`) on Escape, correct-answer confirmation, and any deactivation — no stale panel left visible.
+- **UX fix:** riddle question now remains visible during the typing phase (previously disappeared), so players can refer back to it while composing their answer.
+- **Security fix:** player input is HTML-escaped before injection into `innerHTML` to prevent rendering artefacts from characters such as `<`, `>`, `&`.
+- Removed stale `import { X, CW, CH }` — canvas symbols were no longer used after the drawing code was removed.
+- Updated file header comment to accurately describe the HTML-panel approach.
+
+---
+
+## v1.33 — Audio bugfix: missing note frequencies
+
+### `audio/sound.js`
+- Added `Eb2: 77.78` and `Ab2: 103.83` to the note-frequency table `N`. Both notes were referenced in the vault (bass line) and chamber (bass line) themes introduced in v1.32 but absent from the table, causing `osc.frequency.value = undefined` → `TypeError: Failed to set the 'value' property on 'AudioParam': The provided float value is non-finite` on those realms.
+
+---
+
+## v1.32 — Soundtrack v2: Mario-style 32-beat melodies, modern audio chain
+
+### `audio/sound.js`
+- **32-beat sequences** (doubled from 16) on all five themes. Each theme is now structured as an **A section** (beats 1–16, mid-register) followed by a **B section** (beats 17–32) that drives the melody into the next octave — the classic technique used throughout the Mario and Zelda soundtracks for dramatic energy lifts within a loop.
+- Extended note table: added full octave-5 coverage (`C5`–`B5`) and the previously-missing `Eb2`, `Ab2`.
+- **DynamicsCompressor** inserted at the master output (`threshold −20 dB`, `ratio 4:1`, `attack 3ms`, `release 220ms`). Prevents inter-track clipping, glues the mix, and gives the whole soundtrack a polished, mastered feel with zero additional work.
+- **Convolver reverb** — algorithmically-generated decaying-noise impulse response (1.2s, decay 0.9). Fed from melodic lead tracks only (bass stays dry) at a 14% wet level for spatial depth without mud.
+- **Per-track BiquadFilter** — bass tracks (`lowpass ~400–480 Hz`) for warmth and weight; lead tracks (`lowpass 3600–6000 Hz`) to cut harshness; some tracks use `bandpass` or `highpass` for presence and clarity.
+- **StereoPanner** — each track assigned a stereo position (`pan: -0.35`–`+0.35`) so layers occupy distinct width positions rather than collapsing to mono centre.
+- **Vibrato LFO** — melodic lead tracks (world, oasis, vault, council) have a secondary `OscillatorNode` → `GainNode` → `osc.frequency` chain. Rate ~4–5.5 Hz, depth 7–12 cents. Onset is delayed by ≈120ms (or 30% of note duration) to mimic a natural performer's expressive vibrato rather than a mechanical tremolo.
+- B-section arpeggio climbs: triangle/sine arp tracks now use octave-5 chord tones in the B section to match the melody's register shift.
+- Routing: `oscillator → env → filter → panner → masterGain` (dry); lead tracks also send `filter → convolver` (wet reverb bus).
+
+---
+
 ## v1.31 — Chiptune soundtrack; per-realm themes; sound settings
 
 ### `audio/sound.js` (new)
