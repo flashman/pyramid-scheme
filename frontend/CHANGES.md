@@ -5,6 +5,58 @@
 ## v1.31 — Chiptune soundtrack; per-realm themes; sound settings
 
 ### `audio/sound.js` (new)
+- New `SoundManager` singleton — procedural electronic music via the Web Audio API.
+  Zero audio files; every note synthesised live with oscillators and per-note ADSR envelopes.
+- Expanded note-frequency table now covers A1–E5 including E2, Fs2, E3, Fs3, Bb3.
+- Five realm-specific themes at 108–145bpm with 3 simultaneous oscillator tracks each.
+  All tracks are exactly 16 beats so they loop in beat-accurate lock-step:
+  - **world** (`THE DESERT`) — D Hijaz scale (D Eb F# G A Bb C), **132bpm**.
+    Sawtooth lead blazes fast scalar runs and augmented-2nd jumps (that Egyptian fingerprint).
+    Square bass hammers 8th-note movement. Triangle 16th-note arpeggios drive the groove.
+  - **oasis** (`THE OASIS`) — D minor pentatonic, **114bpm**.
+    Triangle melody floats over a syncopated square bass groove.
+    Sine arpeggio shimmers underneath. Funky and driving, not sappy.
+  - **vault** (`BENEATH THE SPHINX`) — D Phrygian (flat-2 = Eb → dark tension), **108bpm**.
+    Sparse sawtooth lead: every note an event, big gaps create dread.
+    Square bass punches mid-octave (Eb3/D3) for extra presence, not just sub-bass rumble.
+    Slightly detuned triangle arp drones on dimished/minor voicings.
+  - **chamber** (`THE CRYPT`) — D diminished (D F Ab B), **145bpm** — the fastest.
+    Square oscillator hammers relentless 16th-note diminished arpeggios for two full octaves.
+    Sawtooth bass syncopates and slams. Off-beat triangle stabs add a techno snap.
+  - **council** (`GALACTIC COUNCIL`) — A natural minor, **128bpm**.
+    Sine lead has a real hook — call-and-response phrasing. Square bass does steady 4-on-the-floor
+    with walking movement (A→G→D→E). Detuned sawtooth pad (+7 cents) adds electronic shimmer.
+- All notes use ADSR-lite envelopes (fast attack ≤20ms, quick release ≤60ms) to eliminate click artefacts.
+- Browser autoplay policy handled: `AudioContext` is lazy; `SoundManager.resume()` is called on
+  every `keydown` to unblock it after the first user gesture.
+- Preferences (`enabled`, `volume`) persisted to `localStorage` under `ps_audio`.
+
+### `frontend/Dockerfile`
+- Added `COPY audio/ /usr/share/nginx/html/audio/` — the Dockerfile enumerates each source
+  directory explicitly, so new directories must be listed or nginx returns 404 on the import.
+
+### `engine/realm.js`
+- Added `import { Events }` from `./events.js`.
+- `RealmManager.transitionTo()` now emits `Events.emit('realm:enter', { id, fromId })` after
+  every realm swap. Clean hook point for the music system and future cross-cutting listeners.
+
+### `main.js`
+- Imports `SoundManager` from `./audio/sound.js`.
+- `Events.on('realm:enter', ({ id }) => SoundManager.playRealm(id))` — music switches on every realm transition.
+- `SoundManager.resume()` called in the `keydown` handler to satisfy browser autoplay policy.
+- `SoundManager.playRealm('world')` called at the end of `init()` to start the desert theme immediately.
+- `window.toggleSound` exposed for the sidebar button.
+
+### `ui/profile.js`
+- Imports `SoundManager`.
+- New **▶ SOUND SETTINGS** section in the profile modal (above log-out):
+  - Toggle button: `♪ ON` / `✕ OFF` — calls `SoundManager.setEnabled()`.
+  - Volume slider `<input type="range">` — calls `SoundManager.setVolume(pct/100)`.
+
+### `index.html`
+- New **▶ SOUND** panel in the right sidebar with a quick-mute button (`window.toggleSound()`).
+
+
 - New `SoundManager` singleton — procedural chiptune music using the Web Audio API. Zero audio files; every note is synthesised on the fly with oscillators.
 - Five realm-specific themes, each with 3 simultaneous oscillator tracks (melody, bass, and harmony/pad) for a classic 90s RPG/platformer feel:
   - **world** (`THE DESERT`) — D pentatonic major at 88 bpm. Triangle-wave flute lead over a punchy square bass and sine harmony. Warm, sandy, Egyptian.
