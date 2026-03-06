@@ -1,10 +1,10 @@
 // ── FILE: worlds/oasis/riddles.js ───────────────────────
-// Canvas-rendered free-text riddle system.
+// HTML-panel riddle system for the Sphinx.
 // The player types a single-word answer; the Sphinx responds with lore.
-// No HTML elements — everything drawn on the canvas.
+// Uses the shared #dlg / #dlg-speaker / #dlg-text / #dlg-choices / #dlg-hint
+// elements — same as every other dialogue in the game.
 
-import { X, CW, CH } from '../../engine/canvas.js';
-import { Flags }     from '../../engine/flags.js';
+import { Flags } from '../../engine/flags.js';
 
 // ── Riddle pool ───────────────────────────────────────────
 const RIDDLES = [
@@ -168,6 +168,8 @@ export const RiddleManager = (() => {
       if (key === 'Escape') {
         _active = false;
         _phase  = 'idle';
+        const el = document.getElementById('dlg');
+        if (el) el.classList.remove('active');
         return true;
       }
 
@@ -208,6 +210,8 @@ export const RiddleManager = (() => {
         } else if (key === 'Enter' || key === ' ') {
           _active = false;
           _phase  = 'idle';
+          const el = document.getElementById('dlg');
+          if (el) el.classList.remove('active');
         }
         return true;
       }
@@ -216,7 +220,11 @@ export const RiddleManager = (() => {
     },
 
     render() {
-      if (!_active) return;
+      if (!_active) {
+        const el = document.getElementById('dlg');
+        if (el) el.classList.remove('active');
+        return;
+      }
 
       const t = Date.now();
 
@@ -225,109 +233,57 @@ export const RiddleManager = (() => {
         _typeLen = Math.min(_currentText().length, Math.floor((t - _typeStart) / TYPE_MS));
       }
 
-      // ── Soft scene darkener (top 2/3 of screen only) ──────
-      X.save();
-      X.globalAlpha = 0.55;
-      X.fillStyle = 'rgba(6,3,0,0.9)';
-      X.fillRect(0, 0, CW, CH - 170);
-      X.restore();
+      // ── Populate the shared #dlg HTML panel ───────────────
+      const el        = document.getElementById('dlg');
+      const speakerEl = document.getElementById('dlg-speaker');
+      const textEl    = document.getElementById('dlg-text');
+      const choicesEl = document.getElementById('dlg-choices');
+      const hintEl    = document.getElementById('dlg-hint');
+      if (!el) return;
 
-      // ── Bottom dialogue panel — matches #dlg aesthetic ────
-      const PANEL_H  = 162;
-      const PANEL_Y  = CH - PANEL_H;
-      const PAD      = 14;
+      el.classList.add('active');
+      speakerEl.textContent = 'THE SPHINX';
 
-      // Panel background
-      X.fillStyle = '#060200';
-      X.fillRect(0, PANEL_Y, CW, PANEL_H);
-
-      // Outer gold border (top edge only — flush sides/bottom)
-      X.strokeStyle = '#c89028';
-      X.lineWidth = 2;
-      X.beginPath(); X.moveTo(0, PANEL_Y); X.lineTo(CW, PANEL_Y); X.stroke();
-
-      // Inner inset line
-      X.strokeStyle = '#5a3a08';
-      X.lineWidth = 1;
-      X.beginPath(); X.moveTo(0, PANEL_Y + 6); X.lineTo(CW, PANEL_Y + 6); X.stroke();
-
-      // Gold corner accents on top edge
-      X.fillStyle = '#f0c020';
-      X.fillRect(0,       PANEL_Y - 1, 4, 4);
-      X.fillRect(CW - 4,  PANEL_Y - 1, 4, 4);
-
-      // ── Speaker label ─────────────────────────────────────
-      X.font = '7px monospace';
-      X.textAlign = 'left';
-      X.fillStyle = '#c89028';
-      X.fillText('THE   SPHINX', PAD, PANEL_Y + 20);
-
-      // Separator under speaker
-      X.fillStyle = '#5a3a08';
-      X.fillRect(PAD, PANEL_Y + 26, CW - PAD * 2, 1);
-
-      // ── Riddle / response text (typewriter) ───────────────
-      const text  = _currentText().substring(0, _typeLen);
-      const lines = text.split('\n');
-      const bright = _phase === 'correct' ? '#e8d090'
-                   : _phase === 'wrong'   ? '#d06020'
-                   :                        '#e0c870';
-      X.font = '6px monospace';
-      X.textAlign = 'left';
-      let ty = PANEL_Y + 42;
-      for (const line of lines) {
-        if (ty > PANEL_Y + PANEL_H - 30) break;  // don't overflow into controls row
-        X.fillStyle = bright;
-        X.fillText(line, PAD, ty);
-        ty += 14;
+      // Text colour matches phase
+      if (_phase === 'correct') {
+        textEl.style.color = '#e8d090';
+      } else if (_phase === 'wrong') {
+        textEl.style.color = '#d06020';
+      } else {
+        textEl.style.color = '';   // use stylesheet default (#e8c878)
       }
 
-      // ── Input area (typing phase) ─────────────────────────
+      // Main text — typewriter slice.
+      // In typing phase we keep showing the full question so the player
+      // can refer back to it while composing their answer.
+      const displayText = _phase === 'typing'
+        ? _riddle.question
+        : _currentText().substring(0, _typeLen);
+      textEl.textContent = displayText;
+
+      // Typing phase: render an answer input row in the choices slot
       if (_phase === 'typing') {
-        const iy = PANEL_Y + PANEL_H - 44;
-
-        // Input box
-        X.fillStyle = '#0a0600';
-        X.fillRect(PAD, iy, CW - PAD * 2, 22);
-        X.strokeStyle = '#c89028';
-        X.lineWidth = 1;
-        X.strokeRect(PAD, iy, CW - PAD * 2, 22);
-
-        X.font = '6px monospace';
-        X.textAlign = 'left';
-        X.fillStyle = '#7a5010';
-        X.fillText('YOUR ANSWER ›', PAD + 8, iy + 15);
-
-        const cursor  = Math.floor(t / 500) % 2 === 0 ? '█' : ' ';
-        X.fillStyle = '#f0e080';
-        X.fillText(_input + cursor, PAD + 116, iy + 15);
+        const cursor = Math.floor(t / 500) % 2 === 0 ? '█' : ' ';
+        // Escape input before injecting into innerHTML
+        const safeInput = _input.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        choicesEl.innerHTML =
+          `<div class="dlg-choice" style="margin-top:6px">` +
+          `<span style="color:var(--gold-dim)">YOUR ANSWER &rsaquo; </span>` +
+          `<span style="color:var(--gold)">${safeInput}${cursor}</span></div>`;
+        hintEl.textContent = '[ENTER] SUBMIT     [ESC] LEAVE';
+      } else {
+        choicesEl.innerHTML = '';
+        const done = _typewriterDone();
+        if (!done) {
+          hintEl.textContent = '';
+        } else if (_phase === 'reading') {
+          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '▼ SPACE — ANSWER THE RIDDLE' : '';
+        } else if (_phase === 'wrong') {
+          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '[ENTER] TRY AGAIN     [ESC] LEAVE' : '';
+        } else if (_phase === 'correct') {
+          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '▼ SPACE / ENTER' : '';
+        }
       }
-
-      // ── Bottom hint row ───────────────────────────────────
-      const hintY = PANEL_Y + PANEL_H - 10;
-      const blink = 0.45 + 0.55 * Math.abs(Math.sin(t / 520));
-
-      X.save();
-      X.globalAlpha = blink;
-      X.font = '5px monospace';
-      X.textAlign = 'center';
-
-      if (_phase === 'typing') {
-        X.fillStyle = '#5a4010';
-        X.fillText('[ENTER] SUBMIT     [ESC] LEAVE', CW / 2, hintY);
-      } else if (_phase === 'wrong' && _typewriterDone()) {
-        X.fillStyle = '#c07020';
-        X.fillText('[ENTER] TRY AGAIN     [ESC] LEAVE', CW / 2, hintY);
-      } else if (_phase === 'correct' && _typewriterDone()) {
-        X.fillStyle = '#c89028';
-        X.fillText('[ENTER] CONTINUE', CW / 2, hintY);
-      } else if (_phase === 'reading' && _typewriterDone()) {
-        X.fillStyle = '#7a5010';
-        X.fillText('[SPACE] ANSWER THE RIDDLE', CW / 2, hintY);
-      }
-
-      X.textAlign = 'left';
-      X.restore();
     },
   };
 })();

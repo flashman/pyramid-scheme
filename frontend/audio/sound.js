@@ -2,22 +2,27 @@
 // Procedural chiptune / electronic soundtrack for PYRAMID SCHEME™.
 // Uses the Web Audio API — zero audio files; all sound synthesised live.
 //
-// Public API:
-//   SoundManager.playRealm(realmId)   — start the theme for a realm
-//   SoundManager.stop()               — silence everything
-//   SoundManager.setEnabled(bool)     — mute/unmute, persisted to localStorage
-//   SoundManager.setVolume(0..1)      — master volume, persisted to localStorage
-//   SoundManager.resume()             — unblock browser autoplay on first gesture
-//   SoundManager.enabled              — current on/off state
-//   SoundManager.volume               — current volume level
+// v2 improvements inspired by Mario-era soundtrack design:
+//   • 32-beat melodies (A+B sections) with dramatic octave climbs in B
+//   • Compressor at output for instant polish
+//   • Per-track BiquadFilter (warm bass, clear leads)
+//   • Convolver reverb send for spatial depth
+//   • Vibrato LFO on melodic leads
+//   • StereoPanner for width
+//
+// Public API (unchanged):
+//   SoundManager.playRealm(realmId)
+//   SoundManager.stop()
+//   SoundManager.setEnabled(bool)
+//   SoundManager.setVolume(0..1)
+//   SoundManager.resume()
+//   SoundManager.enabled / .volume
 
 // ── Note frequency table (Hz) ─────────────────────────────
 const N = {
-  // Octave 1
-  A1: 55.00, Bb1: 58.27,
   // Octave 2
-  D2: 73.42, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00,
-  A2: 110.00, Bb2: 116.54, B2: 123.47,
+  D2: 73.42, Eb2: 77.78, E2: 82.41, F2: 87.31, Fs2: 92.50, G2: 98.00,
+  Ab2: 103.83, A2: 110.00, Bb2: 116.54, B2: 123.47,
   // Octave 3
   C3: 130.81, D3: 146.83, Eb3: 155.56, E3: 164.81, F3: 174.61,
   Fs3: 185.00, G3: 196.00, Ab3: 207.65, A3: 220.00, Bb3: 233.08, B3: 246.94,
@@ -25,255 +30,474 @@ const N = {
   C4: 261.63, D4: 293.66, Eb4: 311.13, E4: 329.63, F4: 349.23,
   Fs4: 369.99, G4: 392.00, Ab4: 415.30, A4: 440.00, Bb4: 466.16, B4: 493.88,
   // Octave 5
-  C5: 523.25, D5: 587.33, E5: 659.25,
+  C5: 523.25, D5: 587.33, Eb5: 622.25, E5: 659.25, F5: 698.46,
+  Fs5: 739.99, G5: 783.99, Ab5: 830.61, A5: 880.00, Bb5: 932.33, B5: 987.77,
 };
-const _ = null; // musical rest
+const _ = null; // rest
 
 // ── Theme definitions ─────────────────────────────────────
-// bpm    — tempo
-// tracks — oscillator layers: { wave, gain, detune?, seq: [[freq|null, beats], …] }
-// All tracks must sum to exactly 16 beats so they loop in lock-step.
+// bpm     — tempo
+// tracks  — oscillator layers:
+//   { wave, gain, pan?, filter?, vibrato?, detune?, seq: [[freq|null, beats], …] }
+//   pan:     -1..1 stereo position
+//   filter:  { type: 'lowpass'|'highpass'|'bandpass', freq }
+//   vibrato: { rate (Hz), depth (Hz cents) }  — applied to melodic leads
 //
-// Design: short notes (≤0.5 beats), fast tempos (108–145bpm), driving bass,
-//         each realm has a distinct electronic character:
-//   world   — Egyptian house: D Hijaz, sawtooth riff over square bass, 132bpm
-//   oasis   — Desert groove: D minor pentatonic, funky + melodic, 114bpm
-//   vault   — Dark industrial: D Phrygian, sparse menace + heavy bass, 108bpm
-//   chamber — Alien techno: D diminished, 145bpm 16th-note arp assault
-//   council — Space house: A minor, hypnotic hook + 4-on-the-floor bass, 128bpm
+// All tracks sum to 32 beats (A+B sections). B section pushes melody into
+// the next octave — the Mario trick for dramatic energy lifts.
 
 const THEMES = {
 
   // ── THE DESERT (world) ────────────────────────────────────
-  // D Hijaz scale: D Eb F# G A Bb C — augmented 2nd Eb→F# is the Egyptian fingerprint.
-  // 132bpm. Sawtooth lead rips through fast scalar runs. Square bass punches every beat.
+  // D Hijaz: D Eb F# G A Bb C — the augmented 2nd is the Egyptian fingerprint.
+  // 132 bpm. A section: driving 4th-octave riff. B section: same motif an
+  // octave higher with wider leaps — sun-bleached and heroic.
   world: {
     bpm: 132,
     tracks: [
-      // Lead — sawtooth: fast Egyptian riff with scalar runs
-      { wave: 'sawtooth', gain: 0.14, seq: [
-        [N.D4,.5],[N.Eb4,.25],[N.Fs4,.25],[N.G4,.5],[N.A4,.5],           // 2
-        [N.Bb4,.5],[N.A4,.25],[N.G4,.25],[N.Fs4,.5],[N.Eb4,.5],          // 2
-        [N.D4,.25],[N.Eb4,.25],[N.Fs4,.25],[N.G4,.25],[N.A4,.5],[N.G4,.5], // 2
-        [N.Fs4,.25],[N.G4,.25],[N.A4,.25],[N.Bb4,.25],[N.A4,.25],[N.G4,.25],[N.Fs4,.25],[N.Eb4,.25], // 2
-        [N.D5,.5],[_,.25],[N.C5,.25],[N.Bb4,.25],[N.A4,.25],[N.G4,.5],   // 2
-        [N.Fs4,.25],[N.Eb4,.25],[N.D4,.5],[N.A4,.5],[N.G4,.5],           // 2
-        [N.Fs4,.5],[N.G4,.5],[N.A4,.5],[N.Bb4,.5],                       // 2
-        [N.A4,.5],[N.G4,.25],[N.Fs4,.25],[N.Eb4,.25],[N.D4,.75],         // 2
-      ]},                                                                  // 16 beats
-      // Bass — square: driving 8th-note pulse with movement
-      { wave: 'square', gain: 0.10, seq: [
-        [N.D2,.5],[N.D2,.5],[N.D2,.5],[N.A2,.5],
-        [N.G2,.5],[N.G2,.5],[N.A2,.5],[N.G2,.5],
-        [N.D2,.5],[N.D2,.5],[N.Bb2,.5],[N.A2,.5],
-        [N.G2,.5],[N.A2,.5],[N.G2,.5],[N.D2,.5],
-        [N.D2,.5],[N.D2,.5],[N.D2,.5],[N.A2,.5],
-        [N.Bb2,.5],[N.A2,.5],[N.G2,.5],[N.A2,.5],
-        [N.D2,.5],[N.Fs2,.5],[N.G2,.5],[N.A2,.5],
-        [N.D2,.5],[N.D2,.5],[N.D2,1],
-      ]},                                                                  // 16 beats
-      // Arpeggio — triangle: 16th-note arp riding the harmony
-      { wave: 'triangle', gain: 0.08, seq: [
-        [N.D4,.25],[N.Fs4,.25],[N.A4,.25],[N.D5,.25],
-        [N.A4,.25],[N.Fs4,.25],[N.D4,.25],[N.A3,.25],
-        [N.Eb4,.25],[N.G4,.25],[N.Bb4,.25],[N.Eb4,.25],
-        [N.G4,.25],[N.Bb4,.25],[N.G4,.25],[N.Eb4,.25],
-        [N.D4,.25],[N.Fs4,.25],[N.A4,.25],[N.D5,.25],
-        [N.D5,.25],[N.A4,.25],[N.Fs4,.25],[N.D4,.25],
-        [N.A3,.25],[N.D4,.25],[N.Fs4,.25],[N.A4,.25],
-        [N.G3,.25],[N.Bb3,.25],[N.D4,.25],[N.G4,.25],
-        [N.D4,.25],[N.Fs4,.25],[N.A4,.25],[N.D5,.25],
-        [N.C5,.25],[N.A4,.25],[N.Fs4,.25],[N.Eb4,.25],
-        [N.D4,.25],[_,.25],[N.D4,.25],[_,.25],
-        [N.Fs4,.25],[N.A4,.25],[N.D5,.25],[_,.25],
-        [N.G4,.25],[N.Bb4,.25],[N.D5,.25],[N.G4,.25],
-        [N.Fs4,.25],[N.A4,.25],[N.D5,.25],[N.Fs4,.25],
-        [N.Eb4,.25],[N.G4,.25],[N.Bb4,.25],[N.Eb4,.25],
-        [N.D4,.25],[_,.25],[N.D4,.5],
-      ]},                                                                  // 16 beats
+      // Lead — sawtooth with vibrato: Egyptian riff, A oct4 → B oct5
+      { wave: 'sawtooth', gain: 0.12, pan: -0.15,
+        filter: { type: 'lowpass', freq: 4200 },
+        vibrato: { rate: 5.5, depth: 12 },
+        seq: [
+          // ── A section (16 beats, octave 4) ──────────────────
+          [N.D4,.5],[N.Eb4,.25],[N.Fs4,.25],[N.G4,.5],[N.A4,.5],            // 2
+          [N.Bb4,.5],[N.A4,.25],[N.G4,.25],[N.Fs4,.5],[N.Eb4,.5],           // 2
+          [N.D4,.25],[N.Eb4,.25],[N.Fs4,.25],[N.G4,.25],[N.A4,.5],[N.G4,.5],// 2
+          [N.Fs4,.25],[N.G4,.25],[N.A4,.25],[N.Bb4,.25],[N.A4,.25],[N.G4,.25],[N.Fs4,.25],[N.Eb4,.25], // 2
+          [N.D5,.5],[_,.25],[N.C5,.25],[N.Bb4,.5],[N.A4,.5],                // 2
+          [N.G4,.25],[N.Fs4,.25],[N.Eb4,.25],[N.D4,.25],[N.A4,.5],[N.G4,.5],// 2
+          [N.Fs4,.5],[N.G4,.5],[N.A4,.5],[N.Bb4,.5],                        // 2
+          [N.A4,.5],[N.G4,.25],[N.Fs4,.25],[N.Eb4,.25],[N.D4,.75],          // 2
+          // ── B section (16 beats, leaps to octave 5) ─────────
+          [N.D5,.25],[N.Eb5,.25],[N.Fs5,.25],[N.G5,.25],[N.A5,.5],[_,.5],   // 2
+          [N.G5,.25],[N.Fs5,.25],[N.Eb5,.25],[N.D5,.25],[N.A4,.5],[N.D5,.5],// 2
+          [N.Eb5,.5],[N.Fs5,.5],[N.G5,.5],[N.Fs5,.5],                       // 2
+          [N.Eb5,.5],[N.D5,.25],[N.C5,.25],[N.Bb4,.5],[N.A4,.5],            // 2
+          [N.D5,.5],[N.Eb5,.25],[N.Fs5,.25],[N.G5,.5],[N.A5,.5],            // 2
+          [N.Bb5,.5],[_,.25],[N.A5,.25],[N.G5,.5],[N.Fs5,.5],               // 2
+          [N.Eb5,.5],[N.D5,.5],[N.A4,.5],[N.G4,.5],                         // 2
+          [N.Fs4,.5],[N.Eb4,.25],[N.D4,.25],[N.D4,1],                       // 2
+        ]},                                                                    // 32 beats
+      // Bass — square: driving pulse, doubled to 32 beats
+      { wave: 'square', gain: 0.09, pan: 0.0,
+        filter: { type: 'lowpass', freq: 480 },
+        seq: [
+          [N.D2,.5],[N.D2,.5],[N.D2,.5],[N.A2,.5],
+          [N.G2,.5],[N.G2,.5],[N.A2,.5],[N.G2,.5],
+          [N.D2,.5],[N.D2,.5],[N.Bb2,.5],[N.A2,.5],
+          [N.G2,.5],[N.A2,.5],[N.G2,.5],[N.D2,.5],
+          [N.D2,.5],[N.D2,.5],[N.D2,.5],[N.A2,.5],
+          [N.Bb2,.5],[N.A2,.5],[N.G2,.5],[N.A2,.5],
+          [N.D2,.5],[N.Fs2,.5],[N.G2,.5],[N.A2,.5],
+          [N.D2,.5],[N.D2,.5],[N.D2,1],
+          // bar 2 (slight variation)
+          [N.D2,.5],[N.D2,.5],[N.A2,.5],[N.Bb2,.5],
+          [N.G2,.5],[N.A2,.5],[N.D2,.5],[N.D2,.5],
+          [N.D2,.5],[N.D2,.5],[N.G2,.5],[N.A2,.5],
+          [N.Bb2,.5],[N.A2,.5],[N.G2,.5],[N.D2,.5],
+          [N.D2,.5],[N.G2,.5],[N.A2,.5],[N.D2,.5],
+          [N.Bb2,.5],[N.A2,.5],[N.G2,.5],[N.A2,.5],
+          [N.D2,.5],[N.Fs2,.5],[N.G2,.5],[N.A2,.5],
+          [N.D2,.5],[N.D2,.5],[N.D2,1],
+        ]},                                                                    // 32 beats
+      // Arpeggio — triangle: 16th-note harmonic shimmer, doubled
+      { wave: 'triangle', gain: 0.07, pan: 0.3,
+        filter: { type: 'highpass', freq: 280 },
+        seq: [
+          [N.D4,.25],[N.Fs4,.25],[N.A4,.25],[N.D5,.25],
+          [N.A4,.25],[N.Fs4,.25],[N.D4,.25],[N.A3,.25],
+          [N.Eb4,.25],[N.G4,.25],[N.Bb4,.25],[N.Eb4,.25],
+          [N.G4,.25],[N.Bb4,.25],[N.G4,.25],[N.Eb4,.25],
+          [N.D4,.25],[N.Fs4,.25],[N.A4,.25],[N.D5,.25],
+          [N.D5,.25],[N.A4,.25],[N.Fs4,.25],[N.D4,.25],
+          [N.A3,.25],[N.D4,.25],[N.Fs4,.25],[N.A4,.25],
+          [N.G3,.25],[N.Bb3,.25],[N.D4,.25],[N.G4,.25],
+          [N.D4,.25],[N.Fs4,.25],[N.A4,.25],[N.D5,.25],
+          [N.C5,.25],[N.A4,.25],[N.Fs4,.25],[N.Eb4,.25],
+          [N.D4,.25],[_,.25],[N.D4,.25],[_,.25],
+          [N.Fs4,.25],[N.A4,.25],[N.D5,.25],[_,.25],
+          [N.G4,.25],[N.Bb4,.25],[N.D5,.25],[N.G4,.25],
+          [N.Fs4,.25],[N.A4,.25],[N.D5,.25],[N.Fs4,.25],
+          [N.Eb4,.25],[N.G4,.25],[N.Bb4,.25],[N.Eb4,.25],
+          [N.D4,.25],[_,.25],[N.D4,.5],
+          // B section arp climbs higher
+          [N.D5,.25],[N.Fs5,.25],[N.A5,.25],[N.D5,.25],
+          [N.A4,.25],[N.Fs4,.25],[N.D4,.25],[N.A3,.25],
+          [N.Eb5,.25],[N.G5,.25],[N.Bb5,.25],[N.Eb5,.25],
+          [N.G4,.25],[N.Bb4,.25],[N.G4,.25],[N.Eb4,.25],
+          [N.D5,.25],[N.Fs5,.25],[N.A5,.25],[N.D5,.25],
+          [N.D5,.25],[N.A4,.25],[N.Fs4,.25],[N.D4,.25],
+          [N.A4,.25],[N.D5,.25],[N.Fs5,.25],[N.A5,.25],
+          [N.G4,.25],[N.Bb4,.25],[N.D5,.25],[N.G5,.25],
+          [N.D5,.25],[N.Fs5,.25],[N.A5,.25],[N.D5,.25],
+          [N.C5,.25],[N.A4,.25],[N.Fs4,.25],[N.Eb4,.25],
+          [N.D4,.25],[_,.25],[N.D4,.25],[_,.25],
+          [N.Fs4,.25],[N.A4,.25],[N.D5,.25],[_,.25],
+          [N.G4,.25],[N.Bb4,.25],[N.D5,.25],[N.G4,.25],
+          [N.Fs4,.25],[N.A4,.25],[N.D5,.25],[N.Fs4,.25],
+          [N.Eb4,.25],[N.G4,.25],[N.Bb4,.25],[N.Eb4,.25],
+          [N.D4,.25],[_,.25],[N.D4,.5],
+        ]},                                                                    // 32 beats
     ],
   },
 
   // ── THE OASIS (oasis) ─────────────────────────────────────
-  // D minor pentatonic: D F G A C — funky groove meets desert chill.
-  // 114bpm. Triangle melody floats over syncopated square bass and shimmering sine arps.
+  // D minor pentatonic: D F G A C.
+  // 114 bpm. A section: warm flowing melody in oct 4. B section: melody
+  // floats up to A5/D5 with a dreamy, open quality then settles back.
   oasis: {
     bpm: 114,
     tracks: [
-      // Lead — triangle: flowing melodic line with swing
-      { wave: 'triangle', gain: 0.17, seq: [
-        [N.D4,.5],[N.F4,.25],[N.G4,.25],[N.A4,.5],[N.C5,.5],
-        [N.D5,.5],[N.C5,.25],[N.A4,.25],[N.G4,.5],[N.F4,.5],
-        [N.D4,.5],[N.G4,.5],[N.A4,.5],[N.G4,.5],
-        [N.F4,.25],[N.D4,.25],[N.F4,.25],[N.G4,.25],[N.A4,1],
-        [N.A4,.5],[N.C5,.5],[N.D5,.5],[N.C5,.5],
-        [N.A4,.5],[N.G4,.5],[N.F4,.5],[N.D4,.5],
-        [N.G4,.5],[N.A4,.5],[N.C5,.25],[N.A4,.25],[N.G4,.5],
-        [N.D4,2],
-      ]},                                                                  // 16 beats
-      // Bass — square: syncopated funk groove
-      { wave: 'square', gain: 0.10, seq: [
-        [N.D2,.5],[_,.25],[N.D2,.25],[N.G2,.5],[N.G2,.5],
-        [N.A2,.5],[N.A2,.25],[N.G2,.25],[N.D2,.5],[N.D2,.5],
-        [N.G2,.5],[_,.25],[N.G2,.25],[N.A2,.5],[N.G2,.5],
-        [N.D2,.5],[N.F2,.5],[N.G2,.5],[N.D2,.5],
-        [N.D2,.5],[_,.25],[N.D2,.25],[N.G2,.5],[N.A2,.5],
-        [N.C3,.5],[N.A2,.5],[N.G2,.5],[N.D2,.5],
-        [N.D2,.5],[N.F2,.5],[N.D2,.5],[N.G2,.5],
-        [N.A2,.5],[N.G2,.5],[N.D2,1],
-      ]},                                                                  // 16 beats
-      // Arp — sine: shimmering 8th-note harmonic bed
-      { wave: 'sine', gain: 0.08, seq: [
-        [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.D5,.5],
-        [N.D5,.5],[N.A4,.5],[N.F4,.5],[N.D4,.5],
-        [N.G3,.5],[N.D4,.5],[N.G4,.5],[N.D4,.5],
-        [N.A3,.5],[N.D4,.5],[N.A4,.5],[N.D4,.5],
-        [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],
-        [N.A4,.5],[N.G4,.5],[N.F4,.5],[N.D4,.5],
-        [N.D4,.5],[N.G4,.5],[N.C5,.5],[N.A4,.5],
-        [N.D4,.5],[N.A4,.5],[N.D4,1],
-      ]},                                                                  // 16 beats
+      // Lead — triangle, vibrato: flowing line
+      { wave: 'triangle', gain: 0.15, pan: -0.2,
+        filter: { type: 'lowpass', freq: 5000 },
+        vibrato: { rate: 4.8, depth: 9 },
+        seq: [
+          // ── A section ───────────────────────────────────────
+          [N.D4,.5],[N.F4,.25],[N.G4,.25],[N.A4,.5],[N.C5,.5],
+          [N.D5,.5],[N.C5,.25],[N.A4,.25],[N.G4,.5],[N.F4,.5],
+          [N.D4,.5],[N.G4,.5],[N.A4,.5],[N.G4,.5],
+          [N.F4,.25],[N.D4,.25],[N.F4,.25],[N.G4,.25],[N.A4,1],
+          [N.A4,.5],[N.C5,.5],[N.D5,.5],[N.C5,.5],
+          [N.A4,.5],[N.G4,.5],[N.F4,.5],[N.D4,.5],
+          [N.G4,.5],[N.A4,.5],[N.C5,.25],[N.A4,.25],[N.G4,.5],
+          [N.D4,2],
+          // ── B section (rises to oct 5) ──────────────────────
+          [N.D5,.5],[N.F5,.25],[N.G5,.25],[N.A5,.5],[_,.5],
+          [N.A5,.5],[N.G5,.25],[N.F5,.25],[N.D5,.5],[N.C5,.5],
+          [N.D5,.5],[N.A4,.5],[N.D5,.5],[N.F5,.5],
+          [N.G5,.5],[N.F5,.25],[N.D5,.25],[N.C5,.5],[N.A4,.5],
+          [N.A4,.5],[N.C5,.5],[N.D5,.25],[N.F5,.25],[N.G5,.5],
+          [N.A5,.5],[N.G5,.25],[N.F5,.25],[N.D5,.5],[N.C5,.5],
+          [N.A4,.5],[N.G4,.5],[N.F4,.25],[N.G4,.25],[N.A4,.5],
+          [N.D4,2],
+        ]},                                                                    // 32 beats
+      // Bass — square: syncopated funk, doubled
+      { wave: 'square', gain: 0.09, pan: 0.0,
+        filter: { type: 'lowpass', freq: 420 },
+        seq: [
+          [N.D2,.5],[_,.25],[N.D2,.25],[N.G2,.5],[N.G2,.5],
+          [N.A2,.5],[N.A2,.25],[N.G2,.25],[N.D2,.5],[N.D2,.5],
+          [N.G2,.5],[_,.25],[N.G2,.25],[N.A2,.5],[N.G2,.5],
+          [N.D2,.5],[N.F2,.5],[N.G2,.5],[N.D2,.5],
+          [N.D2,.5],[_,.25],[N.D2,.25],[N.G2,.5],[N.A2,.5],
+          [N.C3,.5],[N.A2,.5],[N.G2,.5],[N.D2,.5],
+          [N.D2,.5],[N.F2,.5],[N.D2,.5],[N.G2,.5],
+          [N.A2,.5],[N.G2,.5],[N.D2,1],
+          // bar 2 variant
+          [N.D2,.5],[_,.25],[N.D2,.25],[N.A2,.5],[N.G2,.5],
+          [N.G2,.5],[N.A2,.25],[N.G2,.25],[N.D2,.5],[N.D2,.5],
+          [N.G2,.5],[_,.25],[N.G2,.25],[N.A2,.5],[N.C3,.5],
+          [N.D3,.5],[N.C3,.5],[N.A2,.5],[N.D2,.5],
+          [N.D2,.5],[_,.25],[N.D2,.25],[N.G2,.5],[N.A2,.5],
+          [N.C3,.5],[N.A2,.5],[N.G2,.5],[N.D2,.5],
+          [N.D2,.5],[N.F2,.5],[N.G2,.5],[N.A2,.5],
+          [N.D2,.5],[N.D2,.5],[N.D2,1],
+        ]},                                                                    // 32 beats
+      // Arp — sine: shimmering harmonic bed, doubled
+      { wave: 'sine', gain: 0.07, pan: 0.35,
+        filter: { type: 'highpass', freq: 300 },
+        seq: [
+          [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.D5,.5],
+          [N.D5,.5],[N.A4,.5],[N.F4,.5],[N.D4,.5],
+          [N.G3,.5],[N.D4,.5],[N.G4,.5],[N.D4,.5],
+          [N.A3,.5],[N.D4,.5],[N.A4,.5],[N.D4,.5],
+          [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.C5,.5],
+          [N.A4,.5],[N.G4,.5],[N.F4,.5],[N.D4,.5],
+          [N.D4,.5],[N.G4,.5],[N.C5,.5],[N.A4,.5],
+          [N.D4,.5],[N.A4,.5],[N.D4,1],
+          // bar 2 (goes higher)
+          [N.D5,.5],[N.F5,.5],[N.A5,.5],[N.D5,.5],
+          [N.D5,.5],[N.A4,.5],[N.F4,.5],[N.D4,.5],
+          [N.G4,.5],[N.D5,.5],[N.G5,.5],[N.D5,.5],
+          [N.A4,.5],[N.D5,.5],[N.A5,.5],[N.D5,.5],
+          [N.D5,.5],[N.F5,.5],[N.A5,.5],[N.C5,.5],
+          [N.A4,.5],[N.G4,.5],[N.F4,.5],[N.D4,.5],
+          [N.D4,.5],[N.G4,.5],[N.C5,.5],[N.A4,.5],
+          [N.D4,.5],[N.A4,.5],[N.D4,1],
+        ]},                                                                    // 32 beats
     ],
   },
 
   // ── BENEATH THE SPHINX (vault) ────────────────────────────
-  // D Phrygian: D Eb F G A Bb C — flat-2 (Eb) creates dark tension.
-  // 108bpm. Sparse menacing sawtooth lead over brutal square bass and unsettling arps.
+  // D Phrygian: D Eb F G A Bb C — flat-2 tension.
+  // 108 bpm. A: sparse menace in low register. B: creeping climb through
+  // Eb5/D5 with ominous wide leaps — like descending deeper underground.
   vault: {
     bpm: 108,
     tracks: [
-      // Lead — sawtooth: minimal, dark, every note matters
-      { wave: 'sawtooth', gain: 0.13, seq: [
-        [_,.5],[N.D4,.5],[N.Eb4,.5],[N.D4,.5],
-        [N.F4,.5],[_,.5],[N.Eb4,.5],[N.D4,.5],
-        [N.G4,.5],[N.Ab4,.5],[N.G4,.5],[_,.5],
-        [N.F4,.25],[N.Eb4,.25],[N.D4,.5],[_,1],
-        [_,.25],[N.D4,.25],[_,.25],[N.D4,.25],[N.Eb4,.5],[N.F4,.5],
-        [N.G4,.5],[N.F4,.25],[N.Eb4,.25],[N.D4,.5],[_,.5],
-        [N.Bb4,.5],[N.Ab4,.5],[N.G4,.25],[N.F4,.25],[N.Eb4,.5],
-        [N.D4,1.5],[_,.5],
-      ]},                                                                  // 16 beats
-      // Bass — square: heavy, industrial, mid-octave for extra presence
-      { wave: 'square', gain: 0.14, seq: [
-        [N.D2,.5],[N.D2,.5],[_,.5],[N.D2,.5],
-        [N.D2,.25],[N.D2,.25],[N.D2,.25],[N.D2,.25],[N.F2,.5],[N.G2,.5],
-        [N.Bb2,.5],[N.A2,.5],[N.G2,.5],[N.F2,.5],
-        [N.D2,1],[_,.5],[N.D2,.5],
-        [N.D2,.5],[_,.25],[N.D2,.25],[_,.5],[N.D2,.5],
-        [N.Eb3,.5],[N.D3,.5],[N.Eb3,.5],[N.D3,.5],
-        [N.F3,.5],[N.G3,.5],[N.F3,.5],[N.Eb3,.5],
-        [N.D3,.5],[N.D3,.5],[N.D2,1],
-      ]},                                                                  // 16 beats
-      // Pulse — triangle: constant 8th-note arp in the low register, detuned slightly
-      { wave: 'triangle', gain: 0.07, detune: -8, seq: [
-        [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
-        [N.D4,.25],[N.A3,.25],[N.F3,.25],[N.D3,.25],
-        [N.D3,.25],[N.G3,.25],[N.Bb3,.25],[N.D4,.25],
-        [N.D4,.25],[N.Bb3,.25],[N.G3,.25],[N.D3,.25],
-        [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
-        [N.Eb3,.25],[N.G3,.25],[N.Bb3,.25],[N.Eb4,.25],
-        [N.F3,.25],[N.A3,.25],[N.C4,.25],[N.F4,.25],
-        [N.G3,.25],[N.Bb3,.25],[N.D4,.25],[N.G4,.25],
-        [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
-        [N.D4,.25],[N.A3,.25],[N.F3,.25],[N.D3,.25],
-        [N.Eb3,.25],[N.G3,.25],[N.Bb3,.25],[N.Eb4,.25],
-        [N.Eb4,.25],[N.Bb3,.25],[N.G3,.25],[N.Eb3,.25],
-        [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
-        [N.Ab3,.25],[N.D4,.25],[N.Ab3,.25],[N.F3,.25],
-        [N.D3,.5],[N.D3,.5],[_,.5],[N.D3,.25],[_,.25],
-      ]},                                                                  // 16 beats (last line: .5+.5+.5+.25+.25=2✓, track: 15 full rows + partial = 16✓)
+      // Lead — sawtooth, dark and sparse
+      { wave: 'sawtooth', gain: 0.11, pan: -0.1,
+        filter: { type: 'lowpass', freq: 3600 },
+        vibrato: { rate: 4.2, depth: 7 },
+        seq: [
+          // ── A section ───────────────────────────────────────
+          [_,.5],[N.D4,.5],[N.Eb4,.5],[N.D4,.5],
+          [N.F4,.5],[_,.5],[N.Eb4,.5],[N.D4,.5],
+          [N.G4,.5],[N.Ab4,.5],[N.G4,.5],[_,.5],
+          [N.F4,.25],[N.Eb4,.25],[N.D4,.5],[_,1],
+          [_,.25],[N.D4,.25],[_,.25],[N.D4,.25],[N.Eb4,.5],[N.F4,.5],
+          [N.G4,.5],[N.F4,.25],[N.Eb4,.25],[N.D4,.5],[_,.5],
+          [N.Bb4,.5],[N.Ab4,.5],[N.G4,.25],[N.F4,.25],[N.Eb4,.5],
+          [N.D4,1.5],[_,.5],
+          // ── B section (climbs into oct 5) ───────────────────
+          [_,.5],[N.D5,.5],[N.Eb5,.5],[N.D5,.5],
+          [N.F5,.5],[_,.25],[N.Eb5,.25],[N.D5,.5],[N.C5,.5],
+          [N.Bb4,.5],[N.Ab4,.5],[N.G4,.5],[N.F4,.5],
+          [N.Eb4,.25],[N.D4,.25],[N.Eb5,.5],[_,1],
+          [N.D5,.5],[N.Eb5,.5],[N.F5,.25],[N.G5,.25],[N.F5,.5],
+          [N.Eb5,.5],[N.D5,.25],[N.C5,.25],[N.Bb4,.5],[N.Ab4,.5],
+          [N.G4,.5],[N.F4,.5],[N.Eb4,.5],[N.D4,.5],
+          [N.D4,1],[_,.5],[N.D4,.5],
+        ]},                                                                    // 32 beats
+      // Bass — square: heavy industrial, doubled
+      { wave: 'square', gain: 0.13, pan: 0.0,
+        filter: { type: 'lowpass', freq: 360 },
+        seq: [
+          [N.D2,.5],[N.D2,.5],[_,.5],[N.D2,.5],
+          [N.D2,.25],[N.D2,.25],[N.D2,.25],[N.D2,.25],[N.F2,.5],[N.G2,.5],
+          [N.Bb2,.5],[N.A2,.5],[N.G2,.5],[N.F2,.5],
+          [N.D2,1],[_,.5],[N.D2,.5],
+          [N.D2,.5],[_,.25],[N.D2,.25],[_,.5],[N.D2,.5],
+          [N.Eb3,.5],[N.D3,.5],[N.Eb3,.5],[N.D3,.5],
+          [N.F3,.5],[N.G3,.5],[N.F3,.5],[N.Eb3,.5],
+          [N.D3,.5],[N.D3,.5],[N.D2,1],
+          // bar 2 (more movement)
+          [N.D2,.5],[N.D2,.5],[N.Eb2,.5],[N.D2,.5],
+          [N.F2,.25],[N.F2,.25],[N.G2,.25],[N.G2,.25],[N.F2,.5],[N.Eb2,.5],
+          [N.D2,.5],[_,.5],[N.Bb2,.5],[N.A2,.5],
+          [N.G2,1],[_,.5],[N.D2,.5],
+          [N.D2,.5],[_,.25],[N.Eb2,.25],[N.D2,.5],[N.D2,.5],
+          [N.Eb3,.5],[N.D3,.5],[N.C3,.5],[N.Bb2,.5],
+          [N.F2,.5],[N.G2,.5],[N.F2,.5],[N.Eb2,.5],
+          [N.D2,.5],[N.D2,.5],[N.D2,1],
+        ]},                                                                    // 32 beats
+      // Pulse — triangle: constant arp, detuned for unease
+      { wave: 'triangle', gain: 0.06, detune: -10, pan: 0.3,
+        filter: { type: 'bandpass', freq: 600 },
+        seq: [
+          [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
+          [N.D4,.25],[N.A3,.25],[N.F3,.25],[N.D3,.25],
+          [N.D3,.25],[N.G3,.25],[N.Bb3,.25],[N.D4,.25],
+          [N.D4,.25],[N.Bb3,.25],[N.G3,.25],[N.D3,.25],
+          [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
+          [N.Eb3,.25],[N.G3,.25],[N.Bb3,.25],[N.Eb4,.25],
+          [N.F3,.25],[N.A3,.25],[N.C4,.25],[N.F4,.25],
+          [N.G3,.25],[N.Bb3,.25],[N.D4,.25],[N.G4,.25],
+          [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
+          [N.D4,.25],[N.A3,.25],[N.F3,.25],[N.D3,.25],
+          [N.Eb3,.25],[N.G3,.25],[N.Bb3,.25],[N.Eb4,.25],
+          [N.Eb4,.25],[N.Bb3,.25],[N.G3,.25],[N.Eb3,.25],
+          [N.D3,.25],[N.F3,.25],[N.A3,.25],[N.D4,.25],
+          [N.Ab3,.25],[N.D4,.25],[N.Ab3,.25],[N.F3,.25],
+          [N.D3,.5],[N.D3,.5],[_,.5],[N.D3,.25],[_,.25],
+          [N.D3,.25],[_,.25],[N.F3,.25],[N.A3,.25],
+          // bar 2 arp (higher register)
+          [N.D4,.25],[N.F4,.25],[N.A4,.25],[N.D5,.25],
+          [N.D5,.25],[N.A4,.25],[N.F4,.25],[N.D4,.25],
+          [N.D4,.25],[N.G4,.25],[N.Bb4,.25],[N.D5,.25],
+          [N.D5,.25],[N.Bb4,.25],[N.G4,.25],[N.D4,.25],
+          [N.D4,.25],[N.F4,.25],[N.A4,.25],[N.D5,.25],
+          [N.Eb4,.25],[N.G4,.25],[N.Bb4,.25],[N.Eb5,.25],
+          [N.F4,.25],[N.A4,.25],[N.C5,.25],[N.F5,.25],
+          [N.G4,.25],[N.Bb4,.25],[N.D5,.25],[N.G5,.25],
+          [N.D4,.25],[N.F4,.25],[N.A4,.25],[N.D5,.25],
+          [N.D5,.25],[N.A4,.25],[N.F4,.25],[N.D4,.25],
+          [N.Eb4,.25],[N.G4,.25],[N.Bb4,.25],[N.Eb5,.25],
+          [N.Eb5,.25],[N.Bb4,.25],[N.G4,.25],[N.Eb4,.25],
+          [N.D4,.25],[N.F4,.25],[N.A4,.25],[N.D5,.25],
+          [N.Ab4,.25],[N.D5,.25],[N.Ab4,.25],[N.F4,.25],
+          [N.D4,.5],[N.D4,.5],[_,.5],[N.D4,.25],[_,.25],
+          [N.D3,.25],[_,.25],[N.D3,.5],
+        ]},                                                                    // 32 beats
     ],
   },
 
   // ── THE CRYPT (chamber) ───────────────────────────────────
-  // D diminished: D F Ab B (repeats at tritone — every note is 3 semitones apart).
-  // 145bpm — the fastest theme. 16th-note square arp is relentless alien techno.
-  // Sawtooth bass slams. Triangle fires syncopated stabs.
+  // D diminished: D F Ab B. 145 bpm — relentless alien techno.
+  // A: 16th-note square arp assault. B: same motif driven an octave up,
+  // then a sudden drop for maximum shock effect.
   chamber: {
     bpm: 145,
     tracks: [
-      // Arp — square: unrelenting 16th-note diminished arpeggio
-      { wave: 'square', gain: 0.13, seq: [
-        [N.D3,.25],[N.F3,.25],[N.Ab3,.25],[N.B3,.25],
-        [N.D4,.25],[N.B3,.25],[N.Ab3,.25],[N.F3,.25],
-        [N.F3,.25],[N.Ab3,.25],[N.B3,.25],[N.D4,.25],
-        [N.B3,.25],[N.Ab3,.25],[N.F3,.25],[N.D3,.25],
-        [N.Eb3,.25],[N.G3,.25],[N.Bb3,.25],[N.D4,.25],
-        [N.D4,.25],[N.Bb3,.25],[N.G3,.25],[N.Eb3,.25],
-        [N.D3,.25],[N.F3,.25],[N.Ab3,.25],[N.B3,.25],
-        [N.D4,.25],[N.B3,.25],[N.D4,.25],[N.B3,.25],
-        [N.D4,.25],[N.D4,.25],[_,.25],[N.D4,.25],[N.D4,.25],[_,.25],[N.D4,.25],[N.D4,.25],
-        [N.Ab3,.25],[N.F3,.25],[N.D3,.25],[N.Ab3,.25],[N.B3,.25],[N.D4,.25],[N.F4,.25],[N.D4,.25],
-        [N.D4,.25],[N.F4,.25],[N.Ab4,.25],[N.B4,.25],
-        [N.D5,.25],[N.B4,.25],[N.Ab4,.25],[N.F4,.25],
-        [N.D4,.25],[N.B3,.25],[N.Ab3,.25],[N.F3,.25],
-        [N.D3,.5],[_,.25],[N.D3,.25],
-      ]},                                                                  // 16 beats
-      // Bass — sawtooth: brutal, syncopated, low-end assault
-      { wave: 'sawtooth', gain: 0.12, seq: [
-        [N.D2,1],[N.D2,.5],[_,.5],
-        [N.F2,1],[N.F2,.5],[N.D2,.5],
-        [N.Bb2,.5],[N.A2,.5],[N.G2,.5],[N.F2,.5],
-        [N.D2,.5],[_,.25],[N.D2,.25],[N.D2,.5],[_,.5],
-        [N.D2,.25],[N.D2,.25],[N.D2,.25],[N.D2,.25],[N.D2,.25],[_,.75],
-        [N.F2,.5],[N.A2,.5],[N.Bb2,.5],[N.A2,.5],
-        [N.G2,.5],[N.F2,.5],[N.D2,.5],[_,.5],
-        [N.D2,1],[N.D2,1],
-      ]},                                                                  // 16 beats
-      // Stabs — triangle: off-beat syncopated accents for that techno snap
-      { wave: 'triangle', gain: 0.09, seq: [
-        [_,.5],[N.D4,.5],[_,.5],[N.Ab4,.5],
-        [_,.5],[N.F4,.5],[_,.5],[N.D4,.5],
-        [N.D5,.25],[_,.75],[N.B4,.25],[_,.75],
-        [N.Ab4,.25],[N.F4,.25],[N.D4,.25],[_,1.25],
-        [_,.5],[N.D4,.5],[_,.25],[N.F4,.25],[_,.5],
-        [N.Ab4,.5],[_,.5],[N.B4,.5],[_,.5],
-        [N.D5,.25],[N.B4,.25],[N.Ab4,.25],[N.F4,.25],[N.D4,.5],[_,.5],
-        [N.D4,.25],[_,.25],[N.D4,.5],[_,1],
-      ]},                                                                  // 16 beats
+      // Lead — square, driving 16th arp
+      { wave: 'square', gain: 0.09, pan: 0.1,
+        filter: { type: 'bandpass', freq: 1400 },
+        seq: [
+          // ── A section ───────────────────────────────────────
+          [N.D4,.25],[N.F4,.25],[N.Ab4,.25],[N.B4,.25],
+          [N.B4,.25],[N.Ab4,.25],[N.F4,.25],[N.D4,.25],
+          [N.D4,.25],[N.F4,.25],[N.Ab4,.25],[N.B4,.25],
+          [N.D5,.25],[N.B4,.25],[N.Ab4,.25],[N.F4,.25],
+          [N.D4,.25],[N.Ab4,.25],[N.D4,.25],[N.Ab4,.25],
+          [N.F4,.25],[N.B4,.25],[N.F4,.25],[N.B4,.25],
+          [N.Ab4,.25],[N.D5,.25],[N.Ab4,.25],[N.D4,.25],
+          [N.B3,.25],[N.F4,.25],[N.B3,.25],[N.D4,.25],
+          [N.D4,.25],[N.F4,.25],[N.Ab4,.25],[N.B4,.25],
+          [N.D5,.25],[N.B4,.25],[N.Ab4,.25],[N.F4,.25],
+          [N.D4,.25],[_,.25],[N.D4,.25],[N.F4,.25],
+          [N.Ab4,.25],[N.B4,.25],[N.D5,.25],[_,.25],
+          [N.Ab4,.25],[N.F4,.25],[N.D4,.25],[N.B3,.25],
+          [N.D4,.25],[N.Ab4,.25],[N.F4,.25],[N.D4,.25],
+          [N.B3,.25],[N.F4,.25],[N.Ab4,.25],[N.B4,.25],
+          [N.D4,.5],[_,.25],[N.D4,.25],
+          // ── B section (octave up) ────────────────────────────
+          [N.D5,.25],[N.F5,.25],[N.Ab5,.25],[N.B5,.25],
+          [N.B5,.25],[N.Ab5,.25],[N.F5,.25],[N.D5,.25],
+          [N.D5,.25],[N.F5,.25],[N.Ab5,.25],[N.B5,.25],
+          [N.D5,.25],[N.B4,.25],[N.Ab4,.25],[N.F4,.25],
+          [N.D5,.25],[N.Ab5,.25],[N.D5,.25],[N.Ab5,.25],
+          [N.F5,.25],[N.B5,.25],[N.F5,.25],[N.B5,.25],
+          [N.Ab5,.25],[N.D5,.25],[N.Ab4,.25],[N.D4,.25],
+          [N.B3,.25],[N.D4,.25],[N.F4,.25],[N.Ab4,.25],
+          [N.D5,.25],[N.F5,.25],[N.Ab5,.25],[N.B5,.25],
+          [N.D5,.25],[N.B4,.25],[N.Ab4,.25],[N.F4,.25],
+          [N.D4,.25],[_,.25],[N.D5,.25],[N.F5,.25],
+          [N.Ab5,.25],[N.B5,.25],[N.D5,.25],[_,.25],
+          [N.Ab4,.25],[N.F4,.25],[N.D4,.25],[N.B3,.25],
+          [N.D4,.25],[N.Ab4,.25],[N.F4,.25],[N.D5,.25],
+          [N.B4,.25],[N.Ab4,.25],[N.F4,.25],[N.D4,.25],
+          [N.D4,.5],[_,.25],[N.D4,.25],
+        ]},                                                                    // 32 beats
+      // Bass — sawtooth slams, doubled
+      { wave: 'sawtooth', gain: 0.11, pan: 0.0,
+        filter: { type: 'lowpass', freq: 440 },
+        seq: [
+          [N.D2,.5],[_,.25],[N.D2,.25],[N.D2,.5],[N.D2,.5],
+          [N.F2,.5],[_,.25],[N.F2,.25],[N.Ab2,.5],[N.F2,.5],
+          [N.D2,.5],[N.D2,.5],[N.B2,.5],[N.D2,.5],
+          [N.Ab2,.5],[N.F2,.5],[N.D2,1],
+          [N.D2,.5],[N.D2,.5],[N.F2,.5],[N.Ab2,.5],
+          [N.B2,.5],[N.Ab2,.5],[N.F2,.5],[N.D2,.5],
+          [N.D2,.25],[N.D2,.25],[N.F2,.25],[N.Ab2,.25],[N.B2,.5],[N.D2,.5],
+          [N.D2,.5],[N.Ab2,.5],[N.D2,1],
+          // bar 2
+          [N.D2,.5],[_,.25],[N.D2,.25],[N.F2,.5],[N.D2,.5],
+          [N.Ab2,.5],[_,.25],[N.Ab2,.25],[N.B2,.5],[N.Ab2,.5],
+          [N.D2,.5],[N.D2,.5],[N.F2,.5],[N.D2,.5],
+          [N.B2,.5],[N.Ab2,.5],[N.D2,1],
+          [N.D2,.5],[N.D2,.5],[N.Ab2,.5],[N.F2,.5],
+          [N.D2,.5],[N.B2,.5],[N.Ab2,.5],[N.F2,.5],
+          [N.D2,.25],[N.F2,.25],[N.Ab2,.25],[N.B2,.25],[N.D2,.5],[N.D2,.5],
+          [N.D2,.5],[N.D2,.5],[N.D2,1],
+        ]},                                                                    // 32 beats
+      // Stabs — triangle: syncopated, doubled
+      { wave: 'triangle', gain: 0.08, pan: -0.3,
+        filter: { type: 'highpass', freq: 400 },
+        seq: [
+          [N.D4,.25],[_,.25],[N.Ab4,.25],[_,.25],
+          [N.F4,.25],[_,.25],[N.B4,.25],[_,.25],
+          [N.D4,.25],[N.F4,.25],[N.Ab4,.25],[_,.25],
+          [N.B4,.25],[_,.25],[N.D4,.5],
+          [_,.25],[N.Ab4,.25],[_,.25],[N.D4,.25],
+          [N.F4,.25],[N.B4,.25],[_,.25],[N.Ab4,.25],
+          [N.D4,.25],[_,.25],[N.F4,.25],[N.Ab4,.25],
+          [N.B4,.25],[N.D4,.25],[_,.5],
+          [N.D4,.25],[_,.25],[N.Ab4,.25],[_,.25],
+          [N.F4,.25],[N.B4,.25],[_,.25],[N.D5,.25],
+          [_,.25],[N.Ab4,.25],[N.F4,.25],[_,.25],
+          [N.D4,.5],[_,.25],[N.B3,.25],
+          [N.D4,.25],[N.F4,.25],[_,.25],[N.Ab4,.25],
+          [N.B4,.25],[_,.25],[N.D5,.25],[_,.25],
+          [N.Ab4,.25],[N.F4,.25],[N.D4,.25],[_,.25],
+          [N.D4,.5],[_,.5],
+          // bar 2 (higher)
+          [N.D5,.25],[_,.25],[N.Ab5,.25],[_,.25],
+          [N.F5,.25],[_,.25],[N.B5,.25],[_,.25],
+          [N.D5,.25],[N.F5,.25],[N.Ab5,.25],[_,.25],
+          [N.B5,.25],[_,.25],[N.D5,.5],
+          [_,.25],[N.Ab5,.25],[_,.25],[N.D5,.25],
+          [N.F5,.25],[N.B5,.25],[_,.25],[N.Ab5,.25],
+          [N.D5,.25],[_,.25],[N.F5,.25],[N.Ab5,.25],
+          [N.B5,.25],[N.D5,.25],[_,.5],
+          [N.D5,.25],[_,.25],[N.Ab4,.25],[_,.25],
+          [N.F4,.25],[N.B4,.25],[_,.25],[N.D5,.25],
+          [_,.25],[N.Ab4,.25],[N.F4,.25],[_,.25],
+          [N.D4,.5],[_,.25],[N.B3,.25],
+          [N.D4,.25],[N.F4,.25],[_,.25],[N.Ab4,.25],
+          [N.B4,.25],[_,.25],[N.D5,.25],[_,.25],
+          [N.Ab4,.25],[N.F4,.25],[N.D4,.25],[_,.25],
+          [N.D4,.5],[_,.5],
+        ]},                                                                    // 32 beats
     ],
   },
 
-  // ── GALACTIC COUNCIL (council) ────────────────────────────
-  // A natural minor: A B C D E F G — classic prog/sci-fi minor mode.
-  // 128bpm. Sine lead has a memorable hook (like Daft Punk meets Final Fantasy battle theme).
-  // Square bass drives a steady 4/4 pulse. Detuned sawtooth pad adds electronic texture.
+  // ── THE COUNCIL (council) ────────────────────────────────
+  // A minor: A C D E G. 128 bpm. Space house.
+  // A section: hypnotic hook in oct 4. B section: hook rises to A5/E5 with
+  // sweeping synth energy, then an octave drop for impact.
   council: {
     bpm: 128,
     tracks: [
-      // Lead — sine: strong hook with call-and-response phrasing
-      { wave: 'sine', gain: 0.16, seq: [
-        [N.A4,.5],[_,.25],[N.A4,.25],[N.E4,.5],[N.A4,.5],
-        [N.C5,.5],[N.B4,.5],[N.A4,.5],[_,.5],
-        [N.G4,.5],[N.A4,.5],[N.B4,.5],[N.C5,.5],
-        [N.D5,.5],[N.C5,.25],[N.B4,.25],[N.A4,.5],[N.E4,.5],
-        [N.A4,.25],[N.A4,.25],[_,.25],[N.A4,.25],[N.A4,.25],[N.A4,.25],[_,.5],
-        [N.D5,.5],[N.C5,.25],[N.B4,.25],[N.A4,.5],[N.G4,.5],
-        [N.F4,.5],[N.G4,.5],[N.A4,.5],[N.B4,.5],
-        [N.A4,1],[_,.5],[N.A4,.5],
-      ]},                                                                  // 16 beats
-      // Bass — square: pumping 4-on-the-floor with walking movement
-      { wave: 'square', gain: 0.11, seq: [
-        [N.A2,.5],[N.A2,.5],[N.A2,.5],[N.A2,.5],
-        [N.G2,.5],[N.G2,.5],[N.A2,.5],[N.A2,.5],
-        [N.A2,.5],[N.A2,.5],[N.D2,.5],[N.D2,.5],
-        [N.E2,.5],[N.E2,.5],[N.A2,.5],[N.A2,.5],
-        [N.A2,.5],[N.A2,.5],[N.A2,.5],[N.A2,.5],
-        [N.F2,.5],[N.G2,.5],[N.F2,.5],[N.G2,.5],
-        [N.A2,.5],[N.B2,.5],[N.A2,.5],[N.G2,.5],
-        [N.A2,.5],[N.A2,.5],[N.A2,1],
-      ]},                                                                  // 16 beats
-      // Pad — sawtooth, detuned: electronic texture, space-synth shimmer
-      { wave: 'sawtooth', gain: 0.07, detune: 7, seq: [
-        [N.A4,.5],[N.C5,.5],[N.E4,.5],[N.A4,.5],
-        [N.A4,.25],[_,.25],[N.A4,.25],[_,.25],[N.C5,.25],[_,.25],[N.A4,.25],[_,.25],
-        [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.B4,.5],
-        [N.A4,.5],[N.G4,.5],[N.E4,.5],[N.A4,.5],
-        [N.A4,.5],[N.C5,.5],[N.A4,.5],[N.E4,.5],
-        [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.D5,.5],
-        [N.C5,.5],[N.A4,.5],[N.G4,.5],[N.E4,.5],
-        [N.A4,.5],[N.A4,.5],[N.A4,1],
-      ]},                                                                  // 16 beats
+      // Lead — sine: clean and pure, vibrato for warmth
+      { wave: 'sine', gain: 0.16, pan: -0.2,
+        filter: { type: 'lowpass', freq: 6000 },
+        vibrato: { rate: 5.0, depth: 10 },
+        seq: [
+          // ── A section ───────────────────────────────────────
+          [N.A4,.5],[N.C5,.5],[N.E4,.5],[N.A4,.5],
+          [N.G4,.5],[N.E4,.5],[N.D4,.5],[N.A4,.5],
+          [N.A4,.5],[N.E4,.5],[N.G4,.5],[N.A4,.5],
+          [N.C5,.5],[N.A4,.25],[N.G4,.25],[N.E4,.5],[N.D4,.5],
+          [N.A4,.5],[N.C5,.5],[N.E5,.5],[N.C5,.5],
+          [N.A4,.5],[N.G4,.5],[N.E4,.5],[N.D4,.5],
+          [N.A4,.25],[N.C5,.25],[N.E5,.25],[N.G4,.25],[N.A4,.5],[N.E4,.5],
+          [N.A4,2],
+          // ── B section (soars into oct 5) ────────────────────
+          [N.A5,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],
+          [N.G5,.5],[N.E5,.5],[N.D5,.5],[N.A4,.5],
+          [N.A5,.5],[N.E5,.5],[N.G5,.5],[N.A5,.5],
+          [N.C5,.5],[N.A4,.25],[N.G4,.25],[N.E5,.5],[N.D5,.5],
+          [N.A5,.5],[N.G5,.25],[N.E5,.25],[N.D5,.5],[N.C5,.5],
+          [N.A4,.5],[N.G4,.5],[N.E4,.5],[N.D4,.5],
+          [N.A4,.25],[N.C5,.25],[N.E5,.25],[N.A5,.25],[N.E5,.5],[N.C5,.5],
+          [N.A4,2],
+        ]},                                                                    // 32 beats
+      // Kick / bass — square: 4-on-the-floor, doubled
+      { wave: 'square', gain: 0.09, pan: 0.0,
+        filter: { type: 'lowpass', freq: 400 },
+        seq: [
+          [N.A2,.5],[N.A2,.5],[N.A2,.5],[N.A2,.5],
+          [N.F2,.5],[N.G2,.5],[N.F2,.5],[N.G2,.5],
+          [N.A2,.5],[N.B2,.5],[N.A2,.5],[N.G2,.5],
+          [N.A2,.5],[N.A2,.5],[N.A2,1],
+          [N.A2,.5],[N.A2,.5],[N.E2,.5],[N.A2,.5],
+          [N.G2,.5],[N.E2,.5],[N.D2,.5],[N.A2,.5],
+          [N.A2,.5],[N.A2,.5],[N.E2,.5],[N.G2,.5],
+          [N.A2,.5],[N.A2,.5],[N.A2,1],
+          // bar 2
+          [N.A2,.5],[N.A2,.5],[N.A2,.5],[N.A2,.5],
+          [N.F2,.5],[N.G2,.5],[N.F2,.5],[N.G2,.5],
+          [N.A2,.5],[N.B2,.5],[N.G2,.5],[N.E2,.5],
+          [N.A2,.5],[N.A2,.5],[N.A2,1],
+          [N.A2,.5],[N.E2,.5],[N.A2,.5],[N.G2,.5],
+          [N.F2,.5],[N.G2,.5],[N.A2,.5],[N.E2,.5],
+          [N.D2,.5],[N.F2,.5],[N.G2,.5],[N.A2,.5],
+          [N.A2,.5],[N.A2,.5],[N.A2,1],
+        ]},                                                                    // 32 beats
+      // Pad — sawtooth, detuned shimmer, doubled
+      { wave: 'sawtooth', gain: 0.06, detune: 7, pan: 0.35,
+        filter: { type: 'lowpass', freq: 2800 },
+        seq: [
+          [N.A4,.5],[N.C5,.5],[N.E4,.5],[N.A4,.5],
+          [N.A4,.25],[_,.25],[N.A4,.25],[_,.25],[N.C5,.25],[_,.25],[N.A4,.25],[_,.25],
+          [N.G4,.5],[N.B4,.5],[N.D5,.5],[N.B4,.5],
+          [N.A4,.5],[N.G4,.5],[N.E4,.5],[N.A4,.5],
+          [N.A4,.5],[N.C5,.5],[N.A4,.5],[N.E4,.5],
+          [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.D5,.5],
+          [N.C5,.5],[N.A4,.5],[N.G4,.5],[N.E4,.5],
+          [N.A4,.5],[N.A4,.5],[N.A4,1],
+          // bar 2 (higher shimmer)
+          [N.A5,.5],[N.C5,.5],[N.E5,.5],[N.A5,.5],
+          [N.A5,.25],[_,.25],[N.A5,.25],[_,.25],[N.C5,.25],[_,.25],[N.E5,.25],[_,.25],
+          [N.G5,.5],[N.B4,.5],[N.D5,.5],[N.B4,.5],
+          [N.A4,.5],[N.G4,.5],[N.E5,.5],[N.A5,.5],
+          [N.A5,.5],[N.G5,.5],[N.E5,.5],[N.C5,.5],
+          [N.D4,.5],[N.F4,.5],[N.A4,.5],[N.D5,.5],
+          [N.C5,.5],[N.A4,.5],[N.G4,.5],[N.E4,.5],
+          [N.A4,.5],[N.A4,.5],[N.A4,1],
+        ]},                                                                    // 32 beats
     ],
   },
 };
@@ -293,6 +517,9 @@ class SoundManagerClass {
   constructor() {
     this._ctx          = null;
     this._masterGain   = null;
+    this._compressor   = null;
+    this._reverb       = null;
+    this._reverbGain   = null;
     this._enabled      = true;
     this._volume       = 0.55;
     this._currentRealm = null;
@@ -300,12 +527,11 @@ class SoundManagerClass {
     this._session      = 0;
     this._oscillators  = [];
 
-    // Restore preferences
     try {
       const saved = JSON.parse(localStorage.getItem('ps_audio') || '{}');
       if (typeof saved.enabled === 'boolean') this._enabled = saved.enabled;
       if (typeof saved.volume  === 'number')  this._volume  = Math.max(0, Math.min(1, saved.volume));
-    } catch { /* first launch or storage unavailable */ }
+    } catch { /* first launch */ }
   }
 
   // ── Public API ──────────────────────────────────────────
@@ -318,7 +544,7 @@ class SoundManagerClass {
     if (!themeName) return;
     this._ensureCtx();
     this._stop();
-    if (this._ctx.state === 'suspended') return; // will start on resume()
+    if (this._ctx.state === 'suspended') return;
     this._startTheme(THEMES[themeName]);
   }
 
@@ -371,9 +597,43 @@ class SoundManagerClass {
   _ensureCtx() {
     if (this._ctx) return;
     this._ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Dynamics compressor — instant polish, glues the mix together
+    this._compressor = this._ctx.createDynamicsCompressor();
+    this._compressor.threshold.value = -20;
+    this._compressor.knee.value      = 15;
+    this._compressor.ratio.value     = 4;
+    this._compressor.attack.value    = 0.003;
+    this._compressor.release.value   = 0.22;
+    this._compressor.connect(this._ctx.destination);
+
     this._masterGain = this._ctx.createGain();
     this._masterGain.gain.value = this._enabled ? this._volume : 0;
-    this._masterGain.connect(this._ctx.destination);
+    this._masterGain.connect(this._compressor);
+
+    // Convolver reverb — algorithmically generated impulse response
+    this._reverb = this._buildReverb(1.2, 0.9);
+    this._reverbGain = this._ctx.createGain();
+    this._reverbGain.gain.value = 0.14;   // wet level — subtle spatial wash
+    this._reverb.connect(this._reverbGain);
+    this._reverbGain.connect(this._masterGain);
+  }
+
+  /** Build a simple decaying-noise impulse response for reverb. */
+  _buildReverb(durationSec, decay) {
+    const ctx    = this._ctx;
+    const rate   = ctx.sampleRate;
+    const len    = Math.floor(rate * durationSec);
+    const ir     = ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = ir;
+    return conv;
   }
 
   _stop() {
@@ -400,7 +660,6 @@ class SoundManagerClass {
     const nextStartT = t0 + seqDurSec;
     const sessionId  = this._session;
 
-    // Pre-schedule next loop 350ms before the current one ends to avoid gaps.
     const loopDelay = Math.max(50, (seqDurSec - 0.35) * 1000);
     setTimeout(() => {
       if (this._session !== sessionId) return;
@@ -413,6 +672,29 @@ class SoundManagerClass {
     const ctx = this._ctx;
     let t = startT, beats = 0;
 
+    // Build per-track shared nodes (filter + panner)
+    const filter = ctx.createBiquadFilter();
+    if (track.filter) {
+      filter.type            = track.filter.type;
+      filter.frequency.value = track.filter.freq;
+      filter.Q.value         = track.filter.Q ?? 1.0;
+    } else {
+      filter.type = 'allpass';
+    }
+
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = track.pan ?? 0;
+
+    // Routing: filter → panner → masterGain  (dry)
+    //          filter → reverb  (wet, shared reverb bus)
+    filter.connect(panner);
+    panner.connect(this._masterGain);
+
+    // Reverb send (only for melodic/lead tracks with vibrato, keep bass dry)
+    if (track.vibrato) {
+      filter.connect(this._reverb);
+    }
+
     for (const [freq, dur] of track.seq) {
       const durSec = dur * beatLen;
       if (freq !== null) {
@@ -422,16 +704,35 @@ class SoundManagerClass {
         osc.frequency.value = freq;
         if (track.detune) osc.detune.value = track.detune;
 
-        // ADSR-lite: fast attack, sustain, quick release — no clicks at note ends
-        const attack  = Math.min(0.020, durSec * 0.06);
-        const release = Math.min(0.060, durSec * 0.15);
+        // Vibrato LFO — adds expressiveness to melodic leads
+        if (track.vibrato && dur >= 0.4) {
+          const lfo     = ctx.createOscillator();
+          const lfoGain = ctx.createGain();
+          lfo.frequency.value  = track.vibrato.rate;
+          lfoGain.gain.value   = track.vibrato.depth;
+          // Delay vibrato onset slightly (natural performer gesture)
+          const vibratoOnset = t + Math.min(0.12, durSec * 0.3);
+          lfoGain.gain.setValueAtTime(0,                   t);
+          lfoGain.gain.linearRampToValueAtTime(0,          vibratoOnset);
+          lfoGain.gain.linearRampToValueAtTime(track.vibrato.depth,
+                                               vibratoOnset + 0.06);
+          lfo.connect(lfoGain);
+          lfoGain.connect(osc.frequency);
+          lfo.start(t);
+          lfo.stop(t + durSec + 0.01);
+          this._oscillators.push(lfo);
+        }
+
+        // ADSR: fast attack, full sustain, clean release — no clicks
+        const attack  = Math.min(0.018, durSec * 0.05);
+        const release = Math.min(0.055, durSec * 0.15);
         env.gain.setValueAtTime(0,           t);
         env.gain.linearRampToValueAtTime(track.gain, t + attack);
         env.gain.setValueAtTime(track.gain,  t + durSec - release);
         env.gain.linearRampToValueAtTime(0,  t + durSec);
 
         osc.connect(env);
-        env.connect(this._masterGain);
+        env.connect(filter);
         osc.start(t);
         osc.stop(t + durSec + 0.005);
         this._oscillators.push(osc);
