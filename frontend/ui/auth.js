@@ -157,40 +157,20 @@ const CSS = `
 }
 .tos-warning { color: #e08030; }
 #tos-footer {
-  padding: 14px 20px;
+  padding: 12px 20px;
   border-top: 1px solid #3a2800;
   flex-shrink: 0;
+  text-align: right;
 }
-#tos-check-row {
-  display: flex; align-items: flex-start;
-  gap: 10px; margin-bottom: 12px;
-}
-#tos-check-row input[type=checkbox] {
-  margin-top: 3px; width: 12px; height: 12px;
-  accent-color: var(--gold, #f0c020);
-  flex-shrink: 0; cursor: pointer;
-}
-#tos-check-row label {
-  color: #9a7040; font-size: 6px;
-  line-height: 2; cursor: pointer;
-  letter-spacing: 0.5px;
-}
-#tos-accept {
-  width: 100%; padding: 8px;
-  font: 700 9px/1 monospace;
+#tos-close {
+  padding: 6px 18px;
+  font: 700 8px/1 monospace;
   letter-spacing: 2px; cursor: pointer;
   background: #1a0e00;
   border: 1px solid var(--gold-dim, #8a6a20);
-  color: var(--gold, #f0c020);
+  color: var(--gold-dim, #8a6a20);
 }
-#tos-accept:hover:not(:disabled) { background: #2a1800; }
-#tos-accept:disabled { opacity: 0.3; cursor: default; }
-#tos-decline {
-  display: block; text-align: center;
-  margin-top: 8px; font-size: 6px;
-  color: #3a2800; cursor: pointer; letter-spacing: 1px;
-}
-#tos-decline:hover { color: #6a4020; }
+#tos-close:hover { background: #2a1800; color: var(--gold, #f0c020); }
 `;
 
 // ── HTML ─────────────────────────────────────────────────
@@ -217,10 +197,19 @@ const HTML = `
         <label>CONFIRM PASSWORD</label>
         <input id="auth-confirm" type="password" autocomplete="new-password" placeholder="••••••••" maxlength="128" />
       </div>
-      <div id="auth-tos-link" style="display:none;text-align:right;margin-top:-4px;margin-bottom:6px;">
-        <span id="auth-tos-reopen" style="font-size:5px;color:#4a3020;cursor:pointer;letter-spacing:1px;">
-          ☰ review terms of participation
-        </span>
+      <div id="auth-tos-row" style="display:none;margin-bottom:10px;">
+        <div style="display:flex;align-items:flex-start;gap:8px;">
+          <input type="checkbox" id="auth-tos-check"
+            style="margin-top:2px;flex-shrink:0;accent-color:var(--gold,#f0c020);cursor:pointer;" />
+          <label for="auth-tos-check"
+            style="font-size:5px;color:#6a5030;line-height:2;cursor:pointer;letter-spacing:0.5px;">
+            I have read and agree to the
+            <span id="auth-tos-open"
+              style="color:var(--gold-dim,#8a6a20);text-decoration:underline;cursor:pointer;">
+              Terms of Participation
+            </span>
+          </label>
+        </div>
       </div>
     </div>
     <button id="auth-submit">► ENTER THE DESERT</button>
@@ -390,17 +379,7 @@ const TOS_HTML = `
 
     </div><!-- /#tos-scroll -->
     <div id="tos-footer">
-      <div id="tos-check-row">
-        <input type="checkbox" id="tos-checkbox" />
-        <label for="tos-checkbox">
-          I HAVE READ AND UNDERSTAND THE TERMS OF PARTICIPATION. I ACKNOWLEDGE THAT
-          PYRAMID SCHEME™ IS A GAME FOR ENTERTAINMENT PURPOSES ONLY, THAT MY BUY-IN
-          PAYS FOR GAME ACCESS ONLY, THAT NO FINANCIAL RETURN IS GUARANTEED, AND THAT
-          THE OPERATOR IS NOT LIABLE FOR ANY LOSSES I MAY INCUR.
-        </label>
-      </div>
-      <button id="tos-accept" disabled>► I AGREE — PROCEED TO REGISTER</button>
-      <span id="tos-decline">✕ decline and go back</span>
+      <button id="tos-close">✕ CLOSE</button>
     </div>
   </div>
 </div>
@@ -447,90 +426,49 @@ export async function requireAuth() {
     const confirmW = document.getElementById('auth-confirm-wrap');
     const confirmEl= document.getElementById('auth-confirm');
     const demoBtn  = document.getElementById('auth-demo');
+    const tosRow   = document.getElementById('auth-tos-row');
+    const tosCheck = document.getElementById('auth-tos-check');
+    const tosOpen  = document.getElementById('auth-tos-open');
+    const tosOverlay = document.getElementById('tos-overlay');
+    const tosClose   = document.getElementById('tos-close');
 
-    // ToS elements
-    const tosOverlay  = document.getElementById('tos-overlay');
-    const tosCheckbox = document.getElementById('tos-checkbox');
-    const tosAccept   = document.getElementById('tos-accept');
-    const tosDecline  = document.getElementById('tos-decline');
-
-    let mode        = 'login'; // 'login' | 'register'
-    let tosAccepted = false;   // true once player agrees to ToS
+    let mode = 'login'; // 'login' | 'register'
 
     // Auto-switch to register when arriving via an invite link
     if (_inviteToken) {
-      // Show ToS first, then open register on accept
-      tosOverlay.classList.add('active');
-    }
-
-    const tosLinkWrap = document.getElementById('auth-tos-link');
-    const tosReopen   = document.getElementById('auth-tos-reopen');
-
-    tosReopen.addEventListener('click', () => {
-      tosCheckbox.checked = false;
-      tosAccept.disabled  = true;
-      tosOverlay.classList.add('active');
-      document.getElementById('tos-scroll').scrollTop = 0;
-    });
-
-    // ── ToS checkbox enables the accept button ──────────
-    tosCheckbox.addEventListener('change', () => {
-      tosAccept.disabled = !tosCheckbox.checked;
-    });
-
-    // ── Accept ToS ───────────────────────────────────────
-    tosAccept.addEventListener('click', () => {
-      if (!tosCheckbox.checked) return;
-      tosAccepted = true;
-      tosOverlay.classList.remove('active');
-      // Now open register tab
       mode = 'register';
       tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'register'));
-      confirmW.style.display     = 'block';
-      tosLinkWrap.style.display  = 'block';
-      submit.textContent = '► FOUND YOUR DYNASTY';
-      clearError();
-      setTimeout(() => userEl.focus(), 50);
-    });
+      confirmW.style.display = 'block';
+      tosRow.style.display   = 'block';
+      submit.textContent     = '► FOUND YOUR DYNASTY';
+    }
 
-    // ── Decline ToS ──────────────────────────────────────
-    tosDecline.addEventListener('click', () => {
-      tosOverlay.classList.remove('active');
-      // Reset back to login tab
-      mode = 'login';
-      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'login'));
-      confirmW.style.display    = 'none';
-      tosLinkWrap.style.display = 'none';
-      submit.textContent = '► ENTER THE DESERT';
-    });
+    // ── ToS modal open / close ───────────────────────────
+    function openTos() {
+      document.getElementById('tos-scroll').scrollTop = 0;
+      tosOverlay.classList.add('active');
+    }
+    tosOpen.addEventListener('click', openTos);
+    tosClose.addEventListener('click', () => tosOverlay.classList.remove('active'));
 
     function setError(msg) { errEl.textContent = msg; }
     function clearError()  { errEl.textContent = '';  }
 
-    // ── Tab switching ───────────────────────────────────
+    // ── Tab switching ────────────────────────────────────
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
-        const targetMode = tab.dataset.tab;
-        // Clicking Register: show ToS first (unless already accepted)
-        if (targetMode === 'register' && !tosAccepted) {
-          // Reset ToS state so they must re-scroll & check each time
-          tosCheckbox.checked = false;
-          tosAccept.disabled  = true;
-          tosOverlay.classList.add('active');
-          // Scroll back to top of ToS
-          document.getElementById('tos-scroll').scrollTop = 0;
-          return;
-        }
-        mode = targetMode;
+        mode = tab.dataset.tab;
         tabs.forEach(t => t.classList.toggle('active', t === tab));
-        confirmW.style.display    = mode === 'register' ? 'block' : 'none';
-        tosLinkWrap.style.display = mode === 'register' ? 'block' : 'none';
-        submit.textContent = mode === 'login' ? '► ENTER THE DESERT' : '► FOUND YOUR DYNASTY';
+        const isReg = mode === 'register';
+        confirmW.style.display = isReg ? 'block' : 'none';
+        tosRow.style.display   = isReg ? 'block' : 'none';
+        if (!isReg) tosCheck.checked = false; // reset on leaving register
+        submit.textContent = isReg ? '► FOUND YOUR DYNASTY' : '► ENTER THE DESERT';
         clearError();
       });
     });
 
-    // ── Enter key ───────────────────────────────────────
+    // ── Enter key ────────────────────────────────────────
     [userEl, passEl, confirmEl].forEach(el => {
       el.addEventListener('keydown', e => { if (e.key === 'Enter') doSubmit(); });
     });
@@ -547,6 +485,7 @@ export async function requireAuth() {
 
       if (mode === 'register') {
         if (password !== confirmEl.value) { setError('Passwords do not match.'); return; }
+        if (!tosCheck.checked) { setError('You must agree to the Terms of Participation.'); return; }
       }
 
       submit.disabled = true;
@@ -570,13 +509,12 @@ export async function requireAuth() {
 
     submit.addEventListener('click', doSubmit);
 
-    // ── Guest / demo mode ─────────────────────────────
+    // ── Guest / demo mode ────────────────────────────────
     demoBtn.addEventListener('click', () => {
       _dismiss(overlay);
-      resolve(null); // null token = guest, no server sync
+      resolve(null);
     });
 
-    // Focus username on load
     setTimeout(() => userEl.focus(), 50);
   });
 }
