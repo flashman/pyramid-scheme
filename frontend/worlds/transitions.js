@@ -97,6 +97,49 @@ export function launchTransRender(progress) {
   }
 }
 
+// ── Atlantis dive / surface ───────────────────────────────
+// Ripple rings from centre, then deep-blue wash.
+// Used both on dive-in and on surfacing (reversed feel is fine — water either way).
+
+export function atlantisTransRender(progress) {
+  const p = Math.min(1, progress);
+  const cx = CW / 2;
+  const cy = CH / 2;
+
+  // Expanding concentric water rings
+  if (p < 0.5) {
+    const rp = p / 0.5;
+    for (let r = 0; r < 5; r++) {
+      const rr = ((r / 5) + rp * 1.2) % 1;
+      X.save();
+      X.globalAlpha = (1 - rr) * 0.45;
+      X.strokeStyle = '#44bbdd';
+      X.lineWidth   = 2;
+      X.beginPath();
+      X.arc(cx, cy, rr * Math.max(CW, CH) * 0.9 + 8, 0, Math.PI * 2);
+      X.stroke();
+      X.restore();
+    }
+    // Blue tint washing in
+    X.save();
+    X.globalAlpha = rp * 0.5;
+    X.fillStyle   = '#001428';
+    X.fillRect(0, 0, CW, CH);
+    X.restore();
+  } else {
+    // Full deep-water fade
+    const fp = (p - 0.5) * 2;
+    X.save();
+    X.globalAlpha = Math.min(1, fp * 1.15);
+    const dg = X.createLinearGradient(0, 0, 0, CH);
+    dg.addColorStop(0, '#002040');
+    dg.addColorStop(1, '#000810');
+    X.fillStyle = dg;
+    X.fillRect(0, 0, CW, CH);
+    X.restore();
+  }
+}
+
 // ── Vault descent ─────────────────────────────────────────
 // Gold blaze in (warmth of the oasis above), then darkness
 // (the sealed chamber swallows all light).

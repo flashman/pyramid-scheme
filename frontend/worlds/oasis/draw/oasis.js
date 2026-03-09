@@ -7,7 +7,9 @@ import { COL }               from '../../../engine/colors.js';
 import { OASIS_FLOOR,
          POOL_WX, POOL_WIDTH,
          SPHINX_WX,
-         PASSAGE_WX }        from '../constants.js';
+         PASSAGE_WX,
+         POOL_CENTER_WX,
+         POOL_DIVE_RANGE }   from '../constants.js';
 import { drawPharaoh }       from '../../../draw/pharaoh.js';
 import { RiddleManager }     from '../riddles.js';
 import { Flags }             from '../../../engine/flags.js';
@@ -607,6 +609,141 @@ function drawOasisHUD(realm) {
   X.textAlign = 'left';
 }
 
+// ── Pool statue: rises after the vault ritual ─────────────
+//
+// drawPoolStatue(realm, t)
+// Nothing is visible until atlantis_vault_opened is set from the vault.
+// Then the statue rises from the pool water over a few seconds.
+// When fully risen, a dive portal glows at the pool floor.
+// Called INSIDE the world-space X.translate(-camX, 0) block.
+
+function drawPoolStatue(realm, t) {
+  const vaultOpened = Flags.get('atlantis_vault_opened') || false;
+  if (!vaultOpened) return;
+
+  const risen    = realm._statueRisen;
+  const progress = realm._statueProgress || 0;  // 0..1
+  const wx       = POOL_CENTER_WX;
+  const floor    = OASIS_FLOOR;
+
+  // ── Churning water effect when statue is rising ────────
+  if (progress > 0 && progress < 1) {
+    const churnA = (1 - progress) * 0.5;
+    X.save();
+    for (let i = 0; i < 4; i++) {
+      const phase = (t / 800 + i * 0.25) % 1;
+      const ripR  = 12 + i * 14 + phase * 20;
+      X.globalAlpha = (1 - phase) * churnA;
+      X.strokeStyle = '#66ddee';
+      X.lineWidth   = 1;
+      X.beginPath();
+      X.ellipse(wx, floor + 6, ripR, ripR * 0.28, 0, 0, Math.PI * 2);
+      X.stroke();
+    }
+    X.restore();
+  }
+
+  // ── Statue emerging from water ─────────────────────────
+  if (progress > 0) {
+    const statueH  = 90;
+    const totalRise = statueH + 14;
+    const visible  = progress * totalRise;
+    const clampVis = Math.min(statueH, visible);
+    const baseY    = floor;
+    const topY     = baseY - clampVis;
+
+    X.save();
+    // Clip to the visible portion (rising from below waterline)
+    X.beginPath();
+    X.rect(wx - 24, topY, 48, clampVis + 12);
+    X.clip();
+
+    // Aura glow — teal, intensifies as statue rises
+    const pulse = 0.25 + Math.sin(t * 0.002) * 0.12;
+    X.globalAlpha = pulse * progress;
+    const aura = X.createRadialGradient(wx, baseY - clampVis * 0.5, 0, wx, baseY - clampVis * 0.5, 46);
+    aura.addColorStop(0, '#00ffcc');
+    aura.addColorStop(1, 'transparent');
+    X.fillStyle = aura;
+    X.fillRect(wx - 50, topY - 20, 100, clampVis + 40);
+
+    // Statue body — dark teal stone
+    X.globalAlpha = 0.92;
+    const stg = X.createLinearGradient(wx - 12, 0, wx + 12, 0);
+    stg.addColorStop(0, '#1a4a5a');
+    stg.addColorStop(0.5, '#2a6a7a');
+    stg.addColorStop(1, '#1a4a5a');
+    X.fillStyle = stg;
+
+    // Torso
+    X.fillRect(wx - 11, baseY - statueH, 22, statueH);
+    // Shoulders / arms extended upward (supplication or offering)
+    X.fillRect(wx - 18, baseY - statueH + 16, 36, 10);
+    X.fillRect(wx - 22, baseY - statueH + 22, 8, 32);
+    X.fillRect(wx + 14, baseY - statueH + 22, 8, 32);
+    // Head
+    X.fillRect(wx - 8, baseY - statueH - 15, 16, 17);
+
+    // Crown / headdress — Atlantean, not Egyptian
+    X.fillStyle = '#226655';
+    X.fillRect(wx - 11, baseY - statueH - 20, 22, 6);
+    X.fillStyle = '#00ddaa';
+    X.globalAlpha = 0.55 + Math.sin(t * 0.0022) * 0.2;
+    for (let i = 0; i < 5; i++) {
+      const spireH = 4 + (i === 2 ? 4 : 0);
+      X.fillRect(wx - 10 + i * 5, baseY - statueH - 20 - spireH, 3, spireH);
+    }
+
+    // Eye glow
+    X.globalAlpha = 0.9 + Math.sin(t * 0.004) * 0.1;
+    X.fillStyle = '#00ffee';
+    X.fillRect(wx - 5, baseY - statueH - 8, 2, 2);
+    X.fillRect(wx + 3, baseY - statueH - 8, 2, 2);
+
+    // Inscriptions on torso (carved lines)
+    X.globalAlpha = 0.3;
+    X.fillStyle = '#005544';
+    X.fillRect(wx - 7, baseY - statueH + 30, 14, 1);
+    X.fillRect(wx - 7, baseY - statueH + 38, 14, 1);
+    X.fillRect(wx - 7, baseY - statueH + 46, 14, 1);
+
+    X.restore();
+  }
+
+  // ── Dive portal glow when fully risen ─────────────────
+  if (risen) {
+    // Elliptical portal at the pool floor
+    X.save();
+    const glow  = 0.18 + Math.sin(t * 0.0018) * 0.09;
+    const pulse = Math.sin(t * 0.003);
+    X.globalAlpha = glow;
+    const pg = X.createRadialGradient(wx, floor + 8, 2, wx, floor + 8, 38);
+    pg.addColorStop(0, '#00ffcc');
+    pg.addColorStop(0.4, '#005566');
+    pg.addColorStop(1, 'transparent');
+    X.fillStyle = pg;
+    X.beginPath();
+    X.ellipse(wx, floor + 8, 38 + pulse * 4, 12 + pulse * 2, 0, 0, Math.PI * 2);
+    X.fill();
+    X.restore();
+
+    // Dive hint
+    const inPool  = realm.px >= POOL_WX && realm.px <= POOL_WX + POOL_WIDTH;
+    const nearDive = realm.px && Math.abs(realm.px - wx) < POOL_DIVE_RANGE;
+    if (inPool && nearDive) {
+      const ha = 0.6 + 0.4 * Math.abs(Math.sin(t / 320));
+      X.save();
+      X.globalAlpha = ha;
+      X.font = '7px monospace';
+      X.fillStyle = '#00ffcc';
+      X.textAlign = 'center';
+      X.fillText('[↓] DIVE INTO ATLANTIS', wx, floor - 110);
+      X.textAlign = 'left';
+      X.restore();
+    }
+  }
+}
+
 // ── Passage entry hint (screen-space) ────────────────────
 
 function drawPassageHint(worldPx, camX, t, riddlesSolved) {
@@ -647,6 +784,9 @@ export function drawOasis(realm) {
   // Pass player world-x and riddles solved so pool can react
   const playerInPool = realm.px >= POOL_WX && realm.px <= POOL_WX + POOL_WIDTH;
   drawPool(t, playerInPool ? realm.px : undefined, riddlesSolved);
+
+  // Atlantis statue — rises from pool after the vault ritual
+  drawPoolStatue(realm, t);
 
   // Palms — a few early lone trees on the dry entry stretch, then clustered around pool
   drawPalm(210,                         OASIS_FLOOR, 0.75, t, 0.8);

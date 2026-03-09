@@ -2,6 +2,80 @@
 
 ---
 
+## v1.37 — Atlantis realm: vault-gated entry, alt-history sphinx lore
+
+> *The pool was always the way in. But to open it you must first go beneath the sphinx and learn what the sphinx actually is. The stele tells you. Then the altar opens the door. The flow is non-linear by design.*
+
+### Player flow
+
+1. Solve sphinx riddles → descend to vault
+2. Read the Dream Stele (extended — see below)
+3. Walk to the altar, press **[SPACE]** → altar grinds aside, ancient water rises
+4. Return to oasis, walk to pool → statue emerges from the water
+5. When statue is fully risen, press **[↓]** in the pool → dive to Atlantis
+6. Swim freely with arrow keys; swim up past the surface threshold + press **[↑]** → back to oasis
+
+### `worlds/oasis/VaultRealm.js`
+- **Dream Stele dialogue extended** from 7 nodes to 15.
+  - The original Thutmose IV / pyramid-scheme allegory nodes are preserved verbatim.
+  - After the final allegory node, the text changes register to `BENEATH THE INSCRIPTION  ✦  ~10,500 BC`:
+    - **Hydraulic weathering** — the sphinx body shows rainfall erosion, not wind/sand. The last rains capable of this fell before 7000 BC (Schoch / West theory).
+    - **Astronomical alignment** — on the spring equinox of 10,500 BC the sphinx faced the rising of Leo precisely, pointing to a pre-pharaonic builder.
+    - **Pre-diluvian civilisation** — the builders had a system, believed it was permanent; rising sea levels at the end of the last Ice Age drowned their coastal world.
+    - **The passage** — they left a record beneath the altar in this room, connected to the same aquifer as the pool above. They called it *the House of the Inundated*.
+    - **The mirror** — their civilisation also had uplines, also promised thrones, also had princes who dug and were not recorded. We are their downline.
+  - `stele_read` flag is now set at the final node (`door`) rather than at `question`. The altar hint fires here.
+- **Altar entity registered** in `InteractableRegistry` alongside the stele NPC.
+  - Uses base `Entity` class with an `onInteract` override.
+  - If stele not yet read: generic "old altar" log message; no effect.
+  - If stele read and vault not opened: sets `atlantis_vault_opened`, shake 18, log messages, tells player to return to the pool.
+  - If already opened: ambient water log.
+- `onEnter()` log messages updated to reflect current state (stele unread / stele read but altar intact / vault opened).
+- Imports updated: `Entity` added from `engine/entity.js`; `ALTAR_X` added from constants.
+
+### `worlds/oasis/draw/vault.js`
+- `drawAltar()` signature updated: `(ax, fy, t, steleRead, vaultOpened)`.
+- When `vaultOpened`: teal-blue glow bleeds from stone joints; animated crack-light lines; rising water-drop particles above the altar base.
+- When `steleRead && !vaultOpened`: a subtle radial pulse glow on the altar top surface to signal interactivity.
+- When player is within 70px of altar and `steleRead && !vaultOpened`: pulsing `[SPACE] THE ALTAR AWAITS` prompt in screen space.
+- `drawVault()` and `drawHUD()` updated to pass and consume these flags.
+- HUD hint updates to `✦  PASSAGE OPEN` when `vaultOpened`.
+- Imports updated: `ALTAR_X` added from constants.
+
+### `worlds/oasis/constants.js`
+- **Removed**: `SLAB_WX`, `SLAB_INTERACT` (the pool slab mechanic is gone).
+- **Added**: `ALTAR_X = 310` (world-x of the vault altar, used by VaultRealm and draw/vault.js).
+- **Added**: `POOL_CENTER_WX = 800` (dive point — centre of pool, replaces SLAB_WX).
+- **Added**: `POOL_DIVE_RANGE = 110` (proximity threshold for dive prompt, replaces SLAB_INTERACT).
+
+### `worlds/oasis/OasisRealm.js`
+- **Removed**: `_slabToppled`, `_slabToppleTime` state and all associated logic.
+- **Removed**: SPACE-in-pool "push the slab" handler.
+- Statue rise now triggered by `atlantis_vault_opened` flag (set in vault) rather than a pool interaction.
+  - State: `_statueRising`, `_statueRiseStart`, `_statueProgress`, `_statueRisen`.
+  - In `update()`: if `atlantis_vault_opened` is newly detected and statue not risen, starts the rise animation (5 s).
+  - On `onEnter()`: if vault opened and statue not risen, resumes animation with a 500 ms head start.
+- Pool centre dive uses `POOL_CENTER_WX` / `POOL_DIVE_RANGE` (no named slab position).
+- Log messages updated throughout to reflect the new flow.
+- Imports updated: `SLAB_WX/SLAB_INTERACT` replaced with `POOL_CENTER_WX/POOL_DIVE_RANGE`.
+- SPACE in pool when vault not opened but stele read: context-sensitive hint log.
+
+### `worlds/oasis/draw/oasis.js`
+- `drawAtlantisGate()` **replaced** by `drawPoolStatue()`:
+  - No slab at all — the pool is visually unobstructed before the ritual.
+  - If `atlantis_vault_opened` is false: function returns immediately, pool unchanged.
+  - If rising: concentric elliptical ripple rings on the water surface.
+  - Statue rises with a clip-rect animation (0 → full height over 5 s): dark teal stone body with raised arms, Atlantean crown with five spires, glowing eye slits, carved inscription lines on torso.
+  - Aura glow intensifies as statue rises.
+  - When fully risen: elliptical portal glow at pool floor; `[↓] DIVE INTO ATLANTIS` prompt near dive point.
+- HUD hint updated: `[SPACE] PUSH/SPEAK` → `[SPACE] SPEAK`.
+- Imports updated: `SLAB_WX/SLAB_INTERACT` replaced with `POOL_CENTER_WX/POOL_DIVE_RANGE`.
+
+### `worlds/atlantis/` (AtlantisRealm.js, constants.js, draw/atlantis.js)
+- No changes — the realm itself is unchanged. Entry and exit mechanics are identical.
+
+---
+
 ## v1.36 — Engine abstraction pass: TriggerZone, Enemy, Collectible, getPlayerPose
 
 > *No gameplay changes. Purely structural: removes copy-paste patterns, adds missing game-object abstractions, and closes a long-standing G-sync bug in non-world realms.*

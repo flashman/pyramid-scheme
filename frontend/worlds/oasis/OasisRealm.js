@@ -12,8 +12,11 @@ import { CW, CH, X }                 from '../../engine/canvas.js';
 import { OASIS_FLOOR, OASIS_WORLD_W,
          POOL_FLOOR,
          SPHINX_WX, PASSAGE_WX,
-         POOL_WX, POOL_WIDTH }       from './constants.js';
-import { vaultTransRender }          from '../transitions.js';
+         POOL_WX, POOL_WIDTH,
+         POOL_CENTER_WX,
+         POOL_DIVE_RANGE }           from './constants.js';
+import { vaultTransRender,
+         atlantisTransRender }       from '../transitions.js';
 import { drawOasis }                 from './draw/oasis.js';
 import { RiddleManager }             from './riddles.js';
 import { log }                       from '../../ui/panels.js';
@@ -52,10 +55,15 @@ export class OasisRealm extends PhysicsRealm {
     this.moving   = false;
     this._wasInPool = false;
 
+    // ── Atlantis gate state ──────────────────────────────
+    // The vault ritual opens the passage. The pool shows the result.
+    // The statue rise is a one-way animation triggered by atlantis_vault_opened.
+    this._statueRisen    = Flags.get('atlantis_statue_risen') || false;
+    this._statueProgress = this._statueRisen ? 1 : 0;
+    this._statueRising   = false;
+    this._statueRiseStart = 0;
+
     // ── TriggerZone: pool entry ─────────────────────────
-    // Tracks pool entry/exit to fire splash and log message.
-    // Speed and jump modifications are handled inline in update()
-    // since they need per-frame data (current speed, jump power).
     this.triggers = new TriggerRegistry();
     this.triggers.add(new TriggerZone('pool', {
       x1:      POOL_WX,
@@ -69,11 +77,6 @@ export class OasisRealm extends PhysicsRealm {
 
   // ── Player pose ───────────────────────────────────────
 
-  /**
-   * Returns the display pose for this realm.
-   * Used by drawPharaoh(realm.getPlayerPose()) in draw/oasis.js so that
-   * oasis doesn't need a custom pharaoh function.
-   */
   getPlayerPose() {
     return {
       px:     this.px,
@@ -85,11 +88,6 @@ export class OasisRealm extends PhysicsRealm {
     };
   }
 
-  /**
-   * Sync realm-local player state → G so the HUD, minimap, and any
-   * G-reading system see the correct position while in the oasis.
-   * Called at the end of update().
-   */
   _syncToG() {
     G.px      = this.px;
     G.py      = this.py;
@@ -103,22 +101,45 @@ export class OasisRealm extends PhysicsRealm {
   // ── Lifecycle ─────────────────────────────────────────
 
   onEnter(fromId) {
-    // Coming back up from the vault — spawn near the staircase, facing west.
-    const fromVault = fromId === 'vault';
-    this.px       = fromVault ? PASSAGE_WX + 20 : 60;
-    this.py       = OASIS_FLOOR;
-    this.pvy      = 0;
-    this.camX     = fromVault
+    const fromVault    = fromId === 'vault';
+    const fromAtlantis = fromId === 'atlantis';
+
+    this.px   = fromVault    ? PASSAGE_WX + 20
+              : fromAtlantis ? POOL_CENTER_WX
+              : 60;
+    this.py   = OASIS_FLOOR;
+    this.pvy  = 0;
+    this.camX = fromVault
       ? Math.max(0, Math.min(OASIS_WORLD_W - 800, PASSAGE_WX - 400))
-      : 0;
-    this.facing   = fromVault ? -1 : 1;
+      : fromAtlantis
+        ? Math.max(0, Math.min(OASIS_WORLD_W - 800, POOL_CENTER_WX - 400))
+        : 0;
+    this.facing   = (fromVault || fromAtlantis) ? -1 : 1;
     this.moving   = false;
     this.frame    = 0;
     this._wasInPool = false;
-    G.shake     = fromVault ? 4 : 3;
+
+    // Restore statue state from flags
+    this._statueRisen    = Flags.get('atlantis_statue_risen') || false;
+    this._statueProgress = this._statueRisen ? 1 : 0;
+    this._statueRising   = false;
+
+    // If vault was opened but statue hasn't fully risen yet, resume the animation.
+    if (Flags.get('atlantis_vault_opened') && !this._statueRisen) {
+      this._statueRising   = true;
+      this._statueRiseStart = Date.now() - 500; // half-second head start
+    }
+
+    G.shake     = fromVault ? 4 : fromAtlantis ? 8 : 3;
     Flags.set('oasis_entered', true);
-    if (fromVault) {
+
+    if (fromAtlantis) {
+      log('✦ You breach the surface and gasp for warm air.', 'hi');
+    } else if (fromVault) {
       log('✦ You climb back into the light.', 'hi');
+      if (Flags.get('atlantis_vault_opened') && !this._statueRisen) {
+        setTimeout(() => log('The pool is changing. Walk to the water.', ''), 800);
+      }
     } else {
       log('✦ The air stills. An oasis opens before you.', 'hi');
       if (!Flags.get('sphinx_spoken')) {
@@ -144,11 +165,10 @@ export class OasisRealm extends PhysicsRealm {
     if (RiddleManager.isActive()) return;
     if (RealmManager.isTransitioning) return;
 
-    // ── Pool state (drives speed + floor modifications) ──
+    // ── Pool state ────────────────────────────────────────
     const inPool = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
     const activeFloor = inPool ? POOL_FLOOR : OASIS_FLOOR;
 
-    // TriggerRegistry drives pool onEnter/onExit callbacks.
     this.triggers.update(this.px);
 
     // ── Horizontal movement ───────────────────────────────
@@ -161,13 +181,34 @@ export class OasisRealm extends PhysicsRealm {
 
     if (dx !== 0) this.px = this._clampX(this.px + dx, SPDHALF);
 
-    // ── Auto-return: walked back past the west edge ───────
+    // ── Statue rise animation ─────────────────────────────
+    // Triggered by the vault altar being opened (atlantis_vault_opened flag).
+    // If we enter the oasis and the vault is open but statue not risen, start rising.
+    if (!this._statueRising && !this._statueRisen && Flags.get('atlantis_vault_opened')) {
+      this._statueRising   = true;
+      this._statueRiseStart = Date.now();
+      _spawnSplash(POOL_CENTER_WX, OASIS_FLOOR);
+      log('Something rises in the pool.', '');
+    }
+    if (this._statueRising && !this._statueRisen) {
+      const elapsed = Date.now() - this._statueRiseStart;
+      this._statueProgress = Math.min(1, elapsed / 5000);
+      if (this._statueProgress >= 1) {
+        this._statueRising   = false;
+        this._statueRisen    = true;
+        Flags.set('atlantis_statue_risen', true);
+        G.shake = 8;
+        log('✦ The statue stands in the pool. A passage opens below.', 'hi');
+        log('[↓] Dive into the pool to enter Atlantis.', '');
+      }
+    }
+
     if (this.px <= SPDHALF + 2) {
       RealmManager.transitionTo('world');
       return;
     }
 
-    // ── Gravity + jump (wading: reduced jump, higher floor) ──
+    // ── Gravity + jump ────────────────────────────────────
     const result = this._gravityStep(this.py, this.pvy, activeFloor);
     this.py  = result.py;
     this.pvy = result.pvy;
@@ -179,7 +220,6 @@ export class OasisRealm extends PhysicsRealm {
     // ── Camera ───────────────────────────────────────────
     this.camX = this._trackCameraX(this.camX, this.px);
 
-    // ── Sync realm state → G ─────────────────────────────
     this._syncToG();
   }
 
@@ -191,7 +231,7 @@ export class OasisRealm extends PhysicsRealm {
     if (RiddleManager.isActive()) return RiddleManager.onKeyDown(key);
     if (RealmManager.isTransitioning) return false;
 
-    // Jump (reduced in pool)
+    // Jump
     if (key === 'z' || key === 'Z') {
       const inPool = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
       const jumpPow = inPool ? -6 : -9;
@@ -202,8 +242,23 @@ export class OasisRealm extends PhysicsRealm {
       }
     }
 
-    // Enter vault — descend the staircase between the sphinx paws
     if (key === 'ArrowDown') {
+      const inPool   = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
+      const nearDive = Math.abs(this.px - POOL_CENTER_WX) < POOL_DIVE_RANGE;
+
+      // ── Dive to Atlantis — statue must be fully risen ─
+      if (this._statueRisen && nearDive && inPool) {
+        log('✦ You take a breath and dive beneath the pool.', 'hi');
+        G.shake = 10;
+        RealmManager.scheduleTransition('atlantis', {
+          duration: 1400,
+          render:   atlantisTransRender,
+        });
+        Flags.inc('atlantis_dives');
+        return true;
+      }
+
+      // ── Descend to vault ──────────────────────────────
       const riddlesSolved = Flags.get('sphinx_riddles_solved') || 0;
       if (riddlesSolved >= 1 && Math.abs(this.px - PASSAGE_WX) < 100) {
         log('✦ You descend the stone steps beneath the sphinx.', 'hi');
@@ -223,6 +278,13 @@ export class OasisRealm extends PhysicsRealm {
       if (this._nearSphinx()) {
         Flags.set('sphinx_spoken', true);
         RiddleManager.start();
+        return true;
+      }
+      // Hint if near pool but vault not opened yet
+      const inPool = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
+      if (inPool && !Flags.get('atlantis_vault_opened') && Flags.get('stele_read')) {
+        log('The pool is still. Something has been opened below.', '');
+        log('Wait for the water to change.', '');
         return true;
       }
       return false;

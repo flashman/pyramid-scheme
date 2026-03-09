@@ -3,10 +3,10 @@
 // Ritual circle. Mummy guardians. Sacrificial altar. Apophis on the ceiling.
 // This place has been used. Recently. And before that. And before that.
 
-import { X, CW, CH }              from '../../../engine/canvas.js';
-import { VAULT_FLOOR, STELE_X }   from '../constants.js';
-import { drawVaultPharaoh }       from '../../../draw/pharaoh.js';
-import { Flags }                  from '../../../engine/flags.js';
+import { X, CW, CH }                    from '../../../engine/canvas.js';
+import { VAULT_FLOOR, STELE_X, ALTAR_X } from '../constants.js';
+import { drawVaultPharaoh }              from '../../../draw/pharaoh.js';
+import { Flags }                         from '../../../engine/flags.js';
 
 const STONE    = '#8a5c1c';
 const STONE_LT = '#a87030';
@@ -362,7 +362,7 @@ function drawRitualCircle(cx, fy, t) {
 // Stone slab, shoulder-height, dark with old stains.
 // Implements hang from hooks above.
 
-function drawAltar(ax, fy, t) {
+function drawAltar(ax, fy, t, steleRead, vaultOpened) {
   const aw = 70, ah = 52;
   const ay = fy - ah;
 
@@ -418,6 +418,58 @@ function drawAltar(ax, fy, t) {
   jarPositions.forEach((jx, i) => {
     drawCanopicJar(jx, fy, i);
   });
+
+  // ── Water seeping from altar base when vault opened ──────
+  if (vaultOpened) {
+    const seepA = 0.35 + 0.20 * Math.sin(t / 600);
+    X.save();
+    X.globalAlpha = seepA;
+    // Teal-blue glow bleeding from the stone joints
+    const sg = X.createRadialGradient(ax, fy - 4, 2, ax, fy - 4, 44);
+    sg.addColorStop(0, '#00ccaa');
+    sg.addColorStop(0.5, '#006655');
+    sg.addColorStop(1, 'transparent');
+    X.fillStyle = sg;
+    X.fillRect(ax - 48, fy - 52, 96, 56);
+    // Crack lines with water light
+    X.globalAlpha = 0.5 + 0.3 * Math.sin(t / 300);
+    X.strokeStyle = '#00ffcc';
+    X.lineWidth = 1;
+    X.beginPath();
+    X.moveTo(ax - 6, fy - 4);
+    X.lineTo(ax - 2, fy - 22);
+    X.lineTo(ax + 4, fy - 14);
+    X.stroke();
+    X.beginPath();
+    X.moveTo(ax + 8, fy - 4);
+    X.lineTo(ax + 12, fy - 18);
+    X.stroke();
+    // Rising water drop particles
+    const drops = 5;
+    for (let d = 0; d < drops; d++) {
+      const phase  = (t / 1200 + d * 0.2) % 1;
+      const dropX  = ax - 10 + d * 6 + Math.sin(t / 400 + d) * 3;
+      const dropY  = (fy - 4) - phase * 32;
+      X.globalAlpha = (1 - phase) * 0.7;
+      X.fillStyle = '#88eedd';
+      X.fillRect(Math.round(dropX), Math.round(dropY), 2, 3);
+    }
+    X.restore();
+  }
+
+  // ── Altar interaction hint ────────────────────────────────
+  if (steleRead && !vaultOpened) {
+    const ha = 0.5 + 0.5 * Math.abs(Math.sin(t / 440));
+    X.save();
+    X.globalAlpha = ha;
+    // Subtle pulse glow on altar surface
+    const pg = X.createRadialGradient(ax, ay - 2, 2, ax, ay - 2, 38);
+    pg.addColorStop(0, 'rgba(0,200,150,0.3)');
+    pg.addColorStop(1, 'transparent');
+    X.fillStyle = pg;
+    X.fillRect(ax - 40, ay - 20, 80, 28);
+    X.restore();
+  }
 }
 
 function drawCanopicJar(jx, fy, variant) {
@@ -684,7 +736,7 @@ function drawStele(cx, fy, t, isRead) {
 
 // ── HUD ───────────────────────────────────────────────────
 
-function drawHUD() {
+function drawHUD(vaultOpened) {
   X.fillStyle = '#060200';
   X.fillRect(0, CH - 28, CW, 28);
   X.fillStyle = STONE_DK;
@@ -694,16 +746,20 @@ function drawHUD() {
   X.fillText('BENEATH THE SPHINX', 8, CH - 10);
   X.textAlign = 'center';
   X.fillStyle = '#a06820';
-  X.fillText('← → MOVE     [SPACE] EXAMINE     [↑] ASCEND', CW / 2, CH - 10);
+  const hint = vaultOpened
+    ? '← → MOVE     [SPACE] EXAMINE     [↑] ASCEND  ✦  PASSAGE OPEN'
+    : '← → MOVE     [SPACE] EXAMINE     [↑] ASCEND';
+  X.fillText(hint, CW / 2, CH - 10);
   X.textAlign = 'left';
 }
 
 // ── Master draw ───────────────────────────────────────────
 
 export function drawVault(realm) {
-  const t         = Date.now();
-  const steleRead = Flags.get('stele_read') || false;
-  const circleCX  = Math.round(CW * 0.58);   // ritual circle center — slightly right
+  const t          = Date.now();
+  const steleRead  = Flags.get('stele_read')         || false;
+  const vaultOpened= Flags.get('atlantis_vault_opened') || false;
+  const circleCX   = Math.round(CW * 0.58);   // ritual circle center — slightly right
 
   drawBG();
   drawApophis(t);
@@ -720,14 +776,30 @@ export function drawVault(realm) {
   drawBloodTrail(t);
   drawRitualCircle(circleCX, VAULT_FLOOR, t);
 
-  // Altar at the east half — between the circle and the stele
-  drawAltar(STELE_X - 80, VAULT_FLOOR, t);
+  // Altar — between the ritual circle and the stele; now a gate when stele is read
+  drawAltar(ALTAR_X, VAULT_FLOOR, t, steleRead, vaultOpened);
 
   drawStele(STELE_X, VAULT_FLOOR, t, steleRead);
+
+  // Altar proximity hint (screen-space, so not affected by camera)
+  if (steleRead && !vaultOpened) {
+    const nearAltar = Math.abs(realm.px - ALTAR_X) < 70;
+    if (nearAltar) {
+      const ha = 0.55 + 0.45 * Math.abs(Math.sin(t / 380));
+      X.save();
+      X.globalAlpha = ha;
+      X.font = '6px monospace';
+      X.textAlign = 'center';
+      X.fillStyle = '#00ffcc';
+      X.fillText('[SPACE] THE ALTAR AWAITS', CW / 2, VAULT_FLOOR - 100);
+      X.textAlign = 'left';
+      X.restore();
+    }
+  }
 
   // Shadow figures (appear at room edges when player looks away)
   drawShadowFigures(realm.px, t);
 
   drawVaultPharaoh(realm);
-  drawHUD();
+  drawHUD(vaultOpened);
 }
