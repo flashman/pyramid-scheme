@@ -2,7 +2,54 @@
 
 ---
 
-## v1.35 — Terms of Participation; legal signup gate
+## v1.36 — Engine abstraction pass: TriggerZone, Enemy, Collectible, getPlayerPose
+
+> *No gameplay changes. Purely structural: removes copy-paste patterns, adds missing game-object abstractions, and closes a long-standing G-sync bug in non-world realms.*
+
+### `engine/trigger.js` (new)
+- New **`TriggerZone`** class: world-space proximity region with `condition`, `onEnter`, `onExit`, `onStay` callbacks and an optional pulsing hint text rendered by the canvas.
+- New **`TriggerRegistry`**: owns a list of zones, drives them from `update(px)`, and renders all active hints via `renderHints(camX)`.
+- Replaces the three hardcoded `_oasisGateNear()` / `_cryptDoorNear()` / `_capstoneTipNear()` helpers in `WorldRealm` with registered zones. Adding a new door, gate, or area trigger anywhere is now 5 lines.
+
+### `engine/entity.js`
+- New **`Enemy`** class (extends `Entity`): patrol-and-bounce AI driven by `{ patrol: { x1, x2 }, speed }`, terrain surface-snapping via `surfaceFn(wx)`, stun state (`stun(ts)` / `isStunned`), and `hurtCheck(px, py)` for player collision. Walk animation and facing handled internally. Registers with `InteractableRegistry` like any entity.
+- New **`Collectible`** class (extends `Entity`): auto-collected on proximity — no button press required. `onNear()` fires `onCollect(item)` once, then deactivates. `type` and `value` fields for semantic tagging (coins, scrolls, gems, etc.). Override `draw(sx, sy)` in a subclass to render the item.
+- `NPC` unchanged.
+
+### `engine/realm.js`
+- `Realm` base class gains **`getPlayerPose()`** → `{ px, py, camX, pZ, facing, frame } | null`. Default returns `null`. Each concrete realm overrides it. Used by `drawRealmPharaoh(realm)` so draw files no longer need realm-specific pharaoh wrappers.
+
+### `worlds/FlatRealm.js`
+- **`getPlayerPose()`** implemented: returns fixed-camera pose with `camX: 0, pZ: 0`.
+- **`_walkStep(ts)`** now syncs `G.px / G.py / G.facing / G.pmoving / G.pframe` after each frame. Previously, `FlatRealm` subclasses had their own `this.px/facing` that never propagated to G — HUD and any G-reading system saw stale world position while in chamber/council/vault.
+
+### `worlds/constants.js`
+- New **`inputDx(baseSpeed)`** helper: reads `G.keys` for `ArrowLeft/Right/A/D/Shift`, sets `G.facing` and `G.pmoving`, returns `dx`. Consolidates the identical key-reading block that was duplicated in `WorldRealm.update()` and `OasisRealm.update()`.
+
+### `worlds/oasis/OasisRealm.js`
+- **`getPlayerPose()`** implemented: returns scrolling-world pose including `this.camX`.
+- New **`_syncToG()`**: writes `this.px/py/pvy/camX/facing/frame/moving` → G at the end of every `update()` call. Fixes the bug where G held stale world-realm coordinates while in the oasis, causing HUD and minimap to misreport player position.
+- Pool entry/exit callbacks moved to a **`TriggerZone('pool', ...)`** via a `TriggerRegistry`. The `_wasInPool` manual diff-flag is removed.
+
+### `worlds/earth/WorldRealm.js`
+- `_oasisGateNear()`, `_cryptDoorNear()`, `_capstoneTipNear()` **removed**. Replaced by registered `TriggerZone` objects in a `TriggerRegistry`.
+- New **`_rebuildDynamicTriggers()`**: reconstructs the crypt-door and capstone-tip zones (whose bounds depend on player pyramid position) on every `onEnter()`. Called in constructor and on re-entry.
+- `render()` hint drawing replaced by `this.triggers.renderHints(G.camX)` — one line instead of two separate inline canvas blocks.
+- `onKeyDown()` `ArrowUp` branches use `this.triggers.isInside('id')` instead of calling private helpers.
+- Horizontal movement uses `inputDx(SPEED)` instead of the inline key-reading block.
+
+### `draw/pharaoh.js`
+- Dead realm-floor constant imports (`CHAMBER_FLOOR`, `COUNCIL_FLOOR`, `OASIS_FLOOR`, `VAULT_FLOOR`) **removed** — those values now live in each realm's `getPlayerPose()`.
+- New **`drawRealmPharaoh(realm)`**: calls `realm.getPlayerPose()` and passes the result to `drawPharaoh()`. Preferred over the legacy named variants for any new draw file.
+- `drawChamberPharaoh`, `drawCouncilPharaoh`, `drawOasisPharaoh`, `drawVaultPharaoh` preserved as one-line shims for backward compatibility.
+
+### `main.js`
+- New **`_hydrateState(me)`**: extracts the 15-line `/api/me` → G + Flags hydration block from `init()` into a named function.
+- New **`_wireWsEvents(token)`**: extracts `gameSocket.connect()` and all three `ws:*` event handlers from `init()` into a named function. `init()` calls both; each is independently readable and testable.
+
+---
+
+
 
 ### `ui/auth.js`
 - New **Terms of Participation modal** (`#tos-overlay`) injected alongside the auth overlay at startup.

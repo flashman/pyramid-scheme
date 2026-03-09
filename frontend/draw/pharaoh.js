@@ -1,12 +1,16 @@
 // ── FILE: draw/pharaoh.js ────────────────────────────────
 // Draws the player sprite.
+//
+// drawPharaoh(pose?)         — main function; reads G if no pose passed
+// drawRealmPharaoh(realm)    — preferred for non-world realms; calls realm.getPlayerPose()
+// drawChamberPharaoh(realm)  — legacy shim (backward compat)
+// drawCouncilPharaoh(realm)  — legacy shim
+// drawOasisPharaoh(realm)    — legacy shim
+// drawVaultPharaoh(realm)    — legacy shim
 
 import { G }                        from '../game/state.js';
 import { X, CW, CH }                from '../engine/canvas.js';
 import { COL }                      from '../engine/colors.js';
-import { CHAMBER_FLOOR }            from '../worlds/crypt/constants.js';
-import { COUNCIL_FLOOR }            from '../worlds/council/constants.js';
-import { OASIS_FLOOR, VAULT_FLOOR } from '../worlds/oasis/constants.js';
 import { getTier }                  from '../game/tiers.js';
 
 export function drawPharaoh(pose) {
@@ -87,30 +91,21 @@ export function _drawBody(bx, sy, fr) {
   X.fillRect(bx + 14, sy + 13, 4, 1);
 }
 
-export function drawChamberPharaoh(realm) {
-  drawPharaoh({
-    px: realm.px, py: CHAMBER_FLOOR, camX: 0,
-    pZ: 0, facing: realm.facing, frame: realm.frame,
-  });
-}
+export function drawChamberPharaoh(realm) { drawPharaoh(realm.getPlayerPose()); }
+export function drawCouncilPharaoh(realm) { drawPharaoh(realm.getPlayerPose()); }
+export function drawOasisPharaoh(realm)   { drawPharaoh(realm.getPlayerPose()); }
+export function drawVaultPharaoh(realm)   { drawPharaoh(realm.getPlayerPose()); }
 
-export function drawCouncilPharaoh(realm) {
-  drawPharaoh({
-    px: realm.px, py: COUNCIL_FLOOR, camX: 0,
-    pZ: 0, facing: realm.facing, frame: realm.frame,
-  });
-}
-
-export function drawOasisPharaoh(realm) {
-  drawPharaoh({
-    px: realm.px, py: OASIS_FLOOR, camX: 0,
-    pZ: 0, facing: realm.facing, frame: realm.frame,
-  });
-}
-
-export function drawVaultPharaoh(realm) {
-  drawPharaoh({
-    px: realm.px, py: VAULT_FLOOR, camX: 0,
-    pZ: 0, facing: realm.facing, frame: realm.frame,
-  });
+/**
+ * Draw the player in any realm that implements getPlayerPose().
+ * Prefer this over the realm-specific variants above — they exist
+ * only for backward compatibility with existing draw file imports.
+ *
+ * In new draw files:
+ *   import { drawRealmPharaoh } from '../../../draw/pharaoh.js';
+ *   drawRealmPharaoh(realm);
+ */
+export function drawRealmPharaoh(realm) {
+  const pose = realm.getPlayerPose();
+  if (pose) drawPharaoh(pose);
 }

@@ -140,6 +140,66 @@ function gameLoop(ts) {
   requestAnimationFrame(gameLoop);
 }
 
+// ── State hydration from /api/me ──────────────────────────
+// Called once after login to restore server-owned state into G + Flags.
+
+function _hydrateState(me) {
+  if (!me || me.error) return;
+  if (me.invested     != null) G.invested    = me.invested;
+  if (me.earned       != null) G.earned      = me.earned;
+  if (me.bought       != null) G.bought      = me.bought;
+  if (me.invites_left != null) G.invitesLeft = me.invites_left;
+  if (me.username)             G.username    = me.username;
+  if (me.flags && typeof me.flags === 'object') {
+    for (const [k, v] of Object.entries(me.flags)) {
+      Flags._store[k] = v;  // bypass event bus to avoid sync-back loop
+    }
+  }
+  log(`Welcome back, ${me.username}!`, 'hi');
+}
+
+// ── WebSocket event wiring ────────────────────────────────
+// All real-time backend→frontend event handlers live here.
+// Called once after login; does nothing if called without a token.
+
+function _wireWsEvents(token) {
+  gameSocket.connect(token);
+
+  // A real user bought in somewhere in our downline — add their pyramid.
+  Events.on('ws:recruit_joined', (evt) => {
+    const parentRec = evt.parent_name
+      ? G.recruits.find(r => r.name === evt.parent_name)
+      : null;
+    addRecruit(evt.name, evt.depth, parentRec, { dbId: evt.db_recruit_id });
+
+    const simLog = document.getElementById('dev-sim-log');
+    if (simLog) {
+      const line = document.createElement('div');
+      line.style.color = '#40d080';
+      line.textContent = `[${new Date().toLocaleTimeString()}] ✓ ${evt.name} joined at D${evt.depth} (+$${evt.payout.toFixed(2)})`;
+      simLog.prepend(line);
+    }
+  });
+
+  // Server pushed an authoritative state snapshot (e.g. after buy-in).
+  Events.on('ws:state_update', (evt) => {
+    if (evt.bought       != null) G.bought      = evt.bought;
+    if (evt.earned       != null) G.earned      = evt.earned;
+    if (evt.invites_left != null) G.invitesLeft = evt.invites_left;
+    if (evt.invested     != null) G.invested    = evt.invested;
+    updateStats();
+    updateSlots();
+  });
+
+  // An invitee registered (but hasn't bought in yet).
+  Events.on('ws:invite_accepted', (evt) => {
+    log(`✓ ${evt.email} registered as ${evt.recruit_username}!`, 'hi');
+    Api.getInvites().then(data => {
+      if (data.invites) updateInvitePanel(data.invites);
+    }).catch(() => {});
+  });
+}
+
 // ── State sync helpers ────────────────────────────────────
 // Debounced flag/state push — consolidates rapid flag:change storms
 // (e.g. quest completion firing 4 flags at once) into a single PUT.
@@ -174,23 +234,7 @@ async function init() {
     await loadConfig(Api);
     renderPayoutTable();
     const me = await Api.loadMe();
-    if (me && !me.error) {
-      if (me.invested     != null) G.invested    = me.invested;
-      if (me.earned       != null) G.earned      = me.earned;
-      if (me.bought       != null) G.bought      = me.bought;
-      if (me.invites_left != null) G.invitesLeft = me.invites_left;
-      if (me.username)             G.username    = me.username;
-
-      // Restore flags (server is source of truth)
-      if (me.flags && typeof me.flags === 'object') {
-        for (const [k, v] of Object.entries(me.flags)) {
-          // Use internal store directly to avoid triggering sync-back loop
-          Flags._store[k] = v;
-        }
-      }
-
-      log(`Welcome back, ${me.username}!`, 'hi');
-    }
+    _hydrateState(me);
 
     // ── Restore pyramids and recruits from server ──────
     if (G.bought) {
@@ -237,43 +281,7 @@ async function init() {
     });
 
     // ── WebSocket: connect and wire real-time events ───
-    gameSocket.connect(token);
-
-    // A real user bought in somewhere up (or down) the chain — add their
-    // pyramid to our world and credit our earnings.
-    Events.on('ws:recruit_joined', (evt) => {
-      const parentRec = evt.parent_name
-        ? G.recruits.find(r => r.name === evt.parent_name)
-        : null;
-      addRecruit(evt.name, evt.depth, parentRec, { dbId: evt.db_recruit_id });
-
-      // Echo back to the dev sim log if the panel is open
-      const simLog = document.getElementById('dev-sim-log');
-      if (simLog) {
-        const line = document.createElement('div');
-        line.style.color = '#40d080';
-        line.textContent = `[${new Date().toLocaleTimeString()}] ✓ ${evt.name} joined at D${evt.depth} (+$${evt.payout.toFixed(2)})`;
-        simLog.prepend(line);
-      }
-    });
-
-    // Server pushed an authoritative state snapshot (e.g. after buy-in).
-    Events.on('ws:state_update', (evt) => {
-      if (evt.bought       != null) G.bought      = evt.bought;
-      if (evt.earned       != null) G.earned      = evt.earned;
-      if (evt.invites_left != null) G.invitesLeft = evt.invites_left;
-      if (evt.invested     != null) G.invested    = evt.invested;
-      updateStats();
-      updateSlots();
-    });
-
-    // An invitee registered (but hasn't bought in yet).
-    Events.on('ws:invite_accepted', (evt) => {
-      log(`✓ ${evt.email} registered as ${evt.recruit_username}!`, 'hi');
-      Api.getInvites().then(data => {
-        if (data.invites) updateInvitePanel(data.invites);
-      }).catch(() => {});
-    });
+    _wireWsEvents(token);
 
     // Load and render invite panel on login
     Api.getInvites().then(data => {

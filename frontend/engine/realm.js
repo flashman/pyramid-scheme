@@ -20,6 +20,18 @@ export class Realm {
   update(ts)      {}
   render()        {}
   onKeyDown(key)  { return false; }
+
+  /**
+   * Returns the player's current display pose for this realm.
+   * Used by drawPharaoh() so realm draw files don't need to manually
+   * reconstruct { px, py, camX, pZ, facing, frame } from different sources.
+   *
+   * WorldRealm reads from G directly, so its drawPharaoh() call doesn't
+   * use this. All other realms (FlatRealm, OasisRealm) override it.
+   *
+   * @returns {{ px, py, camX, pZ, facing, frame } | null}
+   */
+  getPlayerPose() { return null; }
 }
 
 // ─────────────────────────────────────────────────────────

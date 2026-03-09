@@ -3,12 +3,13 @@
 import { G }                              from '../../game/state.js';
 import { PhysicsRealm, RealmManager }     from '../../engine/realm.js';
 import { InteractableRegistry }           from '../../engine/interactables.js';
+import { TriggerZone, TriggerRegistry }   from '../../engine/trigger.js';
 import { DialogueManager }                from '../../engine/dialogue.js';
 import { Flags }                          from '../../engine/flags.js';
 import { X, CW, CH }                      from '../../engine/canvas.js';
 import { COL }                            from '../../engine/colors.js';
 import { GND, WORLD_W, Z_LAYERS }         from './constants.js';
-import { SPEED, SPDHALF, LH }             from '../constants.js';
+import { SPEED, SPDHALF, LH, inputDx }   from '../constants.js';
 import { OASIS_ENTRY_X }                  from '../oasis/constants.js';
 import { oasisTransRender, launchTransRender } from '../transitions.js';
 import { spawnParts }                     from '../../draw/utils.js';
@@ -25,7 +26,7 @@ import { drawPharaoh }                    from '../../draw/pharaoh.js';
 import { drawParts, drawHUD, drawMinimap } from '../../draw/hud.js';
 import { log }                            from '../../ui/panels.js';
 
-const OASIS_GATE_RANGE = 220;  // world-px around OASIS_ENTRY_X to show prompt
+const OASIS_GATE_RANGE = 220;
 
 // ── WorldRealm ────────────────────────────────────────────
 
@@ -40,13 +41,57 @@ export class WorldRealm extends PhysicsRealm {
     this.registry    = new InteractableRegistry();
     this.godEntities = buildGodEntities();
     this.godEntities.forEach(g => this.registry.register(g));
+
+    // ── TriggerRegistry: gate zones ──────────────────────
+    // Replaces the 3 hardcoded _xxxNear() helpers.
+    // Each zone draws its hint text via renderHints(); the onEnter
+    // callbacks handle side-effects like log messages.
+    this.triggers = new TriggerRegistry();
+
+    this.triggers.add(new TriggerZone('oasis-gate', {
+      x1:        OASIS_ENTRY_X - OASIS_GATE_RANGE,
+      x2:        OASIS_ENTRY_X + OASIS_GATE_RANGE,
+      condition: () => G.pZ === 0,
+      hint:      '[↑] ENTER THE OASIS',
+      onEnter:   () => log('The east wind pulls you forward.', ''),
+    }));
+
+    // Crypt door and capstone-ascend zones are registered lazily in
+    // onEnter (so they can read the player pyramid position at that time)
+    // and refreshed whenever the player pyramid changes.
+    this._rebuildDynamicTriggers();
+  }
+
+  // Rebuild triggers that depend on player pyramid position.
+  // Called once in constructor and again whenever G.pyramids changes.
+  _rebuildDynamicTriggers() {
+    this.triggers.remove('crypt-door');
+    this.triggers.remove('capstone-tip');
+
+    const pp = G.pyramids.find(p => p.isPlayer);
+
+    this.triggers.add(new TriggerZone('crypt-door', {
+      x1:        pp ? pp.wx - 55 : -9999,
+      x2:        pp ? pp.wx + 55 : -9999,
+      condition: () => G.pZ === -1 && G.py >= GND - 2 && Flags.get('crypt_open'),
+      hint:      '[↑] ENTER THE CRYPT',
+      hintY:     GND - 30,
+    }));
+
+    if (pp && pp.layers) {
+      const topY = GND - pp.layers * LH;
+      this.triggers.add(new TriggerZone('capstone-tip', {
+        x1:        pp.wx - 20,
+        x2:        pp.wx + 20,
+        condition: () => G.pZ === 0 && G.py <= topY + 6 && Flags.get('cosmic_upline_done'),
+        hint:      '[↑] ASCEND',
+        hintY:     topY - 14,
+        hintColor: COL.GOLD_BRIGHT,
+      }));
+    }
   }
 
   // ── Terrain interface ─────────────────────────────────
-  //
-  // Override PhysicsRealm's flat-floor defaults with pyramid terrain.
-  // descendId is respected here so the physics loop can call
-  // this.surfaceAt(x) uniformly without knowing about phase-through.
 
   surfaceAt(x) {
     return G.descendId
@@ -72,28 +117,11 @@ export class WorldRealm extends PhysicsRealm {
       spawnParts(G.px, G.py - 10, '#aa44ff', 40);
       say('BACK ON EARTH!', 180);
     }
+    // Refresh pyramid-position-dependent triggers on every entry
+    this._rebuildDynamicTriggers();
   }
 
   onExit() {}
-
-  // ── Positional helpers ────────────────────────────────
-
-  _oasisGateNear() {
-    return G.pZ === 0 && Math.abs(G.px - OASIS_ENTRY_X) < OASIS_GATE_RANGE;
-  }
-
-  _cryptDoorNear() {
-    const pp = G.pyramids.find(p => p.isPlayer);
-    return G.pZ === -1 && G.py >= GND - 2 && pp && Math.abs(G.px - pp.wx) < 55;
-  }
-
-  _capstoneTipNear() {
-    if (!Flags.get('cosmic_upline_done')) return false;
-    const pp = G.pyramids.find(p => p.isPlayer);
-    if (!pp || !pp.layers) return false;
-    const topY = GND - pp.layers * LH;
-    return G.pZ === 0 && G.py <= topY + 6 && Math.abs(G.px - pp.wx) < 20;
-  }
 
   // ── Update ────────────────────────────────────────────
 
@@ -101,19 +129,15 @@ export class WorldRealm extends PhysicsRealm {
     if (RealmManager.isTransitioning) return;
     if (!G.bought) return;
 
-    // ── Horizontal movement ───────────────────────────────
-    const speed = (G.keys['Shift']) ? SPEED * 2 : SPEED;
-    let dx = 0, moving = false;
-    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { dx = -speed; G.facing = -1; moving = true; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  speed; G.facing =  1; moving = true; }
-    G.pmoving = moving;
+    // ── Horizontal movement (inputDx handles keys + G.facing/pmoving) ─
+    const dx = inputDx(SPEED);
+    G.pmoving = dx !== 0;
 
     if (G.pZ === 0) {
       // ── Z-layer 0: surface plane ──────────────────────
       if (dx !== 0) {
         const edgeX = G.px + dx + (dx > 0 ? SPDHALF : -SPDHALF);
         if (this.canStepTo(G.py, edgeX)) G.px = this._clampX(G.px + dx, SPDHALF);
-        // Snap up slopes: if the surface rose ahead, pull the player up.
         const ns = this.surfaceAt(G.px);
         if (ns < G.py) { G.py = ns; G.pvy = 0; }
       }
@@ -124,19 +148,17 @@ export class WorldRealm extends PhysicsRealm {
       G.pvy = result.pvy;
 
       // ── Cancel phase-through once clear of the pyramid ──
-      // Use raw surfAt (not surfaceAt) here: we want the FULL surface
-      // including the phased pyramid to know when we've fallen past it.
       if (G.descendId && surfAt(G.px) >= G.py) G.descendId = null;
 
     } else {
-      // ── Z-layer -1: foreground plane (in front of everything) ──
+      // ── Z-layer -1: foreground plane ──────────────────
       if (dx !== 0) G.px = this._clampX(G.px + dx, SPDHALF);
       G.py = GND; G.pvy = 0;
     }
 
     // ── Walk animation ────────────────────────────────────
-    if (moving && ts - G.legT > 120) { G.legT = ts; G.pframe = 1 - G.pframe; }
-    else if (!moving) G.pframe = 0;
+    if (G.pmoving && ts - G.legT > 120) { G.legT = ts; G.pframe = 1 - G.pframe; }
+    else if (!G.pmoving) G.pframe = 0;
 
     // ── Camera ────────────────────────────────────────────
     G.camX = this._trackCameraX(G.camX, G.px);
@@ -148,8 +170,10 @@ export class WorldRealm extends PhysicsRealm {
     G.nearEntity = this.registry.update(G.px, G.py - 24);
     G.nearPyr    = nearbyFriendPyr(G.px);
 
+    // ── Trigger zones ─────────────────────────────────────
+    this.triggers.update(G.px);
+
     // ── Oasis gate: clamp player at the east edge ─────────
-    // Don't auto-enter — player must press [↑] at the gate.
     if (G.pZ === 0 && G.px > OASIS_ENTRY_X + OASIS_GATE_RANGE) {
       G.px = OASIS_ENTRY_X + OASIS_GATE_RANGE;
     }
@@ -173,32 +197,15 @@ export class WorldRealm extends PhysicsRealm {
     drawMinimap();
     DialogueManager.render();
 
-    if (!RealmManager.isTransitioning && this._capstoneTipNear()) {
-      const pp = G.pyramids.find(p => p.isPlayer);
-      const sx = pp ? Math.round(pp.wx - G.camX): CW / 2 ;
-      const ty = pp ?  Math.round(GND - pp.layers * LH - G.camY) - 14: CH / 2;
-      X.save();
-      X.globalAlpha = 0.65 + 0.35 * Math.abs(Math.sin(Date.now() / 480));
-      X.fillStyle = COL.GOLD_BRIGHT; X.font = '6px monospace'; X.textAlign = 'center';
-      X.fillText('[↑] ASCEND', sx, ty);
-      X.textAlign = 'left'; X.restore();
+    // Trigger hints (crypt door, capstone ascend, oasis gate)
+    if (!RealmManager.isTransitioning) {
+      this.triggers.renderHints(G.camX);
     }
-
-    if (!RealmManager.isTransitioning && this._oasisGateNear()) {
-      const gx = Math.round(OASIS_ENTRY_X - G.camX);
-      X.save();
-      X.globalAlpha = 0.65 + 0.35 * Math.abs(Math.sin(Date.now() / 460));
-      X.fillStyle = '#f0c020'; X.font = '6px monospace'; X.textAlign = 'center';
-      X.fillText('[↑] ENTER THE OASIS', Math.max(80, Math.min(CW - 80, gx)), CH / 2 - 20);
-      X.textAlign = 'left'; X.restore();
-    }
-
   }
-
 
   // ── Input ─────────────────────────────────────────────
 
-  onKeyDown(key){
+  onKeyDown(key) {
     if (RealmManager.isTransitioning) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
 
@@ -216,18 +223,19 @@ export class WorldRealm extends PhysicsRealm {
     }
 
     if (key === 'ArrowUp' && G.bought) {
-      if (this._oasisGateNear()) {
+      if (this.triggers.isInside('oasis-gate')) {
         RealmManager.scheduleTransition('oasis', {
           duration: 1200,
           render:   oasisTransRender,
         });
         G.shake = 6;
-        log('The east wind pulls you forward.', '');
         return true;
       }
-      if (Flags.get('crypt_open') && this._cryptDoorNear()) {
+      if (this.triggers.isInside('crypt-door')) {
         RealmManager.transitionTo('chamber');
-      } else if (this._capstoneTipNear()) {
+        return true;
+      }
+      if (this.triggers.isInside('capstone-tip')) {
         RealmManager.scheduleTransition('council', {
           duration: 2600,
           render:   launchTransRender,
@@ -236,14 +244,15 @@ export class WorldRealm extends PhysicsRealm {
         spawnParts(G.px, G.py - 10, COL.GOLD_BRIGHT, 50);
         spawnParts(G.px, G.py - 10, '#aa44ff', 30);
         say('TO THE STARS!', 300);
-      } else if (G.pZ === -1 && surfAt(G.px) === GND) {
-        G.pZ = 0;
+        return true;
       }
-      return true;
+      if (G.pZ === -1 && surfAt(G.px) === GND) {
+        G.pZ = 0;
+        return true;
+      }
     }
 
     if ((key === 'z' || key === 'Z') && G.bought && G.pZ === 0) {
-      // ── Jump ───────────────────────────────────────────
       const surf = this.surfaceAt(G.px);
       if (G.py >= surf - 1) { G.pvy = -9; return true; }
     }

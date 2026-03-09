@@ -6,6 +6,7 @@
 import { G }                         from '../../game/state.js';
 import { PhysicsRealm, RealmManager } from '../../engine/realm.js';
 import { Flags }                     from '../../engine/flags.js';
+import { TriggerZone, TriggerRegistry } from '../../engine/trigger.js';
 import { SPEED, SPDHALF }            from '../constants.js';
 import { CW, CH, X }                 from '../../engine/canvas.js';
 import { OASIS_FLOOR, OASIS_WORLD_W,
@@ -18,6 +19,7 @@ import { RiddleManager }             from './riddles.js';
 import { log }                       from '../../ui/panels.js';
 
 const INTERACT_RANGE = 220;  // world-px from SPHINX_WX center to trigger riddle
+
 // Spawns water droplets stored in G.particles (world-space).
 function _spawnSplash(wx, wy) {
   for (let i = 0; i < 14; i++) {
@@ -49,7 +51,56 @@ export class OasisRealm extends PhysicsRealm {
     this.frame    = 0;
     this.moving   = false;
     this._wasInPool = false;
+
+    // ── TriggerZone: pool entry ─────────────────────────
+    // Tracks pool entry/exit to fire splash and log message.
+    // Speed and jump modifications are handled inline in update()
+    // since they need per-frame data (current speed, jump power).
+    this.triggers = new TriggerRegistry();
+    this.triggers.add(new TriggerZone('pool', {
+      x1:      POOL_WX,
+      x2:      POOL_WX + POOL_WIDTH,
+      onEnter: () => {
+        _spawnSplash(this.px, OASIS_FLOOR - 2);
+        log('You wade into the still water.', '');
+      },
+    }));
   }
+
+  // ── Player pose ───────────────────────────────────────
+
+  /**
+   * Returns the display pose for this realm.
+   * Used by drawPharaoh(realm.getPlayerPose()) in draw/oasis.js so that
+   * oasis doesn't need a custom pharaoh function.
+   */
+  getPlayerPose() {
+    return {
+      px:     this.px,
+      py:     this.py,
+      camX:   this.camX,
+      pZ:     0,
+      facing: this.facing,
+      frame:  this.frame,
+    };
+  }
+
+  /**
+   * Sync realm-local player state → G so the HUD, minimap, and any
+   * G-reading system see the correct position while in the oasis.
+   * Called at the end of update().
+   */
+  _syncToG() {
+    G.px      = this.px;
+    G.py      = this.py;
+    G.pvy     = this.pvy;
+    G.camX    = this.camX;
+    G.facing  = this.facing;
+    G.pframe  = this.frame;
+    G.pmoving = this.moving;
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────
 
   onEnter(fromId) {
     // Coming back up from the vault — spawn near the staircase, facing west.
@@ -87,24 +138,22 @@ export class OasisRealm extends PhysicsRealm {
     return Math.abs(this.px - SPHINX_WX) < INTERACT_RANGE;
   }
 
+  // ── Update ────────────────────────────────────────────
+
   update(ts) {
     if (RiddleManager.isActive()) return;
     if (RealmManager.isTransitioning) return;
 
-    // ── Pool wading: is player inside the water footprint? ──
+    // ── Pool state (drives speed + floor modifications) ──
     const inPool = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
     const activeFloor = inPool ? POOL_FLOOR : OASIS_FLOOR;
 
-    // Splash particles on pool entry
-    if (inPool && !this._wasInPool) {
-      _spawnSplash(this.px, OASIS_FLOOR - 2);
-      log('You wade into the still water.', '');
-    }
-    this._wasInPool = inPool;
+    // TriggerRegistry drives pool onEnter/onExit callbacks.
+    this.triggers.update(this.px);
 
     // ── Horizontal movement ───────────────────────────────
     let dx = 0;
-    const baseSpeed = inPool ? SPEED * 0.55 : SPEED;  // wade slowly
+    const baseSpeed = inPool ? SPEED * 0.55 : SPEED;
     const speed = G.keys['Shift'] ? baseSpeed * 2 : baseSpeed;
     if (G.keys['ArrowLeft'] || G.keys['a'] || G.keys['A']) { dx = -speed; this.facing = -1; }
     if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  speed; this.facing =  1; }
@@ -129,6 +178,9 @@ export class OasisRealm extends PhysicsRealm {
 
     // ── Camera ───────────────────────────────────────────
     this.camX = this._trackCameraX(this.camX, this.px);
+
+    // ── Sync realm state → G ─────────────────────────────
+    this._syncToG();
   }
 
   render() {

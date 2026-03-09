@@ -2,8 +2,12 @@
 // Base class for fixed-camera realms with a flat floor:
 // ChamberRealm, CouncilRealm, VaultRealm.
 //
-// Eliminates the 12-line movement/animation block that was
-// copy-pasted identically into each of those files.
+// Provides:
+//   _walkStep(ts)    – movement + animation in one call
+//   getPlayerPose()  – standard pose object for drawPharaoh()
+//
+// With getPlayerPose(), draw files can call drawPharaoh(realm.getPlayerPose())
+// instead of importing a realm-specific drawXxxPharaoh variant.
 //
 // Usage:
 //
@@ -12,7 +16,6 @@
 //   export class MyRealm extends FlatRealm {
 //     constructor() {
 //       super('my-realm', 'MY REALM', { floor: 440, minX: 40, maxX: 740 });
-//       // ... other setup
 //     }
 //     update(ts) {
 //       if (DialogueManager.isActive()) return;
@@ -46,11 +49,31 @@ export class FlatRealm extends Realm {
   }
 
   /**
+   * Returns the player pose for this realm.
+   * Consumed by drawPharaoh(realm.getPlayerPose()) in draw files —
+   * no realm-specific drawXxxPharaoh() variant needed.
+   *
+   * Fixed-camera realms always have camX=0 and pZ=0.
+   */
+  getPlayerPose() {
+    return {
+      px:     this.px,
+      py:     this.floor,
+      camX:   0,
+      pZ:     0,
+      facing: this.facing,
+      frame:  this.frame,
+    };
+  }
+
+  /**
    * Advance horizontal movement and walk animation for one frame.
    * Call from update(ts) after any early-return guards.
    *
    * Reads G.keys for ArrowLeft/Right, A/D, Shift.
-   * Updates this.px (clamped), this.facing, this.moving, this.frame.
+   * Updates this.px, this.facing, this.moving, this.frame.
+   * Syncs G.px/py/facing/pmoving/pframe so the HUD and G-reading
+   * systems always have the current player position.
    */
   _walkStep(ts) {
     const speed = G.keys['Shift'] ? SPEED * 2 : SPEED;
@@ -63,5 +86,12 @@ export class FlatRealm extends Realm {
     }
     if (this.moving && ts - G.legT > 120) { G.legT = ts; this.frame = 1 - this.frame; }
     else if (!this.moving) this.frame = 0;
+
+    // Sync G so the HUD, minimap, and G-reading draw systems see current position.
+    G.px      = this.px;
+    G.py      = this.floor;
+    G.facing  = this.facing;
+    G.pmoving = this.moving;
+    G.pframe  = this.frame;
   }
 }

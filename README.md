@@ -131,3 +131,27 @@ docker compose up --build
 
 **WebSocket 502 from nginx**
 Usually means the backend is crash-looping (check `docker compose logs backend`). Fix the underlying backend error and the WS connection will recover automatically — the frontend reconnects with exponential back-off.
+
+---
+
+## Changelogs
+
+- `frontend/CHANGES.md` — frontend version history (current: **v1.36**)
+- `backend/CHANGES.md` — backend version history (current: **v0.5.0**)
+
+---
+
+## Production Roadmap
+
+`PYRAMID_SCHEME_TODO.md` in the project root contains the full prioritised production checklist, organised into six phases:
+
+1. **Phase 1** — Hard security and payment blockers (~1 day)
+2. **Phase 2** — Ops, SSL, observability, data integrity (~2–3 days)
+3. **Phase 3** — Admin panel and account management (~1 week)
+4. **Phase 4** — Legal and compliance review (before real money)
+5. **Phase 5** — Game completeness: vault payoff, post-Omega loop, mobile controls
+6. **Phase 6** — Scaling (Redis pub/sub, connection pooling, background tasks)
+
+Also includes a **Frontend Engine** section tracking remaining abstraction work from the v1.36 refactor, and a **Quick Wins** list of items under 30 minutes each.
+
+Do not accept real money until Phase 1 is complete.

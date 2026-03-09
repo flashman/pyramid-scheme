@@ -65,8 +65,9 @@ pyramid-scheme/
 │   ├── events.js           # Lightweight pub/sub event bus (Events)
 │   ├── flags.js            # Named boolean/value flags + quest manager
 │   ├── realm.js            # Realm, PhysicsRealm, RealmManager with transition animations
-│   ├── entity.js           # Base Entity and NPC classes
+│   ├── entity.js           # Entity, NPC, Enemy (patrol AI), Collectible (auto-pickup)
 │   ├── interactables.js    # Per-frame nearest-interactable registry
+│   ├── trigger.js          # TriggerZone + TriggerRegistry (area gates, door hints)
 │   └── dialogue.js         # Canvas-rendered branching dialogue system
 │
 ├── game/                   # Game-specific logic and state
@@ -134,6 +135,8 @@ Each scene is a `Realm` subclass registered with `RealmManager`. Switching scene
 
 Realms with walkable terrain should extend **`PhysicsRealm`** instead of `Realm` directly. `PhysicsRealm` is configured with `{ gravity, worldW, floor, maxFallSpeed }` and exposes `_gravityStep()`, `_clampX()`, and `_trackCameraX()` helpers, eliminating copy-pasted physics math.
 
+Fixed-camera realms (chamber, council, vault) extend **`FlatRealm`**, which adds `_walkStep(ts)` (movement + animation + G-sync in one call) and `getPlayerPose()` (see below).
+
 **Terrain interface.** `PhysicsRealm` declares two virtual methods with flat-floor defaults. Override them to give your realm its own surface shape:
 
 ```js
@@ -144,8 +147,6 @@ surfaceAt(x) { return this.floor; }
 canStepTo(feetY, x) { return true; }
 ```
 
-`WorldRealm` overrides both using the geometry from `worlds/earth/terrain.js`. A future ruins realm with platforms would override just `surfaceAt()`. The physics loop in `WorldRealm.update()` calls `this.surfaceAt()` and `this.canStepTo()` and never needs to change.
-
 **Transition animations** are first-class. Instead of managing a local `_launch` flag, realms call:
 ```js
 RealmManager.scheduleTransition('target-realm', {
@@ -154,6 +155,79 @@ RealmManager.scheduleTransition('target-realm', {
 });
 ```
 `main.js` calls `RealmManager.tickTransition()` and `RealmManager.renderTransition()` each frame. Input is blocked during the animation.
+
+**Player pose.** Every realm overrides `getPlayerPose()` → `{ px, py, camX, pZ, facing, frame }`. This lets `drawRealmPharaoh(realm)` work correctly in any realm without realm-specific pharaoh draw variants. `FlatRealm` and `OasisRealm` provide their implementations; `WorldRealm` still passes the pose directly since it draws the pharaoh inline.
+
+**G sync.** `FlatRealm._walkStep()` and `OasisRealm._syncToG()` write local player state back to G each frame. This ensures the HUD, minimap, and any G-reading system sees the current player position regardless of which realm is active.
+
+**Movement input.** Use `inputDx(baseSpeed)` from `worlds/constants.js` instead of repeating the `ArrowLeft/Right/WASD/Shift` block:
+```js
+import { inputDx, SPEED, SPDHALF } from '../constants.js';
+const dx = inputDx(SPEED);  // sets G.facing + G.pmoving as side-effects
+if (dx !== 0) G.px = this._clampX(G.px + dx, SPDHALF);
+```
+
+### TriggerZones (area gates and hints)
+`TriggerZone` replaces hardcoded proximity helpers like `_oasisGateNear()`. Register zones in the realm constructor; the registry handles entry/exit callbacks and hint rendering:
+
+```js
+import { TriggerZone, TriggerRegistry } from '../../engine/trigger.js';
+
+// constructor:
+this.triggers = new TriggerRegistry();
+this.triggers.add(new TriggerZone('my-door', {
+  x1: DOOR_X - 60, x2: DOOR_X + 60,
+  condition: () => Flags.get('door_unlocked'),
+  hint:      '[↑] ENTER',
+  onEnter:   () => log('A door opens.', ''),
+}));
+
+// update():
+this.triggers.update(G.px);
+
+// render():
+this.triggers.renderHints(G.camX);  // draws pulsing hint text for active zones
+
+// onKeyDown():
+if (key === 'ArrowUp' && this.triggers.isInside('my-door')) {
+  RealmManager.transitionTo('target');
+}
+```
+
+### Enemies
+`Enemy` (in `engine/entity.js`) is an `Entity` subclass with patrol AI. Register with `InteractableRegistry` like any entity; the registry calls `update(ts)` and `draw(sx, sy)` automatically.
+
+```js
+import { Enemy } from '../../engine/entity.js';
+
+const scarab = new Enemy('scarab-1', 1800, GND, {
+  speed:     2,
+  patrol:    { x1: 1600, x2: 2000 },
+  hurtRange: 22,
+  surfaceFn: (wx) => surfAt(wx),   // snap to pyramid slopes
+});
+this.registry.register(scarab);
+
+// In realm update() — check hurt each frame:
+if (scarab.hurtCheck(G.px, G.py)) { /* player damaged */ }
+
+// On stomp (player lands on top):
+scarab.stun(ts);
+```
+
+### Collectibles
+`Collectible` auto-collects when the player walks within `interactRange` — no button press needed. Override `draw(sx, sy)` in a subclass to render the item.
+
+```js
+import { Collectible } from '../../engine/entity.js';
+
+const scroll = new Collectible('scroll-drop-1', 2100, GND - 30, {
+  type:      'invite_scroll',
+  value:     1,
+  onCollect: (item) => { G.invitesLeft++; log('Found a lost scroll!', 'hi'); },
+});
+this.registry.register(scroll);
+```
 
 ### Events (decoupling)
 `Events` is a simple pub/sub bus. It's the main tool for keeping layers separate — for example, `engine/flags.js` emits `game:log` instead of importing the UI directly, and `game/pyramids.js` emits `pyramid:layer_added` instead of importing `spawnParts`. Wire cross-system reactions in `main.js`, not inside the individual systems.
