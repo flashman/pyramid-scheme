@@ -2,6 +2,128 @@
 
 ---
 
+## v1.38 — Atlantis world expansion: five zones, three predators, the drowned org chart
+
+> *Atlantis didn't sink because of the sea. It sank because of its own system. The civilization was a multi-level ascension cult — equal parts Scientology, Heaven's Gate, and a property investment seminar. Every citizen was a recruit. They went deeper and deeper to prove their devotion. The flood came. Nobody swam up. They were still waiting for their upline to tell them it was okay to leave. The city is a drowned org chart.*
+
+### Summary
+
+Full Atlantis world replaced with five depth-stratified zones, three enemy types, cult NPC dialogues, a death and reincarnation system with 20+ escalating messages, and a full 5-zone architectural draw overhaul. The core revelation: the Founder found the system already built, already ancient, already furnished with a throne. They added their layer on top. As did whoever came before. As does the player.
+
+---
+
+### `worlds/atlantis/constants.js` (rewritten)
+
+**Added:**
+- `ZONE_1_END / ZONE_2_END / ZONE_3_END / ZONE_4_END` — Y-axis zone boundaries
+- `GREETER_WX/WY`, `PILLAR_WX/WY`, `FOUNDER_WX/WY`, `TABLET_WX/WY` — NPC / interactable positions
+- `CHOIR_WX/WY`, `CHOIR_RADIUS` — death-circle centre and radius (zone 4)
+- `SHARK_PATROL_Y/X1/X2`, `SHARK_SPEED/CHASE_SPD/AGGRO/HURT` — Compliance Shark parameters
+- `SQUID_START_WX/WY`, `SQUID_SPEED/CHASE_SPD/AGGRO/HURT` — Auditor squid parameters
+- `DEVOTED_SPEED/AGGRO/HURT` — Devoted skeletal swimmer parameters
+
+---
+
+### `worlds/atlantis/AtlantisRealm.js` (rewritten)
+
+#### Five zones
+| Zone | Depth | Character |
+|---|---|---|
+| I — The Atrium | Entry | False welcome. A 12,000-year-old skeleton still at the reception desk. |
+| II — The Abundance Hall | Mid-shallow | Gold-painted columns. The paint is visibly flaking. |
+| III — The Processing Chamber | Mid | Rows of seated skeletons facing The Auditor face. The Auditor squid lives here. |
+| IV — The Devoted Quarter | Deep | Founder portraits on every surface. The Choir circle. |
+| V — The Founder's Vault | Deepest | A throne. A cage locked from the inside. The skeleton of the Founder, still crowned, still waiting. |
+
+#### Three enemies
+- **Compliance Shark** — patrols zones 1–2. Chases on proximity. Accelerates toward player when aggroed. Red eye-glow when chasing. Death message: recruitment/collections language.
+- **The Auditor** (giant squid) — zones 2–3. Slow ambient drift; accelerates to inevitable pursuit on aggro. Wide rectangular pupils (like a real squid). Death message: scientology-adjacent processing language.
+- **The Devoted** (3 skeletal swimmers) — zones 4–5. Arms permanently outstretched toward the player. Drift slowly when idle, pursue when in range. Death message: well-meaning harmonization language.
+
+#### Choir hazard (zone 4)
+- Entering the circle in the Devoted Quarter begins a 2.4-second countdown
+- On-screen warning and red vignette builds during countdown
+- Escaping the circle in time cancels the timer
+- Staying the full duration: choir death
+
+#### Death and reincarnation system
+- `_killPlayer(cause)` called by all four hazards — increments `atlantis_deaths`, sets `_dying`, freezes player
+- 2.8-second death screen: white flash → settles to deep void → message appears
+- Death messages are tiered by death count and cause:
+  - Deaths 1–4: cause-specific messages (shark = collections; squid = processing; devoted = harmonizing; choir = devotion)
+  - Deaths 5/10/15/20: milestone messages that override cause ("TIER 3 ACTIVITY", "PLATINUM TIER OF DYING", etc.)
+  - After reading the deepest tablet: all deaths append *"YOU KNOW TOO MUCH. THE SYSTEM CANNOT ALLOW A CLEAR WHO UNDERSTANDS THE SYSTEM."*
+- Respawn: player returns to `ATLANTIS_ENTRY_Y` at world centre with short log; message changes with death count
+
+#### NPC dialogues
+**The Greeter** (`GREETER_WX/WY`, zone 1):
+- 7-node branching dialogue
+- Admits it has waited 12,000 years for a prospect
+- Offers to enrol you regardless of your answer (the choice is cosmetic)
+- Waives the enrolment fee. "Today only. It has been today only since 9,800 BC."
+- Sets `atlantis_recruited`, sets `atlantis_tier = 1`, logs tier enrollment
+
+**The Founder** (`FOUNDER_WX/WY`, zone 5, behind the cage):
+- 8-node linear dialogue
+- Charismatic, self-justifying, gradually honest
+- Reveals: they found this room already built, already furnished with a throne, already containing a tablet describing their system exactly
+- Directs player to the deepest tablet. Sets `atlantis_founder_read`
+
+**The Deepest Tablet** (`TABLET_WX/WY`, zone 5):
+- Locked behind `atlantis_founder_read` flag — shows generic "worn inscription" text before founder dialogue
+- First read: screen shake 14, 5-part revelation log sequence over 5.6 seconds
+- Sets `atlantis_deepest_tablet`
+- Core text: *"WE DID NOT INVENT THIS. WE FOUND THEIR SYSTEM. THE PYRAMID GOES DEEPER THAN THE OCEAN. THERE IS NO UPLINE. THERE NEVER WAS AN UPLINE. THE SYSTEM IS THE UPLINE. PASS IT ON."*
+
+**Welcome Pillar** (`PILLAR_WX/WY`, zone 1):
+- One-shot readable: the founding doctrine carved in stone
+- "THIS IS NOT A PYRAMID SCHEME. THE PYRAMID IS A SYMBOL OF ASCENSION. THE SCHEME IS THE PATH. THESE ARE DIFFERENT THINGS."
+- After first read, revisiting gives: "THE PILLAR STILL SAYS WHAT IT SAYS."
+
+#### Flags added
+- `atlantis_recruited` — Greeter added you to the downline
+- `atlantis_tier` — numeric (starts at 1)
+- `atlantis_pillar_read` — read the welcome pillar
+- `atlantis_founder_read` — completed the Founder dialogue
+- `atlantis_deepest_tablet` — read the final truth
+- `atlantis_deaths` — counter (drives escalating death messages)
+- `atlantis_zone2/3/4/5` — first-entry logs per zone
+
+#### Zone HUD
+- Depth indicator updated with zone name label (replaces plain depth only)
+- Tier indicator top-right when enrolled
+- Death counter top-right when > 0
+- Interactable hint bar shows context label per entity (`[SPACE] READ THE TABLET`, etc.)
+- Choir warning vignette with countdown text
+
+---
+
+### `worlds/atlantis/draw/atlantis.js` (major expansion, ~1000 lines added)
+
+#### Zone atmosphere system
+`drawZoneAtmosphere(camY)` — screen-space colour overlay that bleeds in per zone:
+- Zone 1: cold blue-white (welcoming, false)
+- Zone 2: false gold (fading)
+- Zone 3: sickly green
+- Zone 4: crimson
+- Zone 5: deep void purple — near black
+
+#### New draw functions
+- `drawAtrium(t)` — welcome archway above greeter; reception desk with stacked applications; Greeter skeleton (outstretched arm swaying, enthusiasm-glow eyes); Welcome Pillar (animated sway, carved doctrine text)
+- `drawAbundanceHall(t)` — four gold-painted columns with visible flaking patches; a collapsed Abundance Zone archway; a fallen keystone
+- `drawProcessingChamber(t)` — two rows of stone chairs with seated skeletons (some empty — they ascended); The Auditor Face carved into a massive wall slab (pulsing eye-sockets, no mouth, inscription)
+- `drawDevotedQuarter(t)` — six Founder portrait plaques on every surface; the floor ring of 12 skeletal figures in the Choir circle (arms outstretched inward, swaying, devotion-red eye glow); animated centre glow
+- `drawFounderVault(t)` — tiled throne room floor; the cage (vertical bars, inside lock); throne (tier symbols carved into back); Founder skeleton slumped but crowned (glow in eye sockets); the Deepest Tablet (half-buried, inscription glow that intensifies after reading)
+- `drawShark(shark, camX, camY, t)` — torpedo body, white underbelly, dorsal fin, teeth visible when chasing, red eye when chasing, red glow aura when chasing
+- `drawSquid(squid, camX, camY, t)` — large elliptical mantle, 8 animated arm-tentacles, 2 long grasping tentacles, chromatophore spots pulsing when chasing, rectangular pupils when chasing (biologically accurate), iris glow
+- `drawDevoted(d, camX, camY, t)` — horizontal skeleton swimmer, arms permanently outstretched forward, ribs/spine visible, red devotion glow in eye sockets, carved cult markings on bones, gentle ambient sway
+- `drawInteractHint(realm)` — pulsing screen-space prompt per nearest entity ID
+- `drawDeathOverlay(realm, t)` — white flash → void → message with tiered text; tier label footer
+- `drawChoirWarning(realm, t)` — red vignette + countdown text building over 2.4 seconds
+- `drawAtlantisHUD(realm)` — zone name + depth + tier + death count + full control legend
+
+---
+
 ## v1.37 — Atlantis realm: vault-gated entry, alt-history sphinx lore
 
 > *The pool was always the way in. But to open it you must first go beneath the sphinx and learn what the sphinx actually is. The stele tells you. Then the altar opens the door. The flow is non-linear by design.*

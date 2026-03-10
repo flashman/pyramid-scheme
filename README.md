@@ -136,8 +136,38 @@ Usually means the backend is crash-looping (check `docker compose logs backend`)
 
 ## Changelogs
 
-- `frontend/CHANGES.md` — frontend version history (current: **v1.36**)
+- `frontend/CHANGES.md` — frontend version history (current: **v1.38**)
 - `backend/CHANGES.md` — backend version history (current: **v0.5.0**)
+
+---
+
+## The Atlantis World
+
+Accessible via the oasis pool after completing the vault ritual (v1.37+).
+
+### Five zones of increasing depth
+
+| Zone | Name | What you find |
+|---|---|---|
+| I | The Atrium | A 12,000-year-old skeleton at a reception desk. It will try to enrol you. |
+| II | The Abundance Hall | Gold-painted columns. The paint is visibly flaking. |
+| III | The Processing Chamber | Rows of seated skeletons. The Auditor squid patrols here. |
+| IV | The Devoted Quarter | Founder portraits everywhere. A choir circle that will harmonize you to death. |
+| V | The Founder's Vault | A throne. A cage locked from the inside. The deepest tablet. |
+
+### Three predators
+
+- **The Compliance Shark** — collections enforcement for zones 1–2
+- **The Auditor** — a giant squid; slow, inevitable, processes your doubts (and everything else)
+- **The Devoted** — three skeletal swimmers; arms permanently outstretched toward you; they mean so well
+
+### Death and reincarnation
+
+Death returns you to the surface. Each death has a different message. The messages escalate. Death count milestones change the message category entirely. Reading the deepest tablet adds a postscript to all deaths.
+
+### The core lore
+
+The Founder found this room already built, already ancient, already furnished with a throne and a tablet describing their system exactly. They didn't invent it. They added a layer. As did whoever came before. As does the player. The system is the upline. There never was an upline.
 
 ---
 
