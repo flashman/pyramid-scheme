@@ -2,6 +2,80 @@
 
 ---
 
+## v1.39 — Atlantis: full game loop, puzzles, and richer dialogue
+
+> *The city now has a reason to explore. Every piece of lore pays off mechanically. Every gate opens with knowledge, not arbitrary progress. The Founder has a name. The name is earned.*
+
+### Game loop
+
+```
+PILLAR → GREETER (Tier 1) → TESTIMONIALS (5 plaques, zones 1–2)
+→ Testimonial 2 has the keyword: "ASCENSION AWAITS THE BELIEVING HEART"
+→ Return to Greeter with keyword → Tier 3 + hint about audit chair
+→ PROCESSING CHAIR (zone 3): 3 questions, answers earned by exploration → CLEARED
+→ CLEARED unlocks: squid becomes non-aggressive + Archive Door opens
+→ ARCHIVE (zone 3, far west): 3 tablets — pre-Founder civilization, same system
+→ CHOIR (zone 4): if CLEARED, survive 5s → name alcove opens
+→ NAME TABLET: Founder's real name was KHEM-ATEF, a scribe, age 23, terrified
+→ FOUNDER with name: drops the performance, raw confession
+→ DEEPEST TABLET: final revelation, hits harder now
+```
+
+### New interactables (9 added)
+
+- **5 testimonial plaques** (zones 1–2) — carved stone plaques scattered through the city. Each tells a story. Testimonial 2 (Compliance Officer Taweret, Tier 7) contains the keyword. Testimonials 2 and 3 hint at the archive. Visual state: unread (dark) / read (glowing, with tier badge).
+- **Processing Chair** (zone 3, wx=900) — the special audit chair. Glows cyan when Tier 3 (accessible), green when Cleared. Floor runes pulse beneath it. Locked to Tier 3+ with clear error messages.
+- **Archive Door** (zone 3 far west, wx=185) — a sealed stone door. Shows compliance lock symbol. Opens on CLEARED. Animated door-glow when open.
+- **3 Archive Tablets** inside the archive chamber — records of the Khet-Amun civilization that preceded Atlantis and used the same system. Each flagged individually. Chamber only illuminated when `atlantis_archive_open`.
+- **Name Tablet** (zone 4, east of choir, wx=1750) — sealed alcove with barely-visible hairline crack. Opens only after `atlantis_choir_survived`. Contains Compliance Officer's private record: the Founder's birth name.
+
+### Dialogue rewrites
+
+**Greeter** — fully rebuilt with dynamic `text: () => ...` and conditional branches:
+- First visit: enrollment flow (unchanged)
+- Return visit (enrolled, no keyword): hints at the plaques
+- Return visit (keyword found): tier upgrade to 3, tells you about the Processing Chair and what the three questions will be
+- Return visit (Tier 3, not cleared): reminds you about the audit
+- Return visit (Tier 3, cleared): tells you about the archive
+
+**Audit Dialogue** (new, 11 nodes):
+- Three questions with choices. Correct answers require actual exploration:
+  - Q1: requires reading the welcome archway text in the Atrium
+  - Q2: requires having spoken to the Greeter (conditional choice — doesn't appear if not enrolled)
+  - Q3: requires having spoken to the Greeter (same condition)
+- Wrong answers flag the account but let the session continue
+- Verdict node: `text: () => ...` dynamically reads flag score (0/1/2/3 correct)
+- Score 3 → CLEARED, archive opens; score < 3 → retry message with specific hint
+
+**Founder Dialogue** — rebuilt with two parallel paths:
+- Without `atlantis_founder_name`: original mysterious version (7 nodes)
+- With `atlantis_founder_name` (KHEM-ATEF): completely different path (5 nodes). No performance. Drops "Tier ∞" title. Admits he was twenty-three. Admits he followed instructions because it was easier than not. The final line: *"You found the room. You are reading the documents. I wonder what that makes you."*
+
+### Mechanic changes
+
+**Squid aggression** — The Auditor squid is now only aggressive when `!atlantis_cleared`. When cleared, it drifts passively. Getting cleared changes Zone 3 from dangerous to navigable.
+
+**Devoted aggression** — The Devoted are only aggressive when `!atlantis_founder_name`. When you know the Founder's real name, they drift past harmlessly. Their arms are still outstretched. But they don't pursue.
+
+**Choir mechanic** — Two modes:
+- Without `atlantis_cleared`: 2.4s → death (unchanged)
+- With `atlantis_cleared`: 5s survive → `atlantis_choir_survived` + name alcove opens, no death
+
+### New draw functions
+
+- `drawTestimonialPlaques(t)` — 5 plaques with carved inscription lines, read/unread states, tier badges, subtle shimmer when unread
+- `drawAuditChair(t)` — the special processing chair with state-dependent colour (dark/cyan/green), floor runes, carved tier symbol
+- `drawArchiveRoom(t)` — the archive chamber (zone 3 far west): stone walls, door frame, lock symbol, 3 tablets inside (only visible when open)
+- `drawNameAlcove(t)` — sealed/open alcove east of choir; hairline crack when sealed, purple glow and inscription when open
+
+### HUD updates
+
+- CLEARED status shown top-right in green when active
+- Plaque count shown top-right when plaques found but not yet cleared
+- Interact hints updated for all 9 new entity IDs (context-sensitive: chair shows "YOU ARE ALREADY CLEARED" when done, door shows "THE ARCHIVE IS OPEN" when open, etc.)
+
+---
+
 ## v1.38 — Atlantis world expansion: five zones, three predators, the drowned org chart
 
 > *Atlantis didn't sink because of the sea. It sank because of its own system. The civilization was a multi-level ascension cult — equal parts Scientology, Heaven's Gate, and a property investment seminar. Every citizen was a recruit. They went deeper and deeper to prove their devotion. The flood came. Nobody swam up. They were still waiting for their upline to tell them it was okay to leave. The city is a drowned org chart.*

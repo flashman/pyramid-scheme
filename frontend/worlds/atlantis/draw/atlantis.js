@@ -11,8 +11,12 @@ import {
   ATLANTIS_FLOOR_Y, ATLANTIS_EXIT_Y,
   ZONE_1_END, ZONE_2_END, ZONE_3_END, ZONE_4_END,
   GREETER_WX, GREETER_WY, PILLAR_WX, PILLAR_WY,
+  TESTIMONIALS,
+  CHAIR_WX, CHAIR_WY,
+  ARCHIVE_DOOR_WX, ARCHIVE_DOOR_WY, ARCHIVE_TABLETS,
   FOUNDER_WX, FOUNDER_WY, TABLET_WX, TABLET_WY,
   CHOIR_WX, CHOIR_WY, CHOIR_RADIUS,
+  NAME_TABLET_WX, NAME_TABLET_WY,
 } from '../constants.js';
 
 // ── Deterministic pseudo-random seeded at startup ────────
@@ -1461,6 +1465,351 @@ function drawDevoted(d, camX, camY, t) {
   X.restore();
 }
 
+// ── Testimonial plaques (zones 1-2) ──────────────────────
+// Five carved wall-plaques scattered through the upper city.
+// Visual state: unread (dark stone, faint) vs read (lit, glowing).
+
+function drawTestimonialPlaques(t) {
+  TESTIMONIALS.forEach((pos, i) => {
+    const flagKey = `atlantis_test_${i}`;
+    const read    = Flags.get(`atlantis_${pos.id}`);
+    const wx = pos.wx;
+    const wy = pos.wy;
+
+    X.save();
+    // Backing stone — slightly different per testimonial to feel found, not placed
+    X.fillStyle = read ? '#1a2a3a' : '#121c26';
+    X.fillRect(wx - 26, wy - 50, 52, 58);
+
+    // Border
+    X.strokeStyle = read ? '#3a6080' : '#1a2a38';
+    X.lineWidth = 1;
+    X.strokeRect(wx - 26, wy - 50, 52, 58);
+
+    // Inscription lines (carved marks)
+    const lineCount = 5;
+    X.strokeStyle = read ? '#4a8a6a' : '#1e3040';
+    X.lineWidth   = 0.8;
+    X.globalAlpha = read ? 0.7 : 0.3;
+    for (let l = 0; l < lineCount; l++) {
+      const ly = wy - 40 + l * 9;
+      const w  = 28 + Math.sin(i * 1.3 + l) * 8; // irregular line lengths
+      X.beginPath();
+      X.moveTo(wx - w / 2, ly);
+      X.lineTo(wx + w / 2, ly);
+      X.stroke();
+    }
+
+    // Glow when read
+    if (read) {
+      const pulse = 0.08 + Math.sin(t / 1400 + i * 0.7) * 0.04;
+      X.globalAlpha = pulse;
+      const rg = X.createRadialGradient(wx, wy - 20, 2, wx, wy - 20, 36);
+      rg.addColorStop(0, '#4a8aaa');
+      rg.addColorStop(1, 'transparent');
+      X.fillStyle = rg;
+      X.fillRect(wx - 38, wy - 58, 76, 68);
+
+      // Small glow badge at top-right corner (tier symbol)
+      X.globalAlpha = 0.5;
+      X.fillStyle = '#2a5070';
+      X.fillRect(wx + 16, wy - 54, 12, 10);
+      X.fillStyle = '#66aacc';
+      X.globalAlpha = 0.7;
+      X.font = '4px monospace';
+      X.textAlign = 'center';
+      X.fillText(`T${[4,2,7,5,6][i]}`, wx + 22, wy - 46);
+    } else {
+      // Unread: subtle interaction hint shimmer when near
+      const shimmer = 0.03 + Math.sin(t / 800 + i) * 0.015;
+      X.globalAlpha = shimmer;
+      X.fillStyle = '#aaccdd';
+      X.fillRect(wx - 26, wy - 50, 52, 58);
+    }
+
+    X.textAlign = 'left';
+    X.restore();
+  });
+}
+
+// ── Processing Chair highlight (zone 3) ───────────────────
+// The special audit chair glows differently than the generic rows.
+
+function drawAuditChair(t) {
+  const cx = CHAIR_WX;
+  const cy = CHAIR_WY;
+  const cleared = Flags.get('atlantis_cleared');
+  const tier3   = Flags.get('atlantis_tier3');
+
+  // Outer glow ring — colour signals state
+  const glowCol = cleared ? '#20cc60' : tier3 ? '#00aacc' : '#443820';
+  const glowA   = cleared
+    ? 0.12 + Math.sin(t / 800) * 0.04
+    : tier3
+    ? 0.10 + Math.sin(t / 600) * 0.05
+    : 0.04;
+
+  X.save();
+  X.globalAlpha = glowA;
+  const rg = X.createRadialGradient(cx, cy - 20, 4, cx, cy - 20, 52);
+  rg.addColorStop(0, glowCol);
+  rg.addColorStop(1, 'transparent');
+  X.fillStyle = rg;
+  X.fillRect(cx - 55, cy - 74, 110, 96);
+
+  X.globalAlpha = 1;
+
+  // Chair body — more detailed than generic chairs
+  X.fillStyle = cleared ? '#1a3030' : '#1a2040';
+  X.fillRect(cx - 18, cy - 22, 36, 8);   // seat
+  X.fillRect(cx - 16, cy - 56, 10, 36);  // left back post
+  X.fillRect(cx + 6,  cy - 56, 10, 36);  // right back post
+  X.fillRect(cx - 16, cy - 58, 32, 6);   // headrest
+
+  // Carved tier-three symbol on back
+  X.globalAlpha = 0.55;
+  X.fillStyle = cleared ? '#30cc80' : '#2060a0';
+  X.font = '7px monospace';
+  X.textAlign = 'center';
+  X.fillText(cleared ? '✦ CLEARED ✦' : 'III', cx, cy - 38);
+
+  // Armrests
+  X.globalAlpha = 1;
+  X.fillStyle = '#223040';
+  X.fillRect(cx - 26, cy - 30, 12, 16);
+  X.fillRect(cx + 14, cy - 30, 12, 16);
+
+  // Floor runes beneath chair — Auditor markings
+  X.globalAlpha = 0.3 + Math.sin(t / 1200) * 0.1;
+  X.strokeStyle = cleared ? '#30cc80' : '#1060a0';
+  X.lineWidth   = 0.8;
+  for (let r = 0; r < 4; r++) {
+    const angle = (r / 4) * Math.PI * 2 + t / 4000;
+    X.beginPath();
+    X.moveTo(cx + Math.cos(angle) * 28, cy + Math.sin(angle) * 8);
+    X.lineTo(cx + Math.cos(angle) * 36, cy + Math.sin(angle) * 12);
+    X.stroke();
+  }
+
+  X.textAlign = 'left';
+  X.restore();
+}
+
+// ── Archive Room (zone 3, far west) ──────────────────────
+// A sealed side-chamber. Locked until Cleared. Contains 3 tablets.
+
+function drawArchiveRoom(t) {
+  const dx = ARCHIVE_DOOR_WX;
+  const dy = ARCHIVE_DOOR_WY;
+  const open    = Flags.get('atlantis_archive_open');
+  const cleared = Flags.get('atlantis_cleared');
+
+  // Archive chamber walls — a recessed alcove in the west side
+  const roomX = 20;
+  const roomY = 1000;
+  const roomW = 240;
+  const roomH = 480;
+
+  X.save();
+  // Chamber interior fill
+  X.fillStyle = open ? '#0e1a14' : '#0a1018';
+  X.fillRect(roomX, roomY, roomW, roomH);
+
+  // Stone walls
+  X.strokeStyle = open ? '#1a3a28' : '#152030';
+  X.lineWidth   = 3;
+  X.strokeRect(roomX, roomY, roomW, roomH);
+
+  // Interior wall texture
+  X.strokeStyle = open ? '#162a20' : '#10181e';
+  X.lineWidth   = 1;
+  X.globalAlpha = 0.5;
+  for (let ry = roomY + 20; ry < roomY + roomH; ry += 22) {
+    X.beginPath();
+    X.moveTo(roomX + 4, ry);
+    X.lineTo(roomX + roomW - 4, ry);
+    X.stroke();
+  }
+  X.globalAlpha = 1;
+
+  // Archive label above door
+  X.globalAlpha = cleared ? 0.6 : 0.25;
+  X.font        = '5px monospace';
+  X.fillStyle   = cleared ? '#4a8a6a' : '#2a4050';
+  X.textAlign   = 'center';
+  X.fillText('THE ARCHIVE', dx, dy - 64);
+  X.fillText('CLEARANCE REQUIRED', dx, dy - 56);
+
+  // Door frame
+  X.globalAlpha = 1;
+  X.fillStyle   = open ? '#1a3a28' : '#1a2838';
+  X.fillRect(dx - 22, dy - 48, 44, 4);    // top lintel
+  X.fillRect(dx - 22, dy - 48, 4, 52);    // left post
+  X.fillRect(dx + 18, dy - 48, 4, 52);    // right post
+
+  // Door panel — sealed (dark) or open (passage visible)
+  if (open) {
+    // Open — interior glow visible through doorway
+    const portGlow = 0.15 + Math.sin(t / 1100) * 0.05;
+    X.globalAlpha = portGlow;
+    const dg = X.createLinearGradient(dx - 18, 0, dx + 18, 0);
+    dg.addColorStop(0, 'transparent');
+    dg.addColorStop(0.5, '#20aa60');
+    dg.addColorStop(1, 'transparent');
+    X.fillStyle = dg;
+    X.fillRect(dx - 18, dy - 44, 36, 48);
+    X.globalAlpha = 1;
+  } else {
+    // Closed — heavy stone door with compliance seal
+    X.fillStyle   = cleared ? '#1e3040' : '#141c28';
+    X.fillRect(dx - 18, dy - 44, 36, 48);
+    // Lock symbol
+    X.globalAlpha = cleared ? 0.7 : 0.3;
+    X.strokeStyle = cleared ? '#4488aa' : '#2a3a48';
+    X.lineWidth   = 1.5;
+    X.beginPath();
+    X.arc(dx, dy - 16, 7, Math.PI, 0, false);
+    X.stroke();
+    X.fillStyle = cleared ? '#2a5070' : '#1a2838';
+    X.globalAlpha = cleared ? 1 : 0.5;
+    X.fillRect(dx - 6, dy - 16, 12, 12);
+    // Keyhole
+    X.globalAlpha = 0.6;
+    X.fillStyle   = cleared ? '#66aacc' : '#2a3a4a';
+    X.beginPath();
+    X.arc(dx, dy - 10, 3, 0, Math.PI * 2);
+    X.fill();
+  }
+
+  // Archive tablets (inside the chamber)
+  if (open) {
+    ARCHIVE_TABLETS.forEach((pos, i) => {
+      const archKey = `atlantis_${pos.id}`;
+      const read    = Flags.get(archKey);
+      const tx = pos.wx;
+      const ty = pos.wy;
+
+      // Tablet stone
+      const tg = X.createLinearGradient(tx - 14, 0, tx + 14, 0);
+      tg.addColorStop(0, '#141e18');
+      tg.addColorStop(0.5, '#1e3028');
+      tg.addColorStop(1, '#141e18');
+      X.globalAlpha = 1;
+      X.fillStyle   = tg;
+      X.fillRect(tx - 14, ty - 64, 28, 76);
+
+      // Carved lines
+      const lineA = read ? 0.65 : 0.25;
+      X.globalAlpha = lineA;
+      X.fillStyle   = read ? '#4a8a6a' : '#2a4a38';
+      for (let l = 0; l < 5; l++) {
+        const lw = 12 + (l % 3) * 4;
+        X.fillRect(tx - lw / 2, ty - 54 + l * 11, lw, 2);
+      }
+
+      // Glow if read
+      if (read) {
+        X.globalAlpha = 0.12 + Math.sin(t / 1200 + i * 0.9) * 0.05;
+        const rg2 = X.createRadialGradient(tx, ty - 28, 2, tx, ty - 28, 30);
+        rg2.addColorStop(0, '#20aa60');
+        rg2.addColorStop(1, 'transparent');
+        X.fillStyle = rg2;
+        X.fillRect(tx - 34, ty - 70, 68, 76);
+      }
+
+      // Archive record label
+      X.globalAlpha = read ? 0.5 : 0.2;
+      X.font        = '4px monospace';
+      X.fillStyle   = read ? '#4a8a6a' : '#2a4840';
+      X.textAlign   = 'center';
+      X.fillText(`RECORD ${['I', 'II', 'III'][i]}`, tx, ty + 18);
+      X.textAlign = 'left';
+      X.globalAlpha = 1;
+    });
+  }
+
+  X.textAlign = 'left';
+  X.restore();
+}
+
+// ── Name Alcove (east of choir, zone 4) ───────────────────
+// Sealed until choir survival. Contains the Compliance Officer's
+// private record: the Founder's birth name.
+
+function drawNameAlcove(t) {
+  const nx = NAME_TABLET_WX;
+  const ny = NAME_TABLET_WY;
+  const survived = Flags.get('atlantis_choir_survived');
+  const nameRead = Flags.get('atlantis_founder_name');
+
+  // East wall section — always present
+  X.save();
+  X.fillStyle = '#0e0c18';
+  X.fillRect(nx - 30, ny - 70, 72, 82);
+  X.strokeStyle = survived ? '#3a2050' : '#1a1428';
+  X.lineWidth   = 2;
+  X.strokeRect(nx - 30, ny - 70, 72, 82);
+
+  if (!survived) {
+    // Sealed — hairline crack in wall, barely perceptible
+    X.globalAlpha = 0.15;
+    X.strokeStyle = '#4a3060';
+    X.lineWidth   = 0.5;
+    X.beginPath();
+    X.moveTo(nx - 2, ny - 70);
+    X.lineTo(nx + 4, ny - 10);
+    X.stroke();
+    X.globalAlpha = 1;
+    X.restore();
+    return;
+  }
+
+  // Opened — crack becomes passage glow
+  X.globalAlpha = 0.18 + Math.sin(t / 900) * 0.06;
+  const ag = X.createRadialGradient(nx + 6, ny - 28, 4, nx + 6, ny - 28, 44);
+  ag.addColorStop(0, '#8030cc');
+  ag.addColorStop(1, 'transparent');
+  X.fillStyle = ag;
+  X.fillRect(nx - 32, ny - 72, 76, 84);
+
+  // Tablet inside the alcove
+  X.globalAlpha = 1;
+  const tg = X.createLinearGradient(nx - 12, 0, nx + 12, 0);
+  tg.addColorStop(0, '#16101e');
+  tg.addColorStop(0.5, '#20182e');
+  tg.addColorStop(1, '#16101e');
+  X.fillStyle = tg;
+  X.fillRect(nx - 12, ny - 58, 24, 64);
+
+  // Glow intensity depends on read state
+  const glowA = nameRead ? 0.6 : 0.3 + Math.sin(t / 700) * 0.15;
+  X.globalAlpha = glowA;
+  const tglow = X.createRadialGradient(nx, ny - 24, 2, nx, ny - 24, 28);
+  tglow.addColorStop(0, '#9940ff');
+  tglow.addColorStop(1, 'transparent');
+  X.fillStyle = tglow;
+  X.fillRect(nx - 30, ny - 64, 60, 72);
+
+  // Inscription lines
+  X.globalAlpha = nameRead ? 0.7 : 0.4;
+  X.fillStyle   = '#aa60ff';
+  X.font        = '4px monospace';
+  X.textAlign   = 'center';
+  if (nameRead) {
+    X.fillText('KHEM-ATEF', nx, ny - 34);
+    X.fillText('────────', nx, ny - 26);
+    X.fillText('PRIVATE', nx, ny - 18);
+    X.fillText('RECORD', nx, ny - 10);
+  } else {
+    // Unread: just marks, not decipherable
+    for (let l = 0; l < 4; l++) {
+      X.fillRect(nx - 8, ny - 48 + l * 10, 16, 2);
+    }
+  }
+  X.textAlign = 'left';
+  X.restore();
+}
+
 // ── Interactable hint (screen-space) ─────────────────────
 
 function drawInteractHint(realm) {
@@ -1468,12 +1817,28 @@ function drawInteractHint(realm) {
   const nearest = realm.registry.nearest;
   if (!nearest) return;
 
-  // Label by entity id
   const labels = {
-    welcome_pillar:  '[SPACE] READ THE PILLAR',
-    greeter:         '[SPACE] SPEAK WITH THE GREETER',
-    founder:         '[SPACE] APPROACH THE THRONE',
-    deepest_tablet:  '[SPACE] READ THE TABLET',
+    welcome_pillar: '[SPACE] READ THE PILLAR',
+    greeter:        '[SPACE] SPEAK WITH THE GREETER',
+    test_0:         '[SPACE] READ THE PLAQUE',
+    test_1:         '[SPACE] READ THE PLAQUE',
+    test_2:         '[SPACE] READ THE PLAQUE',
+    test_3:         '[SPACE] READ THE PLAQUE',
+    test_4:         '[SPACE] READ THE PLAQUE',
+    audit_chair:    Flags.get('atlantis_cleared')
+                      ? '[SPACE] YOU ARE ALREADY CLEARED'
+                      : '[SPACE] SIT FOR THE AUDIT',
+    archive_door:   Flags.get('atlantis_archive_open')
+                      ? '[SPACE] THE ARCHIVE IS OPEN'
+                      : '[SPACE] OPEN THE ARCHIVE',
+    arch_0:         '[SPACE] READ ARCHIVE RECORD I',
+    arch_1:         '[SPACE] READ ARCHIVE RECORD II',
+    arch_2:         '[SPACE] READ ARCHIVE RECORD III',
+    name_tablet:    Flags.get('atlantis_choir_survived')
+                      ? '[SPACE] READ THE PRIVATE RECORD'
+                      : '[SPACE] THE ALCOVE IS SEALED',
+    founder:        '[SPACE] APPROACH THE THRONE',
+    deepest_tablet: '[SPACE] READ THE TABLET',
   };
   const label = labels[nearest.id] || '[SPACE] INTERACT';
 
@@ -1607,6 +1972,9 @@ function drawAtlantisHUD(realm) {
     realm.py < ZONE_4_END ? 'ZONE IV — THE DEVOTED QUARTER' :
                             'ZONE V — THE FOUNDER\'S VAULT';
 
+  const testiCount = Flags.get('atlantis_testimonials_read', 0);
+  const cleared    = Flags.get('atlantis_cleared');
+
   X.save();
   X.globalAlpha = 0.65;
   X.font = '7px monospace';
@@ -1626,7 +1994,18 @@ function drawAtlantisHUD(realm) {
   if (tier > 0) {
     X.globalAlpha = 0.5;
     X.fillStyle = '#9966cc';
-    X.fillText(`TIER ${tier}`, CW - 60, 20);
+    X.fillText(`TIER ${tier}`, CW - 80, 20);
+  }
+
+  // Status indicators top-right
+  if (cleared) {
+    X.globalAlpha = 0.55;
+    X.fillStyle = '#30cc80';
+    X.fillText('✦ CLEARED', CW - 80, 36);
+  } else if (testiCount > 0) {
+    X.globalAlpha = 0.45;
+    X.fillStyle = '#88aabb';
+    X.fillText(`PLAQUES: ${testiCount}/5`, CW - 90, 36);
   }
 
   if (deaths > 0) {
@@ -1676,6 +2055,12 @@ export function drawAtlantis(realm) {
   drawProcessingChamber(t);
   drawDevotedQuarter(t);
   drawFounderVault(t);
+
+  // Puzzle elements (world-space, drawn over base geometry)
+  drawTestimonialPlaques(t);
+  drawAuditChair(t);
+  drawArchiveRoom(t);
+  drawNameAlcove(t);
 
   // Original city geometry
   drawBuildings();
