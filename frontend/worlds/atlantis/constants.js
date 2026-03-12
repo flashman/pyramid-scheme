@@ -47,6 +47,7 @@ export const ARCHIVE_TABLETS = [
   { wx: 90, wy: 1380, id: 'arch_2' },
 ];
 
+
 // Zone 3 Auditor face (visual reference for the chair)
 export const AUDITOR_FACE_WX = 2420;
 

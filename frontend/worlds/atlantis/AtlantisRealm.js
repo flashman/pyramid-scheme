@@ -182,7 +182,7 @@ function _buildGreeterDialogue() {
     },
     clarify: {
       speaker: 'THE GREETER  \u2726  TIER 9 ASSOCIATE',
-      text: 'THE PYRAMID IS A SYMBOL OF ASCENSION.\nTHE SCHEME IS THE PATH.\nTHESE ARE DIFFERENT THINGS.\n\nI HAVE A LEAFLET EXPLAINING THIS.\nTHE LEAFLET IS ALSO UNDERWATER.',
+      text: 'THE PYRAMID IS A SYMBOL OF ASCENSION.\nTHE SCHEME IS THE PATH.\nTHESE ARE DIFFERENT THINGS.\n\nTHE FOUNDER RECEIVED THE SYSTEM\nFROM ONE WHO ARRIVED BY SEA.\nTHE ONE BY SEA HAD IT FROM SOMEONE OLDER.\nEVERY SYSTEM HAS A PRIOR UPLINE.\n\nI HAVE A LEAFLET EXPLAINING THIS.\nTHE LEAFLET IS ALSO UNDERWATER.',
       next: 'wait',
     },
     wait: {
@@ -629,6 +629,7 @@ export class AtlantisRealm extends FreeMoveRealm {
       this.registry.register(at);
     });
 
+
     const nameTbl = new Entity('name_tablet', NAME_TABLET_WX, NAME_TABLET_WY);
     nameTbl.interactRange = 75;
     nameTbl.onInteract = () => {
@@ -670,6 +671,9 @@ export class AtlantisRealm extends FreeMoveRealm {
       setTimeout(() => log('THERE NEVER WAS AN UPLINE.', ''), 4200);
       setTimeout(() => log('\u2726 THE SYSTEM IS THE UPLINE.', 'hi'), 5000);
       setTimeout(() => log('PASS IT ON.', ''), 5800);
+      setTimeout(() => log('\u2726 AND BELOW THE SYSTEM?', 'hi'), 7200);
+      setTimeout(() => log('THE OCEAN.', ''), 8000);
+      setTimeout(() => log('THERE IS ALWAYS AN OCEAN.', ''), 8700);
     };
     this.registry.register(deepTbl);
   }
@@ -681,6 +685,8 @@ export class AtlantisRealm extends FreeMoveRealm {
     this.health.setImmunity(2000);
     this._inChoir       = false;
     this._choirUpgraded = false;
+
+    Flags.set('atlantis_deaths', 0);   // reset per-dive death counter
 
     const starts = [[400, 1260], [2200, 1380], [1100, 1480]];
     this.devoted.forEach((d, i) => { d.worldX = starts[i][0]; d.worldY = starts[i][1]; });

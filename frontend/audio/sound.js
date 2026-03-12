@@ -500,6 +500,69 @@ const THEMES = {
         ]},                                                                    // 32 beats
     ],
   },
+
+  // ── ATLANTIS (atlantis) ────────────────────────────────────────────────
+  // D Phrygian: D Eb F G A Bb C — the lowered 2nd is the Mediterranean dark,
+  // the sound of something very old and very wet. 52 bpm — barely a pulse,
+  // more like pressure. No clear melody. Two noise layers carry the texture:
+  // deep ocean rumble (bandpass ~200Hz) + high surface shimmer (~3kHz).
+  // Oscillator voices are sparse and isolated — single notes surfacing into
+  // silence like bubbles. The reverb does most of the work.
+  atlantis: {
+    bpm: 52,
+    tracks: [
+      // ── Deep ocean rumble — filtered noise, the pressure of fathoms
+      { wave: 'noise', gain: 0.055, pan: 0.0,
+        filter: { type: 'bandpass', freq: 210, Q: 0.35 },
+        reverb: true,
+        seq: [[1, 32]] },
+
+      // ── Water surface shimmer — high filtered noise, light through water
+      { wave: 'noise', gain: 0.028, pan: 0.0,
+        filter: { type: 'bandpass', freq: 3100, Q: 1.1 },
+        reverb: true,
+        seq: [[1, 32]] },
+
+      // ── Deep bass — sine, very sparse, like the city breathing
+      { wave: 'sine', gain: 0.10, pan: 0.0,
+        filter: { type: 'lowpass', freq: 300 },
+        reverb: true,
+        seq: [
+          // ── A section (16 beats) ─────────────────
+          [N.D2, 3],   [_,   1.5],  [N.Eb2, 2],  [_,   1.5], // 8
+          [N.G2, 2.5], [_,   2.5],  [N.A2,  1.5],[_,   1.5], // 8
+          // ── B section (16 beats) ─────────────────
+          [_,   2],    [N.D2, 3.5], [_,     2.5],             // 8
+          [N.F2, 2],   [_,   2],    [N.Bb2, 2],  [_,   2],   // 8
+        ]},
+
+      // ── Sparse lead — sine, almost inaudible, notes drifting in from nowhere
+      { wave: 'sine', gain: 0.055, pan: -0.2,
+        filter: { type: 'lowpass', freq: 1600 },
+        vibrato: { rate: 1.6, depth: 4 },
+        seq: [
+          // ── A section (16 beats) ─────────────────
+          [_,    3],   [N.D4,  2.5], [_,    2.5],             // 8
+          [N.Eb4,1.5], [_,     2.5], [N.F4, 1.5], [_,  2.5], // 8
+          // ── B section (16 beats) ─────────────────
+          [_,    4],   [N.A3,  2.5], [_,    1.5],             // 8
+          [_,    2],   [N.C4,  1.5], [_,    2.5], [N.G3, 1], [_, 1], // 8
+        ]},
+
+      // ── High sparkle — sine, very infrequent, like shafts of light through water
+      { wave: 'sine', gain: 0.038, pan: 0.35,
+        filter: { type: 'bandpass', freq: 2000, Q: 2.5 },
+        reverb: true,
+        seq: [
+          // ── A section (16 beats) ─────────────────
+          [_,    7.5], [N.A5, 0.5],                            // 8
+          [_,    8],                                            // 8
+          // ── B section (16 beats) ─────────────────
+          [_,    6],   [N.D5, 0.5], [_,   1.5],               // 8
+          [_,    7],   [N.F5, 0.5], [_,   0.5],               // 8
+        ]},
+    ],
+  },
 };
 
 // Realm ID → theme name.
@@ -508,7 +571,8 @@ const REALM_THEME = {
   oasis:   'oasis',
   vault:   'vault',
   chamber: 'chamber',
-  council: 'council',
+  council:  'council',
+  atlantis: 'atlantis',
 };
 
 // ── SoundManager singleton ────────────────────────────────
@@ -690,9 +754,37 @@ class SoundManagerClass {
     filter.connect(panner);
     panner.connect(this._masterGain);
 
-    // Reverb send (only for melodic/lead tracks with vibrato, keep bass dry)
-    if (track.vibrato) {
+    // Reverb send (melodic leads, or tracks explicitly flagged reverb: true)
+    if (track.vibrato || track.reverb) {
       filter.connect(this._reverb);
+    }
+
+    // ── Noise track handler ──────────────────────────────────
+    // wave: 'noise' — generates a looping filtered white noise source.
+    // track.seq is still used to determine total duration; freq values ignored.
+    if (track.wave === 'noise') {
+      const rate   = ctx.sampleRate;
+      const bufLen = Math.floor(rate * 2.7); // 2.7s buffer, loops seamlessly
+      const buf    = ctx.createBuffer(1, bufLen, rate);
+      const ch     = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) ch[i] = Math.random() * 2 - 1;
+
+      const totalSec = track.seq.reduce((s, [, d]) => s + d * beatLen, 0);
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0,           startT);
+      env.gain.linearRampToValueAtTime(track.gain, startT + 0.8);
+      env.gain.setValueAtTime(track.gain,  startT + totalSec - 0.7);
+      env.gain.linearRampToValueAtTime(0,  startT + totalSec);
+
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop   = true;
+      src.connect(env);
+      env.connect(filter);
+      src.start(startT);
+      src.stop(startT + totalSec);
+      this._oscillators.push(src);
+      return track.seq.reduce((s, [, d]) => s + d, 0);
     }
 
     for (const [freq, dur] of track.seq) {
