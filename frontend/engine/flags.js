@@ -72,3 +72,10 @@ export const QuestManager = {
 
   all() { return this._quests; },
 };
+
+// ── Auto-check quests on any flag change ─────────────────
+// Eliminates the 10+ scattered QuestManager.check() calls that
+// previously had to be remembered after every Flags.set/inc call.
+// Realms and entities no longer need to import or call QuestManager
+// just to trigger a quest evaluation — it fires automatically.
+Events.on('flag:change', () => QuestManager.check());

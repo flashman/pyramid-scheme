@@ -21,14 +21,19 @@ import { surfAt }          from '../worlds/earth/terrain.js';
  * Advances and renders all active particles in G.particles.
  * Applies gravity, fades by `life`, and removes dead particles.
  * Must be called once per frame inside a camera-translated context.
+ *
+ * @param {number} [camX=G.camX] - Camera X offset for this realm.
+ *   World realms can omit this (defaults to G.camX).
+ *   Non-world realms (atlantis, oasis) must pass their own camX so
+ *   particles spawn at the correct screen position.
  */
-export function drawParts() {
+export function drawParts(camX = G.camX) {
   for (let i = G.particles.length-1; i >= 0; i--) {
     const p = G.particles[i];
     p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 0.022;
     if (p.life <= 0) { G.particles.splice(i, 1); continue; }
     X.globalAlpha = p.life; X.fillStyle = p.c;
-    X.fillRect(p.x - G.camX, p.y, p.s, p.s);
+    X.fillRect(p.x - camX, p.y, p.s, p.s);
     X.globalAlpha = 1;
   }
 }

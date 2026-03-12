@@ -2,6 +2,88 @@
 
 ---
 
+## v1.40 — Engine abstraction pass: FreeMoveRealm, HealthSystem, TimedHazard, FreeRoamEnemy
+
+> *Four new engine modules extract the physics, damage, hazard, and enemy AI that were inline in AtlantisRealm into reusable, game-agnostic systems. No gameplay changes. The refactored AtlantisRealm is ~200 lines shorter and every new underwater world gets these systems for free.*
+
+### New files
+
+#### `engine/freemove.js` — `FreeMoveRealm`
+Base class for freely-swimming, 2D-scrolling underwater worlds. Extends `Realm`.
+
+- `_moveStep(ts)` — one call advances 2D physics (yDrift + input acceleration + drag + speed cap + bottom bounce), updates walk animation frame clock, clamps player to world bounds, tracks camera in X and Y, and syncs everything to G. Replaces ~60 lines of inline physics in AtlantisRealm.
+- `_syncCamera()` — lerps camera toward player in both axes, clamped to world bounds. Callable standalone during death/frozen states.
+- `_syncToG()` — writes `px/py/pvx/pvy/camX/camY/facing/pmoving/pframe` → G so the HUD always sees current state.
+- `getPlayerPose()` — standard pose object for `drawRealmPharaoh(realm)`.
+- `_aboveSurface()` — returns `true` when `py ≤ surfaceExitY`; use in `onKeyDown` to gate the "swim up → exit realm" transition.
+- `resetToEntry(jitter)` — teleports player to the entry point with zeroed velocity; intended for respawn callbacks.
+- Constructor options: `worldW`, `worldH`, `entryX`, `entryY`, `floorY`, `surfaceExitY`, `physics: { acc, drag, maxSpd, yDrift }`.
+
+#### `engine/health.js` — `HealthSystem`
+Standalone player damage / death-screen / respawn / immunity system. No realm inheritance required — any realm can own one.
+
+- `kill(cause, msg)` — sets dying state, fires `onKill(cause, msg)` callback immediately.
+- `update()` — call at top of `realm.update()`; returns `true` while dying (realm should skip normal update). Fires `onRespawn()` once the `respawnDelay` elapses and resets immunity timer.
+- `canTakeDamage()` — `true` when not dying and not immune; check before calling `kill()` from enemy/hazard code.
+- `setImmunity(ms)` — grants temporary invincibility (call from `onEnter()` to prevent spawn-kills).
+- Getters: `isDying`, `deathMsg`, `deathCause`, `deathElapsed` (ms since kill, for death-screen fade), `progress` (0–1 fraction toward respawn).
+
+#### `engine/hazard.js` — `TimedHazard`
+Circular world-space zone where standing still for too long has consequences. Generalises the choir mechanic.
+
+Two modes, switchable at runtime via `setMode()`:
+- **Danger mode** (`surviveDuration = null`): player must leave within `dangerDuration` ms or `onDanger` fires.
+- **Survival mode** (`surviveDuration > 0`): player must stay the full duration; `onSurvive` fires once, then zone becomes inert.
+
+AtlantisRealm initialises the choir as danger mode, then calls `choir.setMode({ surviveDuration: 5000, onSurvive: … })` once `atlantis_cleared` is true — the mode switch is idempotent and happens transparently mid-session.
+
+Getters: `isInside`, `elapsed` (ms since entry), `progress` (0–1, useful for vignette opacity).
+
+#### `FreeRoamEnemy` added to `engine/entity.js`
+2D underwater enemy. Extends `Entity`. Replaces the three anonymous enemy structs and `_updateEnemies()` in AtlantisRealm.
+
+Two chase styles:
+- `'direct'` — constant-speed steering toward the player each frame (shark, devoted: snappy, responsive).
+- `'momentum'` — accumulates velocity with a max-speed cap (squid: heavy and inevitable).
+
+Key options:
+- `patrolBounds: { x1, x2, y }` — horizontal patrol bounce when idle (shark).
+- `driftFreq / driftAmp / driftSpeed` — sinusoidal ambient drift when idle (squid, devoted).
+- `aggressiveFn: () => bool` — gates chase entirely (squid → passive when CLEARED; devoted → passive when name known).
+- `aggroZoneY` — player must be above this Y to trigger aggro (shark only chases in zones 1–2).
+- `zoneBounds: { yMin, yMax }` — keeps enemy inside its vertical zone.
+- `drawFn: (enemy, sx, sy, ts) => void` — optional inline renderer, called by `draw()`.
+- `hurtCheck(px, py)` — returns true only when chasing and within `hurtRange`.
+- `update(ts, px, py)` — full AI tick; call from realm `update()`.
+
+Also: `drawFn` option added to the existing `Enemy` class and `draw(sx, sy, ts)` now calls it — fixes the long-standing no-op `draw()` stub.
+
+---
+
+### Modified files
+
+#### `engine/flags.js`
+- Added `Events.on('flag:change', () => QuestManager.check())` at module level.
+- **`QuestManager.check()` now fires automatically** after every `Flags.set()`, `Flags.inc()`, and `Flags.toggle()` call.
+- Removes the need for the 10+ scattered manual `QuestManager.check()` calls that were spread across realm code, dialogue `onEnter` callbacks, and entity `onInteract` handlers. Callers that still call it explicitly are harmless (check is idempotent).
+
+#### `draw/hud.js`
+- `drawParts(camX = G.camX)` — added explicit `camX` parameter (defaults to `G.camX` for backward compatibility with WorldRealm).
+- Fixes the long-standing bug where particles emitted in non-world realms (atlantis, oasis) rendered at the wrong screen position because `drawParts()` always subtracted `G.camX` which holds a stale world-realm value during realm transitions.
+- Non-world realms should now call `drawParts(this.camX)` to pass their own camera offset.
+
+#### `worlds/atlantis/AtlantisRealm.js`
+- Now extends `FreeMoveRealm` instead of `Realm`.
+- Swim physics loop (`~60 lines`) replaced by `this._moveStep(ts)`.
+- `_syncCamera()` / `_syncToG()` / `getPlayerPose()` removed — provided by `FreeMoveRealm`.
+- `_killPlayer()` / `_respawn()` / `_immuneUntil` (`~30 lines`) replaced by `this.health = new HealthSystem(…)`.
+- `_updateEnemies()` (`~80 lines`) replaced by `FreeRoamEnemy` instances (`this.shark`, `this.squid`, `this.devoted[]`) with `update(ts, px, py)` and `hurtCheck(px, py)` called from `update()`.
+- Choir circle timer logic (`~30 lines`) replaced by `this.choir = new TimedHazard(…)` with `choir.setMode()` called once when `atlantis_cleared` becomes true.
+- Net reduction: ~200 lines. Dialogue content, entity interactions, zone-entry logs, and render call are **unchanged**.
+- All `QuestManager.check()` calls removed from dialogue `onEnter` callbacks (now auto-fired by `flag:change`).
+
+---
+
 ## v1.39 — Atlantis: full game loop, puzzles, and richer dialogue
 
 > *The city now has a reason to explore. Every piece of lore pays off mechanically. Every gate opens with knowledge, not arbitrary progress. The Founder has a name. The name is earned.*

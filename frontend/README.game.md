@@ -65,7 +65,10 @@ pyramid-scheme/
 │   ├── events.js           # Lightweight pub/sub event bus (Events)
 │   ├── flags.js            # Named boolean/value flags + quest manager
 │   ├── realm.js            # Realm, PhysicsRealm, RealmManager with transition animations
-│   ├── entity.js           # Entity, NPC, Enemy (patrol AI), Collectible (auto-pickup)
+│   ├── entity.js           # Entity, NPC, Enemy (patrol AI), Collectible, FreeRoamEnemy (2D underwater AI)
+│   ├── freemove.js          # FreeMoveRealm — 2D swim physics + camera-Y (base for Atlantis and future underwater worlds)
+│   ├── health.js           # HealthSystem — kill / death-screen / respawn / immunity (standalone, any realm can use)
+│   ├── hazard.js           # TimedHazard — timed zone hazard (danger mode / survival mode, switchable at runtime)
 │   ├── interactables.js    # Per-frame nearest-interactable registry
 │   ├── trigger.js          # TriggerZone + TriggerRegistry (area gates, door hints)
 │   └── dialogue.js         # Canvas-rendered branching dialogue system
@@ -135,7 +138,26 @@ Each scene is a `Realm` subclass registered with `RealmManager`. Switching scene
 
 Realms with walkable terrain should extend **`PhysicsRealm`** instead of `Realm` directly. `PhysicsRealm` is configured with `{ gravity, worldW, floor, maxFallSpeed }` and exposes `_gravityStep()`, `_clampX()`, and `_trackCameraX()` helpers, eliminating copy-pasted physics math.
 
-Fixed-camera realms (chamber, council, vault) extend **`FlatRealm`**, which adds `_walkStep(ts)` (movement + animation + G-sync in one call) and `getPlayerPose()` (see below).
+Fixed-camera realms (chamber, council, vault) extend **`FlatRealm`**, which adds `_walkStep(ts)` (movement + animation + G-sync in one call) and `getPlayerPose()`.
+
+Underwater / freely-swimming realms extend **`FreeMoveRealm`** (`engine/freemove.js`). It handles 2D free-movement physics, vertical camera tracking, `_syncToG()`, `getPlayerPose()`, and `_aboveSurface()`. Adding a new FreeMoveRealm subclass is the same pattern as any other realm, with swim physics free:
+
+```js
+class MyOceanRealm extends FreeMoveRealm {
+  constructor() {
+    super('my-ocean', 'THE DEEP', {
+      worldW: 3200, worldH: 2400, entryY: 80,
+      physics: { acc: 0.4, drag: 0.92, maxSpd: 6, yDrift: -0.03 },
+    });
+    this.health = new HealthSystem({ onKill: …, onRespawn: () => this.resetToEntry(100) });
+  }
+  update(ts) {
+    if (this.health.update()) { this._syncCamera(); return; }
+    this._moveStep(ts);   // physics + G sync
+    // ... enemies, triggers, etc.
+  }
+}
+```
 
 **Terrain interface.** `PhysicsRealm` declares two virtual methods with flat-floor defaults. Override them to give your realm its own surface shape:
 
@@ -196,6 +218,58 @@ if (key === 'ArrowUp' && this.triggers.isInside('my-door')) {
 
 ### Enemies
 `Enemy` (in `engine/entity.js`) is an `Entity` subclass with patrol AI. Register with `InteractableRegistry` like any entity; the registry calls `update(ts)` and `draw(sx, sy)` automatically.
+
+For **underwater enemies**, use `FreeRoamEnemy` (also in `engine/entity.js`). It supports two chase styles (`'direct'` for snappy surface-level steering, `'momentum'` for heavy accumulating velocity), sinusoidal drift when idle, an `aggressiveFn()` to toggle aggression via flag checks, and zone bounds to keep enemies in their depth range.
+
+```js
+const shark = new FreeRoamEnemy('shark', startX, Y, {
+  chaseStyle: 'direct',  patrolBounds: { x1, x2, y },
+  aggroRange: 210,       hurtRange: 32,
+  aggroZoneY: ZONE_2_END,
+  drawFn: (e, sx, sy, t) => drawShark(e, sx, sy, t),
+});
+// In update():
+shark.update(ts, this.px, this.py);
+if (health.canTakeDamage() && shark.hurtCheck(this.px, this.py)) { … }
+```
+
+Both `Enemy` and `FreeRoamEnemy` accept a `drawFn: (entity, sx, sy, ts) => void` constructor option — pass your draw function inline rather than subclassing.
+
+### Player damage (HealthSystem)
+`HealthSystem` (`engine/health.js`) handles kill/death-timer/respawn/immunity for any realm. No inheritance required — any realm can own one as a field.
+
+```js
+this.health = new HealthSystem({
+  respawnDelay: 2800, immunityAfterSpawn: 3000,
+  onKill:    (cause, msg) => { G.shake = 22; log(msg.split('\n')[0], 'hi'); },
+  onRespawn: ()           => { this.resetToEntry(200); G.shake = 8; },
+});
+// In update() — before any other logic:
+if (this.health.update()) return;  // true while dying
+// To damage:
+if (this.health.canTakeDamage() && enemyHit) {
+  this.health.kill('shark', deathMsg);
+}
+```
+
+### Timed hazard zones (TimedHazard)
+`TimedHazard` (`engine/hazard.js`) models a circular zone where lingering has consequences. Supports **danger mode** (leave in time or die) and **survival mode** (stay the full duration to unlock something). Mode can be switched at runtime via `setMode()`.
+
+```js
+this.choir = new TimedHazard('choir', {
+  wx: CHOIR_WX, wy: CHOIR_WY, radius: CHOIR_RADIUS,
+  dangerDuration: 2400,
+  onEnter: () => log('Swim away.', ''),
+  onEscape: () => log('You swam fast enough.', ''),
+  onDanger: () => health.kill('choir', msg),
+});
+// Switch to survival mode when a flag changes:
+this.choir.setMode({ surviveDuration: 5000, onSurvive: () => { Flags.set('cleared', true); } });
+// In update():
+this.choir.update(this.px, this.py);
+// progress (0..1) is available for drawing vignette overlays:
+if (this.choir.isInside) drawWarning(this.choir.progress);
+```
 
 ```js
 import { Enemy } from '../../engine/entity.js';
