@@ -2,6 +2,27 @@
 
 ---
 
+## v1.43 — GameSession: authenticated lifecycle extracted from main
+
+> *All post-auth setup logic has been moved out of `main.js` into a dedicated `GameSession` class. `main.js` is now purely boot wiring — realm registration, event bus plumbing, input, and the game loop.*
+
+### `game/session.js` (new)
+New `GameSession` class owns the entire authenticated-user lifecycle:
+- **`start()`** — public async entry point called once from `main.js` after `requireAuth` resolves. Sets the API token, shows the profile button, loads server config, hydrates state, restores the player world, wires sync events, and fires off non-critical async work (invite panel, dev panel mode).
+- **`_hydrateState(me)`** — populates `G` and `Flags` from the `/api/me` response; bypasses the event bus for flag hydration to avoid a sync-back loop.
+- **`_restorePlayerWorld()`** — re-places the player's capstone pyramid at its canonical position and rehydrates all recruits from the server. Previously an inline block inside `init()`.
+- **`_scheduleSyncState()`** — debounced 1.5s push of client-owned flags to `/api/state`. Timer is instance-owned (no module-level variable).
+- **`_wireStateSyncEvents()`** / **`_wireBeforeUnload()`** — register the `flag:change`, `recruit`, and `buyin` listeners and the `beforeunload` beacon.
+- **`_wireWsEvents()`** — connects `gameSocket` and registers all `ws:*` event handlers (`ws:recruit_joined`, `ws:state_update`, `ws:invite_accepted`).
+
+### `main.js`
+- Removed: `_hydrateState`, `_wireWsEvents`, `scheduleSyncState`, and the entire authenticated branch of `init()`.
+- Removed imports: `restoreRecruits`, `addRecruit`, `gameSocket`, `updateInvitePanel`, `Flags`, `renderPayoutTable`, `loadConfig`, `devPanelSetAuthMode`.
+- `init()` is now three lines of logic: call `initDevPanel`, await `requireAuth`, then either `await new GameSession(token).start()` or set guest mode.
+- The game loop, event wiring, input handlers, and `window.*` exposure are unchanged.
+
+---
+
 ## v1.42 — THE DEEP: new realm, three gods, primordial lore
 
 > *Below Atlantis. Below the city, the franchise, the myth. Four zones. Three gods. One tablet that was here before the gods. The pyramid does not end at the ocean floor.*
