@@ -167,3 +167,60 @@ export function vaultTransRender(progress) {
     X.restore();
   }
 }
+
+// ── Descent into The Deep ─────────────────────────────────
+// Crushing darkness. Purple crack-light, then absolute void.
+// Used when descending through the Atlantis vault floor.
+
+export function deepTransRender(progress) {
+  const p = Math.min(1, progress);
+
+  if (p < 0.35) {
+    // Crack-light flare — purple bleed from below
+    const rp = p / 0.35;
+    const cx = CW / 2;
+    const cy = CH;
+    X.save();
+    X.globalAlpha = rp * 0.7;
+    const cg = X.createRadialGradient(cx, cy, 0, cx, cy, CH * 1.1);
+    cg.addColorStop(0, '#440066');
+    cg.addColorStop(0.3, '#220033');
+    cg.addColorStop(1, 'transparent');
+    X.fillStyle = cg;
+    X.fillRect(0, 0, CW, CH);
+    X.restore();
+
+    // Crack line spreading across bottom
+    X.save();
+    X.globalAlpha = rp * 0.9;
+    X.strokeStyle = '#cc00ff';
+    X.lineWidth = 3;
+    X.shadowColor = '#cc00ff';
+    X.shadowBlur  = 16;
+    X.beginPath();
+    const spread = rp * CW * 0.7;
+    X.moveTo(cx - spread, CH - 8);
+    X.lineTo(cx - spread * 0.5, CH - 4);
+    X.lineTo(cx + spread * 0.3, CH - 9);
+    X.lineTo(cx + spread, CH - 5);
+    X.stroke();
+    X.restore();
+  } else {
+    // Full void collapse — crack light eaten by absolute dark
+    const fp = (p - 0.35) / 0.65;
+    X.save();
+    X.globalAlpha = Math.min(1, fp * 1.2);
+    X.fillStyle = '#000000';
+    X.fillRect(0, 0, CW, CH);
+    X.restore();
+
+    // Last glimmer of purple, then nothing
+    if (fp < 0.5) {
+      X.save();
+      X.globalAlpha = (0.5 - fp) * 0.4;
+      X.fillStyle = '#220033';
+      X.fillRect(0, 0, CW, CH);
+      X.restore();
+    }
+  }
+}

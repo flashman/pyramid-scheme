@@ -136,7 +136,7 @@ Usually means the backend is crash-looping (check `docker compose logs backend`)
 
 ## Changelogs
 
-- `frontend/CHANGES.md` — frontend version history (current: **v1.38**)
+- `frontend/CHANGES.md` — frontend version history (current: **v1.42**)
 - `backend/CHANGES.md` — backend version history (current: **v0.5.0**)
 
 ---
@@ -153,7 +153,7 @@ Accessible via the oasis pool after completing the vault ritual (v1.37+).
 | II | The Abundance Hall | Gold-painted columns. The paint is visibly flaking. |
 | III | The Processing Chamber | Rows of seated skeletons. The Auditor squid patrols here. |
 | IV | The Devoted Quarter | Founder portraits everywhere. A choir circle that will harmonize you to death. |
-| V | The Founder's Vault | A throne. A cage locked from the inside. The deepest tablet. |
+| V | The Founder's Vault | A throne. A cage locked from the inside. The deepest tablet. A crack in the floor. |
 
 ### Three predators
 
@@ -167,7 +167,30 @@ Death returns you to the surface. Each death has a different message. The messag
 
 ### The core lore
 
-The Founder found this room already built, already ancient, already furnished with a throne and a tablet describing their system exactly. They didn't invent it. They added a layer. As did whoever came before. As does the player. The system is the upline. There never was an upline.
+The Founder found this room already built, already ancient, already furnished with a throne and a tablet describing their system exactly. They didn't invent it. They added a layer. As did whoever came before. As does the player. The system is the upline. There never was an upline. And below the system? The ocean. There is always an ocean.
+
+---
+
+## The Deep (v1.42+)
+
+Accessible through a crack in the Atlantis vault floor, revealed after reading the deepest tablet. Press `[↓]` near the crack to descend. Press `[↑]` at the top to return to Atlantis.
+
+### Four zones
+
+| Zone | Name | What you find |
+|---|---|---|
+| I | The Shelf | Atlantean debris sinking slowly. The Herald — a bioluminescent ancient creature — has watched every civilisation arrive from above. |
+| II | The Franchise Office | Poseidon's domain. Stone walls carved with the divine org chart. He is still filing a quarterly report on Atlantis sinking. The org chart goes up to Tier ∞ with [REDACTED] at the top. |
+| III | The Pelagic | Okeanos drifts here as a vast coiled presence. Pre-franchise, pre-everything. He does not respond to Poseidon's memos. |
+| IV | The Abyss | A primordial tablet in the floor sediment. It predates the word for tablet. The Leviathan passes through occasionally. |
+
+### Inhabitants
+
+- **The Herald** — watched Khem-Atef arrive in a boat with a stylus. Has no tier and no name. "Names are how they track you."
+- **Poseidon** — Tier 7, Sea Franchise #1. Built the concentric rings for love. Someone turned the shape into a system. He has been thinking about this for twelve thousand years.
+- **Okeanos** — Tier 12. Was the ocean before there were oceans to name. Has received 11,462 compliance memos from Poseidon. Has not responded.
+- **Anglers** — three bioluminescent ambush hunters. The lure orb asks nothing. You assumed an invitation.
+- **The Leviathan** — not a predator. Not part of the system. The reason there is a system.
 
 ---
 

@@ -18,6 +18,7 @@ import { CouncilRealm }           from './worlds/council/CouncilRealm.js';
 import { OasisRealm }            from './worlds/oasis/OasisRealm.js';
 import { VaultRealm }            from './worlds/oasis/VaultRealm.js';
 import { AtlantisRealm }         from './worlds/atlantis/AtlantisRealm.js';
+import { DeepRealm }             from './worlds/deep/DeepRealm.js';
 import { renderPayoutTable }      from './ui/config-editor.js';
 import { loadConfig }             from './game/config.js';
 import { updateStats, updateSlots, log } from './ui/panels.js';
@@ -37,7 +38,8 @@ RealmManager
   .register(new CouncilRealm())
   .register(new OasisRealm())
   .register(new VaultRealm())
-  .register(new AtlantisRealm());
+  .register(new AtlantisRealm())
+  .register(new DeepRealm());
 
 // ── Quests ────────────────────────────────────────────────
 registerAllQuests();

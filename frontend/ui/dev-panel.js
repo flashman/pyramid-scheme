@@ -209,6 +209,24 @@ const REALMS = [
       _unlockCouncil();
     },
   },
+  {
+    id: 'oasis', label: '🌊 OASIS',
+    setup() {
+      _unlockOasis();
+    },
+  },
+  {
+    id: 'atlantis', label: '🐚 ATLANTIS',
+    setup() {
+      _unlockAtlantis();
+    },
+  },
+  {
+    id: 'deep', label: '🌑 THE DEEP',
+    setup() {
+      _unlockDeep();
+    },
+  },
 ];
 
 // ── Flag toggles ──────────────────────────────────────────
@@ -238,6 +256,32 @@ const FLAG_GROUPS = [
       { key: 'upline_accepted',  label: 'Upline accepted'    },
     ],
   },
+  {
+    label: 'Oasis / Sphinx',
+    flags: [
+      { key: 'stele_read',              label: 'Dream Stele read'      },
+      { key: 'atlantis_vault_opened',   label: 'Vault altar activated' },
+    ],
+  },
+  {
+    label: 'Atlantis',
+    flags: [
+      { key: 'atlantis_cleared',        label: 'Cleared (audit done)'  },
+      { key: 'atlantis_choir_survived', label: 'Choir survived'        },
+      { key: 'atlantis_founder_name',   label: 'Founder name known'    },
+      { key: 'atlantis_founder_read',   label: 'Founder spoken'        },
+      { key: 'atlantis_deepest_tablet', label: 'Deepest tablet read'   },
+      { key: 'atlantis_crack_visible',  label: 'Crack visible (THE DEEP entry)', side: null },
+    ],
+  },
+  {
+    label: 'The Deep',
+    flags: [
+      { key: 'poseidon_spoken',      label: 'Poseidon spoken'       },
+      { key: 'okeanos_spoken',       label: 'Okeanos spoken'        },
+      { key: 'deep_primordial_read', label: 'Primordial tablet read' },
+    ],
+  },
 ];
 
 function _sideEffectSH() {
@@ -248,6 +292,39 @@ function _sideEffectCU() {
 }
 
 // ── State cheat helpers ───────────────────────────────────
+
+function _unlockOasis() {
+  // Sphinx riddles bypassed — vault opened, pool statue ready
+  Flags.set('atlantis_vault_opened', true);
+  Flags.set('stele_read', true);
+  for (let i = 0; i < 3; i++) Flags.inc('sphinx_riddles_solved');
+  log('[DEV] Oasis unlocked — vault opened, all riddles solved.', '');
+}
+
+function _unlockAtlantis() {
+  // Full Atlantis progression: recruited, cleared, archive read, choir survived,
+  // founder known, founder spoken, deepest tablet read
+  _unlockOasis();
+  Flags.set('atlantis_visited', true);
+  Flags.set('atlantis_recruited', true);
+  Flags.set('atlantis_tier', 3);
+  Flags.set('atlantis_cleared', true);
+  Flags.set('atlantis_choir_survived', true);
+  Flags.set('atlantis_founder_name', true);
+  Flags.set('atlantis_founder_read', true);
+  Flags.set('atlantis_archive_open', true);
+  Flags.set('atlantis_archive_read', 3);
+  Flags.set('atlantis_deepest_tablet', true);
+  Flags.set('atlantis_crack_visible', true);
+  log('[DEV] Atlantis fully unlocked — crack visible.', '');
+}
+
+function _unlockDeep() {
+  // Everything above + deep flags
+  _unlockAtlantis();
+  Flags.set('deep_visited', true);
+  log('[DEV] The Deep unlocked.', '');
+}
 
 function _grantBuyIn() {
   G.bought = true;

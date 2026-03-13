@@ -1102,6 +1102,101 @@ function drawDevotedQuarter(t) {
   X.restore();
 }
 
+
+// ── Vault crack — entry to The Deep ──────────────────────
+// Visible only after atlantis_deepest_tablet is read.
+// Pulses with an ancient non-bioluminescent light.
+
+function drawVaultCrack(t) {
+  if (!Flags.get('atlantis_crack_visible')) return;
+
+  // Place crack near the tablet but away from the building at wx=620 (w=260, reaches x=880).
+  // Use FOUNDER_WX area — open vault floor, no building geometry above it.
+  const cx  = FOUNDER_WX - 120;   // 1270 — open floor in the vault
+  const cy  = ATLANTIS_FLOOR_Y - 10;
+  const pulse = 0.55 + Math.sin(t * 0.0016) * 0.35;
+
+  X.save();
+
+  // Wide upward glow — makes it unmissable when you're in the vault
+  const glowGrad = X.createRadialGradient(cx, cy, 4, cx, cy - 40, 110);
+  glowGrad.addColorStop(0,   `rgba(120,0,160,${pulse * 0.7})`);
+  glowGrad.addColorStop(0.3, `rgba(60,0,90,${pulse * 0.4})`);
+  glowGrad.addColorStop(0.7, `rgba(20,0,30,${pulse * 0.15})`);
+  glowGrad.addColorStop(1,   'transparent');
+  X.fillStyle = glowGrad;
+  X.beginPath(); X.ellipse(cx, cy - 20, 110, 70, 0, 0, Math.PI * 2); X.fill();
+
+  // Black void underneath — stone is broken open
+  X.fillStyle = '#000000';
+  X.beginPath();
+  X.ellipse(cx, cy + 2, 52, 6, 0, 0, Math.PI * 2);
+  X.fill();
+
+  // Crack lines — thick, clearly visible
+  X.strokeStyle = '#110011';
+  X.lineWidth = 6;
+  X.shadowColor = '#220033';
+  X.shadowBlur  = 0;
+  X.globalAlpha = 1.0;
+  X.beginPath();
+  X.moveTo(cx - 60, cy + 1);
+  X.lineTo(cx - 32, cy - 3);
+  X.lineTo(cx - 10, cy + 4);
+  X.lineTo(cx + 8,  cy - 2);
+  X.lineTo(cx + 30, cy + 5);
+  X.lineTo(cx + 58, cy);
+  X.stroke();
+
+  // Secondary crack branch
+  X.lineWidth = 3;
+  X.beginPath();
+  X.moveTo(cx - 10, cy + 4);
+  X.lineTo(cx - 18, cy + 16);
+  X.moveTo(cx + 8,  cy - 2);
+  X.lineTo(cx + 20, cy + 12);
+  X.stroke();
+
+  // Purple light bleeding up through crack
+  X.globalAlpha = pulse * 0.9;
+  X.strokeStyle = '#aa00cc';
+  X.lineWidth = 3;
+  X.shadowColor = '#dd00ff';
+  X.shadowBlur  = 18;
+  X.beginPath();
+  X.moveTo(cx - 56, cy + 1);
+  X.lineTo(cx - 30, cy - 3);
+  X.lineTo(cx - 8,  cy + 4);
+  X.lineTo(cx + 10, cy - 2);
+  X.lineTo(cx + 32, cy + 5);
+  X.lineTo(cx + 54, cy);
+  X.stroke();
+
+  // Bright hot centre of the crack
+  X.globalAlpha = pulse * 0.6;
+  X.strokeStyle = '#ff88ff';
+  X.lineWidth = 1;
+  X.shadowBlur  = 6;
+  X.beginPath();
+  X.moveTo(cx - 20, cy + 1);
+  X.lineTo(cx + 20, cy + 1);
+  X.stroke();
+
+  // Label — larger, brighter
+  X.shadowBlur  = 0;
+  X.globalAlpha = 0.7 + 0.3 * pulse;
+  X.font = '7px monospace';
+  X.fillStyle = '#cc66ff';
+  X.textAlign = 'center';
+  X.fillText('[\u2193] THE DEEP', cx, cy - 50);
+  X.font = '6px monospace';
+  X.fillStyle = '#884499';
+  X.fillText('something below', cx, cy - 40);
+  X.textAlign = 'left';
+
+  X.restore();
+}
+
 // ── Zone 5: The Founder's Vault ───────────────────────────
 // The throne. The cage. The tablet.
 
@@ -1839,6 +1934,7 @@ function drawInteractHint(realm) {
                       : '[SPACE] THE ALCOVE IS SEALED',
     founder:        '[SPACE] APPROACH THE THRONE',
     deepest_tablet: '[SPACE] READ THE TABLET',
+    vault_crack:    '[↓] DESCEND INTO THE DEEP',
   };
   const label = labels[nearest.id] || '[SPACE] INTERACT';
 
@@ -2071,6 +2167,9 @@ export function drawAtlantis(realm) {
   drawCoral(t);
   drawBiolum(t);
   drawFish(t);
+
+  // Crack in vault floor — drawn last so it renders over all geometry
+  drawVaultCrack(t);
 
   X.restore();
 

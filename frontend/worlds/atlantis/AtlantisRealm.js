@@ -41,6 +41,7 @@ import {
   CHOIR_WX, CHOIR_WY, CHOIR_RADIUS,
   NAME_TABLET_WX, NAME_TABLET_WY,
   FOUNDER_WX, FOUNDER_WY, TABLET_WX, TABLET_WY,
+  ATLANTIS_FLOOR_Y,
   SHARK_PATROL_Y, SHARK_PATROL_X1, SHARK_PATROL_X2,
   SHARK_SPEED, SHARK_CHASE_SPD, SHARK_AGGRO, SHARK_HURT,
   SQUID_START_WX, SQUID_START_WY,
@@ -49,7 +50,7 @@ import {
   SWIM_ACC, SWIM_DRAG, SWIM_MAX_SPD, SWIM_BUOYANCY,
 } from './constants.js';
 import { drawAtlantis }        from './draw/atlantis.js';
-import { atlantisTransRender } from '../transitions.js';
+import { atlantisTransRender, deepTransRender } from '../transitions.js';
 
 // ══════════════════════════════════════════════════════════
 // Death message system
@@ -659,7 +660,12 @@ export class AtlantisRealm extends FreeMoveRealm {
     deepTbl.interactRange = 80;
     deepTbl.onInteract = () => {
       if (!Flags.get('atlantis_founder_read'))  { log('A stone tablet, half-buried in silt.', ''); log('The inscription is worn. Come back when you know more.', ''); return; }
-      if (Flags.get('atlantis_deepest_tablet')) { log('THE SYSTEM IS THE UPLINE.', ''); log('You already know this. You keep coming back anyway.', ''); return; }
+      if (Flags.get('atlantis_deepest_tablet')) {
+        log('THE SYSTEM IS THE UPLINE.', '');
+        log('You already know this. You keep coming back anyway.', '');
+        setTimeout(() => log('The crack in the floor is still there. [\u2193] near it to descend.', ''), 800);
+        return;
+      }
       Flags.set('atlantis_deepest_tablet', true);
       G.shake = 14;
       log('\u2726 WE DID NOT INVENT THIS.', 'hi');
@@ -674,8 +680,29 @@ export class AtlantisRealm extends FreeMoveRealm {
       setTimeout(() => log('\u2726 AND BELOW THE SYSTEM?', 'hi'), 7200);
       setTimeout(() => log('THE OCEAN.', ''), 8000);
       setTimeout(() => log('THERE IS ALWAYS AN OCEAN.', ''), 8700);
+      setTimeout(() => {
+        G.shake = 12;
+        Flags.set('atlantis_crack_visible', true);
+        log('\u2726 The vault floor shifts.', 'hi');
+        log('A crack. In the stone. Running east to west.', '');
+        log('Light from below \u2014 not bioluminescent. Older.', '');
+        log('[\u2193] near the crack to go deeper.', '');
+      }, 10500);
     };
     this.registry.register(deepTbl);
+
+    // \u2500\u2500 The Crack \u2014 entry to The Deep \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    const crack = new Entity('vault_crack', 1270, ATLANTIS_FLOOR_Y - 10);
+    crack.interactRange = 72;
+    crack.onInteract = () => {
+      if (!Flags.get('atlantis_crack_visible')) {
+        log('The vault floor. Stone. Ancient.', '');
+        return;
+      }
+      log('The crack pulses. A dim light below.', '');
+      log('[\u2193] to descend.', '');
+    };
+    this.registry.register(crack);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -797,6 +824,17 @@ export class AtlantisRealm extends FreeMoveRealm {
       G.shake = 8;
       RealmManager.scheduleTransition('oasis', { duration: 1200, render: atlantisTransRender });
       return true;
+    }
+    // Descend through the crack to The Deep
+    if (key === 'ArrowDown' || key === 's' || key === 'S') {
+      const nearCrack = Math.abs(this.px - 1270) < 100 &&
+                        Math.abs(this.py - (ATLANTIS_FLOOR_Y - 10)) < 70;
+      if (nearCrack && Flags.get('atlantis_crack_visible')) {
+        log('\u2726 You slip through the crack.', 'hi');
+        G.shake = 14;
+        RealmManager.scheduleTransition('deep', { duration: 1800, render: deepTransRender });
+        return true;
+      }
     }
     if (key === ' ') return this.registry.interact();
     return false;

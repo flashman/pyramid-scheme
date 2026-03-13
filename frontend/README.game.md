@@ -34,6 +34,7 @@ Then open **http://localhost:8000** in your browser.
 | Skip dialogue text | `Space` (while text is printing) |
 | Jump (world + oasis) | `Z` |
 | Sprint | `Shift + ← →` |
+| Descend into The Deep (near crack) | `↓` |
 
 **The loop:**
 1. Click **BUY IN** ($10) to place your capstone and receive 4 invite scrolls.
@@ -47,6 +48,10 @@ Then open **http://localhost:8000** in your browser.
 9. Walk east to the edge of the desert. Press `[↑]` to enter the Oasis.
 10. Wade through the pool (watch the reflection change). Walk to the great sphinx and press `[Space]` to receive a riddle.
 11. Answer correctly — with each solved riddle the passage between the sphinx's paws glows brighter. Solve at least one and press `[↑]` at the archway to step through.
+12. In the vault, read the Dream Stele and activate the altar → return to the oasis pool, dive into Atlantis.
+13. In Atlantis: explore all five zones, survive the predators, complete the audit, read the archive, learn the Founder's name, reach the vault, read the deepest tablet.
+14. After reading the deepest tablet, a crack appears in the vault floor. Press `[↓]` near it to descend into **The Deep**.
+15. In The Deep: speak with the Herald, navigate the Franchise Office (Poseidon, Tier 7), drift through the Pelagic where Okeanos encircles everything, descend to the Abyss and read the primordial tablet. Survive the anglers. The Leviathan will pass.
 
 ---
 

@@ -2,6 +2,136 @@
 
 ---
 
+## v1.42 — THE DEEP: new realm, three gods, primordial lore
+
+> *Below Atlantis. Below the city, the franchise, the myth. Four zones. Three gods. One tablet that was here before the gods. The pyramid does not end at the ocean floor.*
+
+### New realm: `worlds/deep/`
+
+The Deep is accessible through a crack in the Atlantis vault floor, revealed only after reading the deepest tablet. It extends 3,800 world-pixels down — twice the height of Atlantis — with four distinct zones, three god characters with full branching dialogue, one enemy type, a procedural Leviathan, and a primordial tablet at the bottom that predates everything above it.
+
+#### `worlds/deep/constants.js`
+- `DEEP_WORLD_W/H`, `DEEP_ENTRY_Y`, `DEEP_EXIT_Y`, `DEEP_FLOOR_Y`
+- Zone boundaries: `SHELF_END` (900), `FRANCHISE_END` (1900), `PELAGIC_END` (3000); Zone IV (The Abyss) is 3000–3800
+- NPC positions: `HERALD_WX/WY`, `HIERARCHY_WX/WY`, `POSEIDON_WX/WY`, `OKEANOS_WX/WY`, `PRIMORDIAL_WX/WY`
+- Angler constants: `ANGLER_POSITIONS` (3 spawn points), `ANGLER_AGGRO`, `ANGLER_SPEED`, `ANGLER_CHASE_SPD`, `ANGLER_HURT`
+- Leviathan bounds: `LEVIATHAN_Y_MIN/MAX`, `LEVIATHAN_HURT_RANGE`
+- Physics: `SWIM_ACC=0.38`, `SWIM_DRAG=0.89`, `SWIM_MAX_SPD=5.5`, `SWIM_BUOY=-0.02` (slightly heavier than Atlantis)
+
+#### `worlds/deep/DeepRealm.js`
+Extends `FreeMoveRealm`. Full realm with HealthSystem, InteractableRegistry, 3 anglers, Leviathan, and 4 interactable entities.
+
+**Four zones:**
+| Zone | Depth | Character |
+|---|---|---|
+| I — The Shelf | Entry–900 | Atlantean debris sinking through the dark. The Herald waits here — a bioluminescent ancient creature that has watched every civilisation arrive from above. |
+| II — The Franchise Office | 900–1900 | Poseidon's domain. Stone walls carved with the divine org chart. He's still filing quarterly reports on Atlantis sinking. He has opinions. |
+| III — The Pelagic | 1900–3000 | Okeanos drifts here as a vast, barely-visible coiled presence. Pre-franchise, pre-everything. He does not file reports. He does not respond to memos. |
+| IV — The Abyss | 3000–3800 | No zone label. A dim light that is not bioluminescent. The primordial tablet rests in the floor sediment. Below the tablet: the Leviathan occasionally passes. |
+
+**Three NPCs:**
+- **The Herald** (Zone I) — 7-node branching dialogue. Watched Atlantis rise and sink. Watched Khem-Atef arrive in a small wooden boat with a stylus and a clean piece of clay. Has no tier and no name. "Names are how they track you."
+- **Poseidon** (Zone II) — 8-node branching dialogue. Tier 7, Sea Franchise #1. Built Atlantis for love (concentric rings for Kleito); someone turned the shape into a system; he has been thinking about this for twelve thousand years. Still filing compliance forms on a stone clipboard. His trident has a KPI tracker.
+- **Okeanos** (Zone III) — 6-node branching dialogue. Tier 12, pre-franchise. Spoke in geological time. Was the ocean before oceans had a name. Has received 11,462 compliance memos from Poseidon. Has not responded to any. Deeply envied by Poseidon.
+- **Primordial Tablet** (Zone IV) — one-shot read. Inscription in no known language and yet the player can read it. "THE SHAPE PRECEDES THE HAND THAT DRAWS IT. THE PYRAMID PRECEDES THE DESERT. THE OCEAN PRECEDES THE PYRAMID. SOMETHING PRECEDES THE OCEAN... IT MIGHT BE YOU. HELLO. PASS IT ON."
+
+**Enemies:**
+- **Anglers** (3, Zones II–III) — bioluminescent ambush hunters. Lure orb is teal when idle, red when chasing. Passive once Poseidon acknowledges the player (`poseidon_spoken`). Drive-by aggression only — `aggressiveFn` gates chase entirely after Zone II. Rendered by `drawAngler()` in the draw file with articulated teeth, dorsal spine, pectoral fins.
+- **The Leviathan** — not a standard enemy; a procedural presence. Begins passing through Zones III–IV after a 45-second grace period on entry. 1800px body, semi-transparent, barely visible. Multiple eyes. Periodic passes at random intervals (28–48 seconds). Reverses direction each pass. Hurt range 120px×72px. Death message: "LEVIATHAN IS NOT PART OF THE SYSTEM. LEVIATHAN IS WHY THERE IS A SYSTEM."
+
+**Death messages** — 3 causes (`angler`, `leviathan`, `pressure`), 3–4 messages each, escalating milestones at death counts 4/8/12. All thematically consistent: the angler messages frame attraction to the lure as a transaction; the leviathan messages situate it as pre-systemic; the pressure messages are the quiet existential ones.
+
+**Zone entry logs** — four distinct log sequences as the player crosses each zone boundary, each setting a `_zoneLogged` flag to fire only once per dive.
+
+**Flags set:**
+- `deep_visited`, `deep_deaths`, `deep_herald_spoken`, `deep_herald_lore`, `deep_herald_below_known`, `deep_herald_atlantis`
+- `poseidon_spoken`, `deep_poseidon_office`, `deep_poseidon_atlantis`, `deep_poseidon_rings`, `deep_poseidon_upline`, `deep_poseidon_responsible`, `deep_poseidon_send_down`, `deep_poseidon_okeanos`
+- `okeanos_spoken`, `okeanos_what_known`, `okeanos_atlantis`, `okeanos_scheme`, `okeanos_below`, `okeanos_tablet_known`
+- `deep_primordial_read`
+
+**Exit:** `[↑]` above `DEEP_EXIT_Y` → transition back to `atlantis` via `deepTransRender`.
+
+#### `worlds/deep/draw/deep.js`
+Full visual implementation. All world-space drawing happens under `X.translate(-camX, -camY)`.
+
+- `drawWaterBg(camY)` — gradient from near-black at shallow to absolute void at floor; deepens as camera descends
+- `drawZoneAtmosphere(camY)` — faint colour overlay per zone (deep blue → dark purple → near-void → black)
+- `drawBioglints(t)` — 90 pre-generated bioluminescent particles scattered across the full world height; six colours; pulsing phase-offset glow with `shadowBlur`
+- `drawDebris(t)` — 30 Atlantean stone fragments in the Shelf zone; drifting side-to-side based on depth and sine time
+- `drawShelf(t)` — fallen arch sections from Atlantis above; stone slabs at zone boundary; the Herald rendered as an elongated bioluminescent dolphin-form with etched markings, ancient eye, and aura glow
+- `drawFranchiseOffice(t)` — faint stone walls; the Hierarchy Tablet (org chart stone: Tier ∞/12/8/7/4/1/0 with labels, connecting lines); office floor tiles; calls `drawPoseidon(t)`
+- `drawPoseidon(t)` — full character: bureaucratic throne with carved tier symbols and arm rests; massive seated figure with weathered bronze skin, long tangled beard (with individual beard lines), star-crowned tiara, trident with KPI glow; stone clipboard on lap with Q3 report; nameplate below
+- `drawPelagic(t)` — three hydrothermal vents with superheated plumes (animated particles); calls `drawOkeanos(t)`
+- `drawOkeanos(t)` — five concentric vortex rings rotating slowly; a vast partially-visible coiled serpentine body (90px stroke); scale detail on coil; single eye visible on the rotating arc with vertical pupil slit; nameplae
+- `drawAbyss(t)` — absolute floor sediment; calls `drawPrimordialTablet(t)`
+- `drawPrimordialTablet(t)` — dim purple glow; inscribed text visible only after `deep_primordial_read`; pre-read state shows only eroded marks
+- `export drawAngler(angler, camX, camY, t)` — full character: dark elliptical body, teeth (gap scales with `angler.chasing`), dorsal spine, lure orb (teal/red with `shadowBlur` halo and inner bright spot), yellow eyes, pectoral fins; flipped by `angler.facing`
+- `export drawLeviathan(realm, camX, camY, t)` — 1800px semi-transparent body; scale pattern; four eye positions; visibility fades in/out as Leviathan enters/exits; controlled by `realm._leviathan.visibility`
+- `drawDeepSwimmer(realm)` — swimming pharaoh identical to Atlantis but with depth-proportional purple pressure aura
+- `drawDeepSurface(camX, camY)` — entry shimmer at world top
+- `drawInteractHint(realm)` — four entity labels (Herald, Poseidon, Okeanos, primordial tablet)
+- `drawDeepHUD(realm)` — depth, zone name, dissolution counter, controls legend
+- `drawDeathOverlay(realm, t)` — dark blue death colour scheme (distinct from Atlantis)
+- `drawImmunityFlash(realm)` — dark blue immunity tint
+
+---
+
+### Modified files
+
+#### `worlds/atlantis/AtlantisRealm.js`
+- **Deepest tablet updated:** first read now fires a delayed sequence that sets `atlantis_crack_visible` (10.5s in) and logs the crack appearing in the vault floor; repeat reads include a reminder about the crack
+- **New entity: vault crack** at `(TABLET_WX + 80, ATLANTIS_FLOOR_Y - 18)` — inactive until `atlantis_crack_visible`; Space to inspect, Down to descend
+- **New key handler:** `ArrowDown/S` near the crack while `atlantis_crack_visible` → `scheduleTransition('deep', { duration: 1800, render: deepTransRender })`
+- Imports: `ATLANTIS_FLOOR_Y` added from constants; `deepTransRender` added from transitions
+
+#### `worlds/atlantis/draw/atlantis.js`
+- **`drawVaultCrack(t)`** (new) — only renders when `atlantis_crack_visible`; jagged crack line through the vault floor; purple glow bleeding upward; `[↓] THE DEEP` label above; called in main draw after `drawNameAlcove(t)`
+- Imports: `TABLET_WX`, `ATLANTIS_FLOOR_Y` added from constants
+- **Interact hints** updated: `vault_crack: '[↓] DESCEND INTO THE DEEP'` added to the label map
+
+#### `worlds/transitions.js`
+- **`deepTransRender(progress)`** (new) — crack-light phase (purple flare from bottom, crack line spreading across screen), then absolute void collapse. Reversed for the ascent (same function, water → void → crack light → back to Atlantis).
+
+#### `audio/sound.js`
+- **`deep` theme** added (34 bpm — the slowest theme in the game):
+  - Sub-bass rumble: noise → bandpass 82Hz Q=0.28, reverb — the sound of geological pressure
+  - Void shimmer: noise → bandpass 7800Hz Q=1.4, reverb — near-ultrasonic hiss
+  - Single bass note: D1 (36.71 Hz), surfaces once per 32-beat loop then disappears — "an event, not a melody"
+  - One voice: A3 bandpass, appears once per loop like a question, then 16 beats of silence
+- **D1 (36.71 Hz)** and **Eb1 (38.89 Hz)** added to the note table (sub-bass octave 1)
+- `REALM_THEME` mapping updated: `deep: 'deep'`
+
+#### `main.js`
+- `DeepRealm` imported from `worlds/deep/DeepRealm.js`
+- `.register(new DeepRealm())` added to the realm chain
+
+---
+
+---
+
+## v1.41 — Atlantis: audio redesign, death counter reset, greeter/tablet lore expansion
+
+> *The Atlantis theme is no longer a melody. It's pressure. The death counter resets on each dive. The Greeter now knows the system's prior upline. The deepest tablet now ends at the ocean — as a door, not an answer.*
+
+### `audio/sound.js`
+- **Atlantis theme rebuilt** from D Dorian melodic (88 BPM) to D Phrygian ambient soundscape (52 BPM). Five tracks:
+  - Deep ocean rumble: noise → bandpass 210Hz Q=0.35, reverb — the pressure of fathoms
+  - Surface shimmer: noise → bandpass 3100Hz Q=1.1, reverb — light through water
+  - Sparse sine bass: D Phrygian root movement, very long rests, reverb — "like the city breathing"
+  - Barely-there lead: isolated sine notes, slow vibrato (rate 1.6, depth 4), lots of silence
+  - High sparkle: single notes every ~8 beats, bandpass 2000Hz, reverb — light shafts
+- Engine: `_scheduleTrack()` gains `wave: 'noise'` support. Creates looping 2.7s white noise buffer, routes through bandpass filter + gain envelope. `reverb: true` property added to tracks.
+
+### `worlds/atlantis/AtlantisRealm.js`
+- **Death counter reset on entry:** `Flags.set('atlantis_deaths', 0)` added to `onEnter()`. Atlantis deaths are now per-dive, not per-session.
+- **Greeter "clarify" dialogue expanded:** now mentions the prior upline chain — "THE FOUNDER RECEIVED THE SYSTEM / FROM ONE WHO ARRIVED BY SEA. / THE ONE BY SEA HAD IT FROM SOMEONE OLDER. / EVERY SYSTEM HAS A PRIOR UPLINE."
+- **Archive completion log updated:** threshold `>= 3` tablets, door message "Three tablets."
+- **Deepest Tablet** — ending lines added after "THE SYSTEM IS THE UPLINE / PASS IT ON": "AND BELOW THE SYSTEM? / THE OCEAN. / THERE IS ALWAYS AN OCEAN." Ends here — a door, not an answer.
+
+---
+
+---
+
 ## v1.40 — Engine abstraction pass: FreeMoveRealm, HealthSystem, TimedHazard, FreeRoamEnemy
 
 > *Four new engine modules extract the physics, damage, hazard, and enemy AI that were inline in AtlantisRealm into reusable, game-agnostic systems. No gameplay changes. The refactored AtlantisRealm is ~200 lines shorter and every new underwater world gets these systems for free.*
