@@ -2,7 +2,9 @@
 
 > *★ WALK THE DESERT ★ BUILD YOUR EMPIRE ★ TOTALLY LEGAL ★*
 
-A browser-based canvas game about building a pyramid scheme in ancient Egypt — and eventually being recruited into a **galactic** one. Walk the desert, recruit followers, climb the ranks from Peasant to Pharaoh, descend into the crypt, and ascend to the stars.
+A browser-based canvas game about building a pyramid scheme in ancient Egypt — and eventually being
+recruited into a **galactic** one. Walk the desert, recruit followers, climb the ranks from Peasant
+to Pharaoh, explore ancient worlds, and ascend to the stars.
 
 ---
 
@@ -51,7 +53,10 @@ Then open **http://localhost:8000** in your browser.
 12. In the vault, read the Dream Stele and activate the altar → return to the oasis pool, dive into Atlantis.
 13. In Atlantis: explore all five zones, survive the predators, complete the audit, read the archive, learn the Founder's name, reach the vault, read the deepest tablet.
 14. After reading the deepest tablet, a crack appears in the vault floor. Press `[↓]` near it to descend into **The Deep**.
-15. In The Deep: speak with the Herald, navigate the Franchise Office (Poseidon, Tier 7), drift through the Pelagic where Okeanos encircles everything, descend to the Abyss and read the primordial tablet. Survive the anglers. The Leviathan will pass.
+15. In The Deep: speak with the Herald, navigate the Franchise Office (Poseidon, Tier 7), drift
+    through the Pelagic where Okeanos encircles everything, descend to the Abyss and read the
+    primordial tablet. Survive the anglers. The Leviathan will pass.
+16. And so on...
 
 ---
 
@@ -119,19 +124,22 @@ pyramid-scheme/
     │   └── draw/
     │       └── chamber.js  # Crypt interior: stone walls, torches, hieroglyphs
     │
-    ├── council/            # Galactic Council station (end-game)
+    ├── council/            # Galactic Council station (space-access-point)
     │   ├── CouncilRealm.js # Council movement + Grand Archon Ω-1 dialogue
     │   ├── constants.js    # Floor Y, NPC positions, Earth portal X
     │   └── draw/
     │       └── council.js  # Space station interior: stars, columns, cosmic FX
     │
-    └── oasis/              # The Oasis — east of the desert (sphinx realm)
-        ├── OasisRealm.js   # PhysicsRealm: scrolling world, pool wading, passage entry
-        ├── constants.js    # OASIS_FLOOR, POOL_WX/WIDTH/FLOOR, SPHINX_WX, PASSAGE_WX
-        ├── riddles.js      # RiddleManager: 12 riddles, typewriter, bottom-bar panel UI
-        └── draw/
-            └── oasis.js    # Golden-hour sky, pool w/ prophetic reflection + player splash,
-                            #   palms, full-detail sphinx, hidden passage archway
+    ├── oasis/              # The Oasis — east of the desert (sphinx realm)
+    │   ├── OasisRealm.js   # PhysicsRealm: scrolling world, pool wading, passage entry
+    │   ├── constants.js    # OASIS_FLOOR, POOL_WX/WIDTH/FLOOR, SPHINX_WX, PASSAGE_WX
+    │   ├── riddles.js      # RiddleManager: 12 riddles, typewriter, bottom-bar panel UI
+    │   └── draw/
+    │       └── oasis.js    # Golden-hour sky, pool w/ prophetic reflection + player splash,
+    │                       #   palms, full-detail sphinx, hidden passage archway
+    │
+    ├── etc/                # And so on and on
+
 ```
 
 ---
@@ -315,13 +323,13 @@ this.registry.register(scroll);
 `Flags` is a key/value store that fires `flag:change` on every mutation. `QuestManager` holds quest definitions; call `QuestManager.check()` after any state change that might complete a quest. Quests use `condition()` to stay hidden until prerequisites are met.
 
 ### Payout Math
-The scheme must always balance: `platformFee + Σ(all depth payouts) = entryFee`.  
-The payout curve is geometric: `d1Payout × decay^(depth-1)`, truncated at `minPayout`.  
+The scheme must always balance: `platformFee + Σ(all depth payouts) = entryFee`.
+The payout curve is geometric: `d1Payout × decay^(depth-1)`, truncated at `minPayout`.
 The config editor enforces this constraint before applying changes.
 
 ### Z-Layers (depth / parallax)
-The desert world has 3 depth layers (0 = foreground, 1 = mid, 2 = far).  
-Each layer has its own `parallax` scroll factor, `scale`, `alpha`, and `fog` amount.  
+The desert world has 3 depth layers (0 = foreground, 1 = mid, 2 = far).
+Each layer has its own `parallax` scroll factor, `scale`, `alpha`, and `fog` amount.
 The player can press `↓` to walk in the foreground plane (z=-1), which places them in front of everything.
 
 ### PyramidLayout
@@ -345,24 +353,3 @@ See `worlds/WORLD_TEMPLATE.md` for a step-by-step guide. In short:
 3. Register it in `main.js`: `RealmManager.register(new YourRealm())`.
 4. Transition to it via `RealmManager.scheduleTransition('your-realm-id', { ... })`.
 5. Create a `PyramidLayout` for your slot arrays if the realm has friend pyramids.
-
----
-
-## Future Plans
-
-- **Proper frontend/backend split** — move game state to a server, enable persistent sessions and real multiplayer recruitment chains.
-- Leaderboard / live recruit feed.
-- The passage beyond the sphinx — a second oasis, deeper desert, or stranger realm.
-- Sound effects and music.
-- Mobile touch controls.
-
----
-
-## File Naming Conventions
-
-| Pattern | Meaning |
-|---------|---------|
-| `*.js~` or `#*.js#` | Editor backup files — safe to delete |
-| `.DS_Store` | macOS metadata — safe to delete |
-| `WORLD_TEMPLATE.md` | Developer reference doc, not shipped |
-| `CHANGES.md` | Running changelog |

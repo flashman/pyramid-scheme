@@ -1,28 +1,39 @@
+*The following project is for educational and artistic purposes only.  It is generated almost
+entirely by Claude (Sonnet 4.5+, extended, free-tier) as a personal experiment in agentic software
+development. User discretion is advised.*
+
 # ⚡ PYRAMID SCHEME™
 
 > WALK THE DESERT ★ BUILD YOUR EMPIRE ★ TOTALLY LEGAL™
 
-A satirical pyramid scheme simulator with a real backend. Users invite friends via email, friends buy in, money flows up the chain in real time via WebSocket.
+🚧 **Under Construction** 🚧
+
+This project is currently under active development. Some features may not work as expected, and
+documentation may be incomplete.
 
 ---
 
 ## Legal notice
 
-PYRAMID SCHEME™ is a **game for entertainment purposes only**. It is a satirical simulation — not an investment vehicle, financial product, or solicitation of any kind. Any buy-in pays for game access only. Any rewards from in-game achievements are entirely at the discretion of the operator and are never guaranteed. The company is not liable for any losses incurred through participation.
+PYRAMID SCHEME™ is a **game for entertainment purposes only**. It is satirical— not an investment
+vehicle, financial product, or solicitation of any kind. Any buy-in pays for game access only. Any
+rewards from in-game achievements are entirely at the discretion of the operator and are never
+guaranteed. The company is not liable for any losses incurred through participation.
 
-Players are presented with a full **Terms of Participation** (PSE-TOS-2025-R1) on registration and must actively accept before creating an account.
+Players are presented with a full **Terms of Participation** (PSE-TOS-2025-R1) on registration and
+must actively accept before creating an account.
 
 ---
 
 ## Services
 
-| Service   | URL                         | Purpose                              |
+| Service | URL | Purpose |
 |-----------|-----------------------------|--------------------------------------|
-| Frontend  | http://localhost:5173       | Game (nginx static + API proxy)      |
-| Backend   | http://localhost:8000       | FastAPI (internal — proxied by nginx)|
-| Database  | localhost:5432              | PostgreSQL                           |
-| pgAdmin   | http://localhost:5050       | DB browser (no login required)       |
-| **Mailhog**   | **http://localhost:8025**   | **Caught invite emails (dev)**       |
+| Frontend | http://localhost:5173 | Game (nginx static + API proxy) |
+| Backend | http://localhost:8000 | FastAPI (internal — proxied by nginx)|
+| Database | localhost:5432 | PostgreSQL |
+| pgAdmin | http://localhost:5050 | DB browser (no login required) |
+| **Mailhog** | **http://localhost:8025** | **Caught invite emails (dev)** |
 
 ---
 
@@ -60,7 +71,9 @@ docker compose exec backend alembic upgrade head
 5. The backend runs the real chain-walk — DB writes, payout credits, WS event
 6. After the delay, your pyramid gains a layer and the activity log updates
 
-The sim uses the same `run_buyin_chain()` function as a real buy-in. The only difference: the simulated "user" has no real account row; their `Recruit` records have `recruit_id = NULL` and a name like `🤖 PHARAOH_X7K2A`.
+The sim uses the same `run_buyin_chain()` function as a real buy-in. The only difference: the
+simulated "user" has no real account row; their `Recruit` records have `recruit_id = NULL` and a
+name like `🤖 PHARAOH_X7K2A`.
 
 Use **🗑 CLEAR SIMS** to remove all sim recruit rows from the DB.
 
@@ -97,7 +110,8 @@ Browser
 - `app/routers/dev.py` — simulation endpoints (gated behind `DEBUG=true`)
 
 **Key frontend files**
-- `audio/sound.js` — procedural Web Audio soundtrack; 5 realm themes; compressor, reverb, vibrato, stereo panning
+- `audio/sound.js` — procedural Web Audio soundtrack; 5 realm themes; compressor, reverb, vibrato,
+  stereo panning
 - `game/ws.js` — WS client with auto-reconnect + keep-alive
 - `game/recruits.js` — `addRecruit()` handles both real WS arrivals and local guest sim
 - `ui/auth.js` — login/register overlay; ToS gate on registration (PSE-TOS-2025-R1)
@@ -129,74 +143,23 @@ docker compose down -v   # removes the db volume
 docker compose up --build
 ```
 
-**WebSocket 502 from nginx**
-Usually means the backend is crash-looping (check `docker compose logs backend`). Fix the underlying backend error and the WS connection will recover automatically — the frontend reconnects with exponential back-off.
+**WebSocket 502 from nginx** Usually means the backend is crash-looping (check `docker compose logs
+backend`). Fix the underlying backend error and the WS connection will recover automatically — the
+frontend reconnects with exponential back-off.
 
 ---
 
 ## Changelogs
 
-- `frontend/CHANGES.md` — frontend version history (current: **v1.42**)
-- `backend/CHANGES.md` — backend version history (current: **v0.5.0**)
-
----
-
-## The Atlantis World
-
-Accessible via the oasis pool after completing the vault ritual (v1.37+).
-
-### Five zones of increasing depth
-
-| Zone | Name | What you find |
-|---|---|---|
-| I | The Atrium | A 12,000-year-old skeleton at a reception desk. It will try to enrol you. |
-| II | The Abundance Hall | Gold-painted columns. The paint is visibly flaking. |
-| III | The Processing Chamber | Rows of seated skeletons. The Auditor squid patrols here. |
-| IV | The Devoted Quarter | Founder portraits everywhere. A choir circle that will harmonize you to death. |
-| V | The Founder's Vault | A throne. A cage locked from the inside. The deepest tablet. A crack in the floor. |
-
-### Three predators
-
-- **The Compliance Shark** — collections enforcement for zones 1–2
-- **The Auditor** — a giant squid; slow, inevitable, processes your doubts (and everything else)
-- **The Devoted** — three skeletal swimmers; arms permanently outstretched toward you; they mean so well
-
-### Death and reincarnation
-
-Death returns you to the surface. Each death has a different message. The messages escalate. Death count milestones change the message category entirely. Reading the deepest tablet adds a postscript to all deaths.
-
-### The core lore
-
-The Founder found this room already built, already ancient, already furnished with a throne and a tablet describing their system exactly. They didn't invent it. They added a layer. As did whoever came before. As does the player. The system is the upline. There never was an upline. And below the system? The ocean. There is always an ocean.
-
----
-
-## The Deep (v1.42+)
-
-Accessible through a crack in the Atlantis vault floor, revealed after reading the deepest tablet. Press `[↓]` near the crack to descend. Press `[↑]` at the top to return to Atlantis.
-
-### Four zones
-
-| Zone | Name | What you find |
-|---|---|---|
-| I | The Shelf | Atlantean debris sinking slowly. The Herald — a bioluminescent ancient creature — has watched every civilisation arrive from above. |
-| II | The Franchise Office | Poseidon's domain. Stone walls carved with the divine org chart. He is still filing a quarterly report on Atlantis sinking. The org chart goes up to Tier ∞ with [REDACTED] at the top. |
-| III | The Pelagic | Okeanos drifts here as a vast coiled presence. Pre-franchise, pre-everything. He does not respond to Poseidon's memos. |
-| IV | The Abyss | A primordial tablet in the floor sediment. It predates the word for tablet. The Leviathan passes through occasionally. |
-
-### Inhabitants
-
-- **The Herald** — watched Khem-Atef arrive in a boat with a stylus. Has no tier and no name. "Names are how they track you."
-- **Poseidon** — Tier 7, Sea Franchise #1. Built the concentric rings for love. Someone turned the shape into a system. He has been thinking about this for twelve thousand years.
-- **Okeanos** — Tier 12. Was the ocean before there were oceans to name. Has received 11,462 compliance memos from Poseidon. Has not responded.
-- **Anglers** — three bioluminescent ambush hunters. The lure orb asks nothing. You assumed an invitation.
-- **The Leviathan** — not a predator. Not part of the system. The reason there is a system.
+- `frontend/CHANGES.md` — frontend version history
+- `backend/CHANGES.md` — backend version history
 
 ---
 
 ## Production Roadmap
 
-`PYRAMID_SCHEME_TODO.md` in the project root contains the full prioritised production checklist, organised into six phases:
+`PYRAMID_SCHEME_TODO.md` in the project root contains the full prioritised production checklist,
+organised into six phases:
 
 1. **Phase 1** — Hard security and payment blockers (~1 day)
 2. **Phase 2** — Ops, SSL, observability, data integrity (~2–3 days)
@@ -205,6 +168,7 @@ Accessible through a crack in the Atlantis vault floor, revealed after reading t
 5. **Phase 5** — Game completeness: vault payoff, post-Omega loop, mobile controls
 6. **Phase 6** — Scaling (Redis pub/sub, connection pooling, background tasks)
 
-Also includes a **Frontend Engine** section tracking remaining abstraction work from the v1.36 refactor, and a **Quick Wins** list of items under 30 minutes each.
+Also includes a **Frontend Engine** section tracking remaining abstraction work from the v1.36
+refactor, and a **Quick Wins** list of items under 30 minutes each.
 
 Do not accept real money until Phase 1 is complete.
