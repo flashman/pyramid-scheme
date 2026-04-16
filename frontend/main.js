@@ -11,13 +11,7 @@ import { spawnParts, depthHex }   from './draw/utils.js';
 import { say, buyIn, recruitFriend } from './game/recruits.js';
 import { GameSession }            from './game/session.js';
 import { registerAllQuests }      from './game/quests.js';
-import { WorldRealm }             from './worlds/earth/WorldRealm.js';
-import { ChamberRealm }           from './worlds/crypt/ChamberRealm.js';
-import { CouncilRealm }           from './worlds/council/CouncilRealm.js';
-import { OasisRealm }            from './worlds/oasis/OasisRealm.js';
-import { VaultRealm }            from './worlds/oasis/VaultRealm.js';
-import { AtlantisRealm }         from './worlds/atlantis/AtlantisRealm.js';
-import { DeepRealm }             from './worlds/deep/DeepRealm.js';
+import { ALL_REALMS }             from './worlds/manifest.js';
 import { updateStats, updateSlots, log } from './ui/panels.js';
 import { initDevPanel }           from './ui/dev-panel.js';
 import { closeModal }             from './ui/modal.js';
@@ -29,14 +23,10 @@ import { openProfile }            from './ui/profile.js';
 import { SoundManager }           from './audio/sound.js';
 
 // ── Realms ────────────────────────────────────────────────
-RealmManager
-  .register(new WorldRealm())
-  .register(new ChamberRealm())
-  .register(new CouncilRealm())
-  .register(new OasisRealm())
-  .register(new VaultRealm())
-  .register(new AtlantisRealm())
-  .register(new DeepRealm());
+// Realm instances are created in worlds/manifest.js.
+// Portal connections are registered inside each realm's constructor.
+// To add a new realm, edit manifest.js only — main.js never changes.
+ALL_REALMS.forEach(r => RealmManager.register(r));
 
 // ── Quests ────────────────────────────────────────────────
 registerAllQuests();

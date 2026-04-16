@@ -51,6 +51,7 @@ import {
 } from './constants.js';
 import { drawAtlantis }        from './draw/atlantis.js';
 import { atlantisTransRender, deepTransRender } from '../transitions.js';
+import { PortalRegistry }     from '../../engine/portal.js';
 
 // ══════════════════════════════════════════════════════════
 // Death message system
@@ -495,6 +496,28 @@ export class AtlantisRealm extends FreeMoveRealm {
     // ── Interactable entities ──────────────────────────
     this.registry = new InteractableRegistry();
     this._buildEntities();
+
+    // ── Portal exits ──────────────────────────────────────
+    // Conditions use `this` (available here in the constructor).
+    // onKeyDown() normalises WASD → arrow keys before calling handleKey().
+    PortalRegistry.register({
+      from: 'atlantis', to: 'oasis',
+      key: 'ArrowUp',
+      condition:  () => this._aboveSurface(),
+      onUse:      () => { log('✦ You breach the surface.', 'hi'); G.shake = 8; },
+      transition: atlantisTransRender, duration: 1200,
+    });
+    PortalRegistry.register({
+      from: 'atlantis', to: 'deep',
+      key: 'ArrowDown',
+      condition: () => {
+        const nearCrack = Math.abs(this.px - 1270) < 100 &&
+                          Math.abs(this.py - (ATLANTIS_FLOOR_Y - 10)) < 70;
+        return nearCrack && Flags.get('atlantis_crack_visible');
+      },
+      onUse:      () => { log('✦ You slip through the crack.', 'hi'); G.shake = 14; },
+      transition: deepTransRender, duration: 1800,
+    });
   }
 
   // ── Enemy construction ────────────────────────────────────────────────────
@@ -819,23 +842,9 @@ export class AtlantisRealm extends FreeMoveRealm {
   onKeyDown(key) {
     if (RealmManager.isTransitioning || this.health.isDying) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
-    if ((key === 'ArrowUp' || key === 'w' || key === 'W') && this._aboveSurface()) {
-      log('\u2726 You breach the surface.', 'hi');
-      G.shake = 8;
-      RealmManager.scheduleTransition('oasis', { duration: 1200, render: atlantisTransRender });
-      return true;
-    }
-    // Descend through the crack to The Deep
-    if (key === 'ArrowDown' || key === 's' || key === 'S') {
-      const nearCrack = Math.abs(this.px - 1270) < 100 &&
-                        Math.abs(this.py - (ATLANTIS_FLOOR_Y - 10)) < 70;
-      if (nearCrack && Flags.get('atlantis_crack_visible')) {
-        log('\u2726 You slip through the crack.', 'hi');
-        G.shake = 14;
-        RealmManager.scheduleTransition('deep', { duration: 1800, render: deepTransRender });
-        return true;
-      }
-    }
+    // Normalise WASD → arrow keys so portals only need to handle canonical keys.
+    const k = { w: 'ArrowUp', W: 'ArrowUp', s: 'ArrowDown', S: 'ArrowDown' }[key] ?? key;
+    if (PortalRegistry.handleKey(k, 'atlantis', null)) return true;
     if (key === ' ') return this.registry.interact();
     return false;
   }

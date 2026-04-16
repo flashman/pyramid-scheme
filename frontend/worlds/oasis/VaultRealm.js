@@ -6,13 +6,13 @@
 // and they are waiting for you to find it.
 
 import { G }                         from '../../game/state.js';
-import { RealmManager }              from '../../engine/realm.js';
 import { FlatRealm }                 from '../FlatRealm.js';
 import { InteractableRegistry }      from '../../engine/interactables.js';
 import { NPC, Entity }               from '../../engine/entity.js';
 import { Dialogue, DialogueManager } from '../../engine/dialogue.js';
 import { Flags, QuestManager }       from '../../engine/flags.js';
 import { vaultTransRender }          from '../transitions.js';
+import { PortalRegistry }            from '../../engine/portal.js';
 import { VAULT_FLOOR, STELE_X,
          ALTAR_X }                   from './constants.js';
 import { drawVault }                 from './draw/vault.js';
@@ -126,6 +126,13 @@ export class VaultRealm extends FlatRealm {
 
     this.registry = new InteractableRegistry();
 
+    // ── Portal exits ──────────────────────────────────────
+    PortalRegistry.register({
+      from: 'vault', to: 'oasis',
+      key: 'ArrowUp',
+      transition: vaultTransRender, duration: 1000,
+    });
+
     // ── Dream Stele ──────────────────────────────────────
     this._stele = new NPC('stele', STELE_X, VAULT_FLOOR, 'DREAM STELE', _buildSteleDialogue());
     this._stele.interactRange = 110;
@@ -201,13 +208,7 @@ export class VaultRealm extends FlatRealm {
 
   onKeyDown(key) {
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
-    if (key === 'ArrowUp') {
-      RealmManager.scheduleTransition('oasis', {
-        duration: 1000,
-        render: vaultTransRender,
-      });
-      return true;
-    }
+    if (PortalRegistry.handleKey(key, 'vault', null)) return true;
     if (key === ' ') return this.registry.interact();
     return false;
   }

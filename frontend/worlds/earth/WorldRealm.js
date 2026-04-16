@@ -12,6 +12,7 @@ import { GND, WORLD_W, Z_LAYERS }         from './constants.js';
 import { SPEED, SPDHALF, LH, inputDx }   from '../constants.js';
 import { OASIS_ENTRY_X }                  from '../oasis/constants.js';
 import { oasisTransRender, launchTransRender } from '../transitions.js';
+import { PortalRegistry }                      from '../../engine/portal.js';
 import { spawnParts }                     from '../../draw/utils.js';
 import {
   surfAt, surfAtExcluding, canStep,
@@ -60,6 +61,36 @@ export class WorldRealm extends PhysicsRealm {
     // onEnter (so they can read the player pyramid position at that time)
     // and refreshed whenever the player pyramid changes.
     this._rebuildDynamicTriggers();
+
+    // ── Portal exits ──────────────────────────────────────
+    // These are the outgoing edges of this realm in the graph.
+    // onKeyDown() delegates to PortalRegistry.handleKey() — adding a
+    // new realm that branches off the world only requires a new portal
+    // registration; WorldRealm.js does not need to change.
+    PortalRegistry.register({
+      from: 'world', to: 'oasis',
+      key: 'ArrowUp', trigger: 'oasis-gate',
+      condition:  () => G.bought,
+      onUse:      () => { G.shake = 6; },
+      transition: oasisTransRender, duration: 1200,
+    });
+    PortalRegistry.register({
+      from: 'world', to: 'chamber',
+      key: 'ArrowUp', trigger: 'crypt-door',
+      condition: () => G.bought,
+    });
+    PortalRegistry.register({
+      from: 'world', to: 'council',
+      key: 'ArrowUp', trigger: 'capstone-tip',
+      condition: () => G.bought,
+      onUse: () => {
+        G.shake = 12;
+        spawnParts(G.px, G.py - 10, COL.GOLD_BRIGHT, 50);
+        spawnParts(G.px, G.py - 10, '#aa44ff', 30);
+        say('TO THE STARS!', 300);
+      },
+      transition: launchTransRender, duration: 2600,
+    });
   }
 
   // Rebuild triggers that depend on player pyramid position.
@@ -210,6 +241,7 @@ export class WorldRealm extends PhysicsRealm {
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
 
     if (key === 'ArrowDown' && G.bought && G.pZ === 0) {
+      // Z-layer descent — not a portal, handled locally.
       if (G.py >= GND - 2) {
         G.pZ = -1;
       } else {
@@ -223,33 +255,10 @@ export class WorldRealm extends PhysicsRealm {
     }
 
     if (key === 'ArrowUp' && G.bought) {
-      if (this.triggers.isInside('oasis-gate')) {
-        RealmManager.scheduleTransition('oasis', {
-          duration: 1200,
-          render:   oasisTransRender,
-        });
-        G.shake = 6;
-        return true;
-      }
-      if (this.triggers.isInside('crypt-door')) {
-        RealmManager.transitionTo('chamber');
-        return true;
-      }
-      if (this.triggers.isInside('capstone-tip')) {
-        RealmManager.scheduleTransition('council', {
-          duration: 2600,
-          render:   launchTransRender,
-        });
-        G.shake = 12;
-        spawnParts(G.px, G.py - 10, COL.GOLD_BRIGHT, 50);
-        spawnParts(G.px, G.py - 10, '#aa44ff', 30);
-        say('TO THE STARS!', 300);
-        return true;
-      }
-      if (G.pZ === -1 && surfAt(G.px) === GND) {
-        G.pZ = 0;
-        return true;
-      }
+      // Portal exits (oasis, chamber, council) — delegated to registry.
+      if (PortalRegistry.handleKey('ArrowUp', 'world', this.triggers)) return true;
+      // Fallthrough: z-layer exit (not a portal).
+      if (G.pZ === -1 && surfAt(G.px) === GND) { G.pZ = 0; return true; }
     }
 
     if ((key === 'z' || key === 'Z') && G.bought && G.pZ === 0) {

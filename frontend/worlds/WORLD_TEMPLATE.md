@@ -180,27 +180,59 @@ export class ThroneRealm extends FlatRealm {
 
 ---
 
-## 5. Register in `main.js`
+## 5. Register in `worlds/manifest.js`
 
 ```js
-import { UnderworldRealm } from './worlds/underworld/UnderworldRealm.js';
-RealmManager.register(new UnderworldRealm());
+// worlds/manifest.js
+import { UnderworldRealm } from './underworld/UnderworldRealm.js';
+
+export const ALL_REALMS = [
+  // ... existing realms ...
+  new UnderworldRealm(),   // ← add here; main.js never changes
+];
 ```
+
+**Do not edit `main.js`** — it imports `ALL_REALMS` from the manifest and registers everything automatically.
 
 ---
 
-## 6. Wire a transition
+## 6. Wire portal transitions
+
+Portals (realm-to-realm transitions) are registered in the realm's **constructor** using `PortalRegistry`. This keeps the graph edge list colocated with the realm that owns the exit.
 
 ```js
-// Immediate (no animation):
-RealmManager.transitionTo('underworld');
+import { PortalRegistry } from '../../engine/portal.js';
 
-// With overlay animation:
-RealmManager.scheduleTransition('underworld', {
-  duration: 1500,
-  render: (progress) => { /* draw overlay 0..1 */ },
-});
+constructor() {
+  super('underworld', …);
+
+  // Outgoing portals — registered here so conditions can close over `this`.
+  PortalRegistry.register({
+    from: 'underworld', to: 'world',
+    key: 'ArrowUp',
+    condition:  () => this.px < 100,         // optional: return-gate proximity
+    onUse:      () => { G.shake = 4; },       // optional: side-effects before swap
+    transition: myTransRender,               // optional: null = instant swap
+    duration:   1200,                        // ms (ignored when transition = null)
+  });
+}
 ```
+
+Then in `onKeyDown()`, replace any hardcoded `scheduleTransition()` call with:
+
+```js
+onKeyDown(key) {
+  if (RealmManager.isTransitioning) return false;
+  if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
+  // Optionally normalise WASD → arrow keys for swimming realms:
+  // const k = { w: 'ArrowUp', W: 'ArrowUp', s: 'ArrowDown', S: 'ArrowDown' }[key] ?? key;
+  if (PortalRegistry.handleKey(key, 'underworld', this.triggers)) return true;
+  if (key === ' ') return this.registry.interact();
+  return false;
+}
+```
+
+**Adding a portal from an existing realm to your new realm** does not require editing the existing realm. Register the portal in your new realm's constructor with `from: 'existing-realm'` — `PortalRegistry.handleKey()` is already called inside that realm's `onKeyDown()` and will pick up the new portal automatically.
 
 ---
 

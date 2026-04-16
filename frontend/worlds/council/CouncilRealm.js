@@ -10,6 +10,7 @@ import { InteractableRegistry }       from '../../engine/interactables.js';
 import { NPC }                        from '../../engine/entity.js';
 import { Dialogue, DialogueManager }  from '../../engine/dialogue.js';
 import { Flags, QuestManager }        from '../../engine/flags.js';
+import { PortalRegistry }             from '../../engine/portal.js';
 import { CW }                         from '../../engine/canvas.js';
 import { COUNCIL_FLOOR, COUNCIL_ARCHON_X, COUNCIL_PORTAL_X } from './constants.js';
 import { drawCouncil }                from './draw/council.js';
@@ -145,6 +146,13 @@ export class CouncilRealm extends FlatRealm {
                             'GRAND ARCHON Ω-1', _buildArchonDialogue());
     this.archon.interactRange = 120;
     this.registry.register(this.archon);
+
+    // ── Portal exits ──────────────────────────────────────
+    PortalRegistry.register({
+      from: 'council', to: 'world',
+      key: 'ArrowUp',
+      condition: () => Math.abs(this.px - COUNCIL_PORTAL_X) < 80,
+    });
   }
 
   onEnter(fromId) {
@@ -180,14 +188,7 @@ export class CouncilRealm extends FlatRealm {
   onKeyDown(key) {
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
     if (RealmManager.isTransitioning) return false;
-
-    if (key === 'ArrowUp') {
-      // Earth return portal — left side.
-      if (Math.abs(this.px - COUNCIL_PORTAL_X) < 80) {
-        RealmManager.transitionTo('world');
-        return true;
-      }
-    }
+    if (PortalRegistry.handleKey(key, 'council', null)) return true;
     if (key === ' ') return this.registry.interact();
     return false;
   }

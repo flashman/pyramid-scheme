@@ -20,6 +20,7 @@ import { Flags }                 from '../../engine/flags.js';
 import { G }                     from '../../game/state.js';
 import { log }                   from '../../ui/panels.js';
 import { deepTransRender }       from '../transitions.js';
+import { PortalRegistry }        from '../../engine/portal.js';
 import { drawDeep }              from './draw/deep.js';
 import {
   DEEP_WORLD_W, DEEP_WORLD_H, DEEP_ENTRY_Y, DEEP_EXIT_Y, DEEP_FLOOR_Y,
@@ -445,6 +446,16 @@ export class DeepRealm extends FreeMoveRealm {
 
     // ── Zone log tracking ──────────────────────────────
     this._zoneLogged = { shelf: false, franchise: false, pelagic: false, abyss: false };
+
+    // ── Portal exits ──────────────────────────────────────
+    // onKeyDown() normalises WASD → arrow keys before calling handleKey().
+    PortalRegistry.register({
+      from: 'deep', to: 'atlantis',
+      key: 'ArrowUp',
+      condition:  () => this._aboveSurface(),
+      onUse:      () => { log('✦ You rise through the crack.', 'hi'); G.shake = 8; },
+      transition: deepTransRender, duration: 1400,
+    });
   }
 
   // ── Enemy construction ─────────────────────────────────────────────────────
@@ -657,12 +668,9 @@ export class DeepRealm extends FreeMoveRealm {
   onKeyDown(key) {
     if (RealmManager.isTransitioning || this.health.isDying) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
-    if ((key === 'ArrowUp' || key === 'w' || key === 'W') && this._aboveSurface()) {
-      log('✦ You rise through the crack.', 'hi');
-      G.shake = 8;
-      RealmManager.scheduleTransition('atlantis', { duration: 1400, render: deepTransRender });
-      return true;
-    }
+    // Normalise WASD → arrow keys so portals only need to handle canonical keys.
+    const k = { w: 'ArrowUp', W: 'ArrowUp', s: 'ArrowDown', S: 'ArrowDown' }[key] ?? key;
+    if (PortalRegistry.handleKey(k, 'deep', null)) return true;
     if (key === ' ') return this.registry.interact();
     return false;
   }

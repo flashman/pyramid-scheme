@@ -1,12 +1,12 @@
 // ── FILE: worlds/crypt/ChamberRealm.js ──────────────────
 
 import { G }                         from '../../game/state.js';
-import { RealmManager }               from '../../engine/realm.js';
 import { FlatRealm }                  from '../FlatRealm.js';
 import { InteractableRegistry }       from '../../engine/interactables.js';
 import { NPC }                        from '../../engine/entity.js';
 import { Dialogue, DialogueManager }  from '../../engine/dialogue.js';
 import { Flags, QuestManager }        from '../../engine/flags.js';
+import { PortalRegistry }             from '../../engine/portal.js';
 import { Events }                     from '../../engine/events.js';
 import { CHAMBER_FLOOR, CHIEF_X }    from './constants.js';
 import { drawChamber }                from './draw/chamber.js';
@@ -86,6 +86,9 @@ export class ChamberRealm extends FlatRealm {
     this.chief    = new NPC('chief', CHIEF_X, CHAMBER_FLOOR, 'SECTOR CHIEF Ω-7', _buildChiefDialogue());
     this.chief.interactRange = 100;
     this.registry.register(this.chief);
+
+    // ── Portal exits ──────────────────────────────────────
+    PortalRegistry.register({ from: 'chamber', to: 'world', key: 'ArrowUp' });
   }
 
   onEnter(fromId) {
@@ -116,7 +119,7 @@ export class ChamberRealm extends FlatRealm {
 
   onKeyDown(key) {
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
-    if (key === 'ArrowUp') { RealmManager.transitionTo('world'); return true; }
+    if (PortalRegistry.handleKey(key, 'chamber', null)) return true;
     if (key === ' ') return this.registry.interact();
     return false;
   }

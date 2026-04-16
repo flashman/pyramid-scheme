@@ -17,6 +17,7 @@ import { OASIS_FLOOR, OASIS_WORLD_W,
          POOL_DIVE_RANGE }           from './constants.js';
 import { vaultTransRender,
          atlantisTransRender }       from '../transitions.js';
+import { PortalRegistry }            from '../../engine/portal.js';
 import { drawOasis }                 from './draw/oasis.js';
 import { RiddleManager }             from './riddles.js';
 import { log }                       from '../../ui/panels.js';
@@ -73,6 +74,40 @@ export class OasisRealm extends PhysicsRealm {
         log('You wade into the still water.', '');
       },
     }));
+
+    // ── Portal exits ──────────────────────────────────────
+    // Registered with `this` in scope so conditions can read instance state.
+    PortalRegistry.register({
+      from: 'oasis', to: 'vault',
+      key: 'ArrowDown',
+      condition: () => {
+        const riddlesSolved = Flags.get('sphinx_riddles_solved') || 0;
+        return riddlesSolved >= 1 && Math.abs(this.px - PASSAGE_WX) < 100;
+      },
+      onUse: () => {
+        log('✦ You descend the stone steps beneath the sphinx.', 'hi');
+        G.shake = 8;
+        Flags.inc('passage_crossed');
+      },
+      transition: vaultTransRender, duration: 1400,
+    });
+    PortalRegistry.register({
+      from: 'oasis', to: 'atlantis',
+      key: 'ArrowDown',
+      condition: () => {
+        const inPool   = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
+        const nearDive = Math.abs(this.px - POOL_CENTER_WX) < POOL_DIVE_RANGE;
+        return this._statueRisen && nearDive && inPool;
+      },
+      onUse: () => {
+        log('✦ You take a breath and dive beneath the pool.', 'hi');
+        G.shake = 10;
+        Flags.inc('atlantis_dives');
+      },
+      transition: atlantisTransRender, duration: 1400,
+    });
+    // oasis→world is boundary-triggered in update() — registered here for graph completeness.
+    PortalRegistry.register({ from: 'oasis', to: 'world', key: null });
   }
 
   // ── Player pose ───────────────────────────────────────
@@ -231,9 +266,9 @@ export class OasisRealm extends PhysicsRealm {
     if (RiddleManager.isActive()) return RiddleManager.onKeyDown(key);
     if (RealmManager.isTransitioning) return false;
 
-    // Jump
+    // Jump — not a portal.
     if (key === 'z' || key === 'Z') {
-      const inPool = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
+      const inPool  = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
       const jumpPow = inPool ? -6 : -9;
       if (this.py >= (inPool ? POOL_FLOOR : OASIS_FLOOR) - 1) {
         this.pvy = jumpPow;
@@ -242,45 +277,19 @@ export class OasisRealm extends PhysicsRealm {
       }
     }
 
+    // Portal exits (vault, atlantis) — delegated to registry.
     if (key === 'ArrowDown') {
-      const inPool   = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
-      const nearDive = Math.abs(this.px - POOL_CENTER_WX) < POOL_DIVE_RANGE;
-
-      // ── Dive to Atlantis — statue must be fully risen ─
-      if (this._statueRisen && nearDive && inPool) {
-        log('✦ You take a breath and dive beneath the pool.', 'hi');
-        G.shake = 10;
-        RealmManager.scheduleTransition('atlantis', {
-          duration: 1400,
-          render:   atlantisTransRender,
-        });
-        Flags.inc('atlantis_dives');
-        return true;
-      }
-
-      // ── Descend to vault ──────────────────────────────
-      const riddlesSolved = Flags.get('sphinx_riddles_solved') || 0;
-      if (riddlesSolved >= 1 && Math.abs(this.px - PASSAGE_WX) < 100) {
-        log('✦ You descend the stone steps beneath the sphinx.', 'hi');
-        G.shake = 8;
-        RealmManager.scheduleTransition('vault', {
-          duration: 1400,
-          render:   vaultTransRender,
-        });
-        Flags.inc('passage_crossed');
-        return true;
-      }
+      if (PortalRegistry.handleKey('ArrowDown', 'oasis', null)) return true;
       return false;
     }
 
-    // Speak to sphinx
+    // Speak to sphinx / pool hint.
     if (key === ' ') {
       if (this._nearSphinx()) {
         Flags.set('sphinx_spoken', true);
         RiddleManager.start();
         return true;
       }
-      // Hint if near pool but vault not opened yet
       const inPool = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
       if (inPool && !Flags.get('atlantis_vault_opened') && Flags.get('stele_read')) {
         log('The pool is still. Something has been opened below.', '');
