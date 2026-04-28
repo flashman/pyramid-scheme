@@ -13,6 +13,12 @@ documentation may be incomplete.
 
 ---
 
+## Preview
+
+An early _static_ version of the game is available [here](https://claude.ai/public/artifacts/aa812c14-6458-4591-8fcf-d084fb2ebd7d). 
+
+---
+
 ## Legal notice
 
 PYRAMID SCHEME™ is a **game for entertainment purposes only**. It is satirical— not an investment
