@@ -111,13 +111,14 @@ function _startHourglass(canvas, wrap, caption) {
   const TOP_W = 54, BOT_W = 54;
   const NECK_YT = H * 0.47, NECK_YB = H * 0.53;
   const NECK_W = 3;
-  const SPEED = 0.00018;
+  const SPEED = 0.00012;
 
   let sandRatio = 0;
   let state = 'draining';
   let flipDeg = 0;
   let flipProg = 0;
   let pauseTimer = 0;
+  let turnIndex = 0;
   const PAUSE_DUR = 0.7;
   const FLIP_DUR = 1.1;
 
@@ -125,12 +126,11 @@ function _startHourglass(canvas, wrap, caption) {
   let running = true;
   let _ts = 0;
 
-  const LABELS = [
-    'THE GODS REQUIRE TIME',
-    'THE SANDS FALL...',
-    'PATIENCE, PHARAOH...',
-    'NEARLY THERE...',
-    'THE DESERT STIRS...',
+  const LABEL_SETS = [
+    ['THE GODS REQUIRE TIME', 'THE SANDS FALL...', 'PATIENCE, PHARAOH...', 'NEARLY THERE...', 'THE DESERT STIRS...'],
+    ['WAKING THE PHARAOH...', 'BRIBING THE SCRIBES...', 'STACKING THE STONES...', 'PYRAMID RISING...', 'ALMOST OPEN...'],
+    ['THE ORACLE SLEEPS...', 'SANDS OF ETERNITY...', 'THE ANCIENTS STIR...', 'THE VEIL THINS...', 'THE DESERT WAKES...'],
+    ['IN THE BEGINNING...', 'THE SANDS REMEMBER...', 'A WORLD STIRS...', 'A PHARAOH DREAMS...', 'THE EMPIRE WAKES...'],
   ];
 
   function makeWorldGrad() {
@@ -226,7 +226,7 @@ function _startHourglass(canvas, wrap, caption) {
 
     if (state === 'draining') {
       sandRatio = Math.min(1, sandRatio + SPEED * 1000 * dt);
-      caption.textContent = LABELS[Math.min(4, Math.floor(sandRatio * 5))];
+      caption.textContent = LABEL_SETS[turnIndex % 4][Math.min(4, Math.floor(sandRatio * 5))];
       ptTimer += dt;
       if (ptTimer > 0.09) {
         if (particles.length < 6 && sandRatio > 0.02 && sandRatio < 0.98) {
@@ -250,6 +250,7 @@ function _startHourglass(canvas, wrap, caption) {
         wrap.style.transform = 'rotate(0deg)';
         flipDeg = 0;
         sandRatio = 1 - sandRatio;
+        turnIndex++;
         state = 'draining';
       }
     }
