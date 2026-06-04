@@ -133,7 +133,7 @@ export const RiddleManager = (() => {
       Flags.inc('sphinx_riddles_solved');
     } else {
       _attempts++;
-      if (_attempts >= 3) {
+      if (_attempts >= 13) {
         const hint = _riddle.answers[0].toUpperCase();
         _phase    = 'correct';
         _respText = `THE ANSWER IS: ${hint}.\n${_riddle.response}`;
