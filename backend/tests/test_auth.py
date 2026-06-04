@@ -30,13 +30,14 @@ async def setup_db():
 
 
 @pytest.fixture
-def client():
+async def client():
     app.dependency_overrides[get_db] = override_get_db
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+    yield AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
-async def valid_invite(setup_db):
+async def valid_invite():
     """Insert a valid unused invite into the test DB."""
     token = uuid.uuid4().hex
     async with TestingSessionLocal() as db:
