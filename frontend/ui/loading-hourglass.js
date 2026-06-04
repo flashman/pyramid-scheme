@@ -71,6 +71,44 @@ function _pollUntilHealthy(BASE) {
   });
 }
 
+function _startSandAudio() {
+  try {
+    const ctx = new AudioContext();
+    ctx.resume();
+
+    const bufLen = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buf;
+    source.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 2000;
+    filter.Q.value = 0.8;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.8);
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    source.start();
+
+    return () => {
+      gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.32);
+      setTimeout(() => { try { source.stop(); ctx.close(); } catch {} }, 350);
+    };
+  } catch {
+    return () => {};
+  }
+}
+
 function _showOverlayAndWait(BASE) {
   return new Promise(resolve => {
     const style = document.createElement('style');
@@ -93,8 +131,10 @@ function _showOverlayAndWait(BASE) {
       document.getElementById('hg-wrap'),
       document.getElementById('hg-caption'),
     );
+    const stopAudio = _startSandAudio();
 
     Promise.all([_minDelay(MIN_DISPLAY_MS), _pollUntilHealthy(BASE)]).then(() => {
+      stopAudio();
       stopAnim();
       overlay.style.opacity = '0';
       setTimeout(() => { overlay.remove(); style.remove(); resolve(); }, 320);
