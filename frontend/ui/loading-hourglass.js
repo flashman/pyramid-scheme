@@ -29,51 +29,75 @@ const CSS = `
 }
 `;
 
-export function waitForBackend() {
+const PROBE_TIMEOUT_MS = 500;
+const MIN_DISPLAY_MS   = 5000;
+const POLL_INTERVAL_MS = 3000;
+
+export async function waitForBackend() {
   const BASE = window.API_BASE || '';
+  const warm = await _probe(BASE);
+  if (warm) return;
+  await _showOverlayAndWait(BASE);
+}
+
+async function _probe(BASE) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
+    const r = await fetch(`${BASE}/api/health`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+function _minDelay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function _pollUntilHealthy(BASE) {
   return new Promise(resolve => {
-    fetch(`${BASE}/api/config`).then(r => {
-      if (r.ok) { resolve(); return; }
-      _showOverlayAndPoll(BASE, resolve);
-    }).catch(() => _showOverlayAndPoll(BASE, resolve));
+    async function poll() {
+      try {
+        const r = await fetch(`${BASE}/api/health`);
+        if (r.ok) { resolve(); return; }
+      } catch { /* still starting */ }
+      setTimeout(poll, POLL_INTERVAL_MS);
+    }
+    poll();
   });
 }
 
-function _showOverlayAndPoll(BASE, resolve) {
-  const style = document.createElement('style');
-  style.textContent = CSS;
-  document.head.appendChild(style);
+function _showOverlayAndWait(BASE) {
+  return new Promise(resolve => {
+    const style = document.createElement('style');
+    style.textContent = CSS;
+    document.head.appendChild(style);
 
-  const overlay = document.createElement('div');
-  overlay.id = 'hg-overlay';
-  overlay.innerHTML = `
-    <div id="hg-title">⚡ PYRAMID SCHEME™ ⚡</div>
-    <div id="hg-wrap">
-      <canvas id="hg-canvas" width="160" height="220"></canvas>
-    </div>
-    <div id="hg-caption">THE GODS REQUIRE TIME</div>
-  `;
-  document.body.appendChild(overlay);
+    const overlay = document.createElement('div');
+    overlay.id = 'hg-overlay';
+    overlay.innerHTML = `
+      <div id="hg-title">⚡ PYRAMID SCHEME™ ⚡</div>
+      <div id="hg-wrap">
+        <canvas id="hg-canvas" width="160" height="220"></canvas>
+      </div>
+      <div id="hg-caption">THE GODS REQUIRE TIME</div>
+    `;
+    document.body.appendChild(overlay);
 
-  const stopAnim = _startHourglass(
-    document.getElementById('hg-canvas'),
-    document.getElementById('hg-wrap'),
-    document.getElementById('hg-caption'),
-  );
+    const stopAnim = _startHourglass(
+      document.getElementById('hg-canvas'),
+      document.getElementById('hg-wrap'),
+      document.getElementById('hg-caption'),
+    );
 
-  async function poll() {
-    try {
-      const res = await fetch(`${BASE}/api/config`);
-      if (res.ok) {
-        stopAnim();
-        overlay.style.opacity = '0';
-        setTimeout(() => { overlay.remove(); style.remove(); resolve(); }, 320);
-        return;
-      }
-    } catch { /* backend not up yet */ }
-    setTimeout(poll, 3000);
-  }
-  poll();
+    Promise.all([_minDelay(MIN_DISPLAY_MS), _pollUntilHealthy(BASE)]).then(() => {
+      stopAnim();
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.remove(); style.remove(); resolve(); }, 320);
+    });
+  });
 }
 
 function _startHourglass(canvas, wrap, caption) {
