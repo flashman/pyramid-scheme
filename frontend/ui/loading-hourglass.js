@@ -74,7 +74,6 @@ function _pollUntilHealthy(BASE) {
 function _startSandAudio() {
   try {
     const ctx = new AudioContext();
-    ctx.resume().catch(() => {});
 
     const bufLen = ctx.sampleRate * 2;
     const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
@@ -91,22 +90,44 @@ function _startSandAudio() {
     filter.Q.value = 0.8;
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 3);
+    gain.gain.value = 0;
 
     source.connect(filter);
     filter.connect(gain);
     gain.connect(ctx.destination);
-    source.start();
+
+    let started = false;
+    function tryStart() {
+      if (started) return;
+      ctx.resume().then(() => {
+        if (started) return;
+        started = true;
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 3);
+        source.start();
+      }).catch(() => {});
+    }
+
+    tryStart();
+
+    const onGesture = () => {
+      tryStart();
+      document.removeEventListener('click',      onGesture);
+      document.removeEventListener('keydown',    onGesture);
+      document.removeEventListener('touchstart', onGesture);
+    };
+    document.addEventListener('click',      onGesture);
+    document.addEventListener('keydown',    onGesture);
+    document.addEventListener('touchstart', onGesture);
 
     let stopped = false;
 
     function setState(newState) {
-      if (stopped) return;
+      if (stopped || !started) return;
       gain.gain.cancelScheduledValues(ctx.currentTime);
       gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
       if (newState === 'draining') {
-        gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 3);
+        gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 0.3);
       } else {
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
       }
@@ -116,9 +137,14 @@ function _startSandAudio() {
       stop() {
         if (stopped) return;
         stopped = true;
-        gain.gain.cancelScheduledValues(ctx.currentTime);
-        gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
+        document.removeEventListener('click',      onGesture);
+        document.removeEventListener('keydown',    onGesture);
+        document.removeEventListener('touchstart', onGesture);
+        if (started) {
+          gain.gain.cancelScheduledValues(ctx.currentTime);
+          gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
+        }
         setTimeout(() => { try { source.stop(); ctx.close(); } catch {} }, 350);
       },
       setState,
