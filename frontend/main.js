@@ -152,7 +152,6 @@ async function init() {
   log('Click BUY IN to place your capstone!', '');
   Events.emit('game:started', {});
 
-  document.getElementById('boot-screen')?.remove();
   SoundManager.playRealm('world');
   requestAnimationFrame(gameLoop);
 }
