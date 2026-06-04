@@ -13,7 +13,7 @@ import { GameSession }            from './game/session.js';
 import { registerAllQuests }      from './game/quests.js';
 import { ALL_REALMS }             from './worlds/manifest.js';
 import { updateStats, updateSlots, log } from './ui/panels.js';
-import { initDevPanel }           from './ui/dev-panel.js';
+import { initDevPanel, devPanelSetAuthMode } from './ui/dev-panel.js';
 import { closeModal }             from './ui/modal.js';
 import { GND }                    from './worlds/earth/constants.js';
 import { LH }                     from './worlds/constants.js';
@@ -143,6 +143,9 @@ async function init() {
   } else {
     G.isGuest = true;
     log('Playing as guest — progress will not be saved.', '');
+    Api.get('/api/health')
+      .then(h => devPanelSetAuthMode(h.debug === true))
+      .catch(() => devPanelSetAuthMode(false));
   }
 
   updateStats();
