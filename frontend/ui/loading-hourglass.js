@@ -30,44 +30,50 @@ const CSS = `
 `;
 
 export function waitForBackend() {
+  const BASE = window.API_BASE || '';
   return new Promise(resolve => {
-    const BASE = window.API_BASE || '';
-
-    const style = document.createElement('style');
-    style.textContent = CSS;
-    document.head.appendChild(style);
-
-    const overlay = document.createElement('div');
-    overlay.id = 'hg-overlay';
-    overlay.innerHTML = `
-      <div id="hg-title">⚡ PYRAMID SCHEME™ ⚡</div>
-      <div id="hg-wrap">
-        <canvas id="hg-canvas" width="160" height="220"></canvas>
-      </div>
-      <div id="hg-caption">THE GODS REQUIRE TIME</div>
-    `;
-    document.body.appendChild(overlay);
-
-    const stopAnim = _startHourglass(
-      document.getElementById('hg-canvas'),
-      document.getElementById('hg-wrap'),
-      document.getElementById('hg-caption'),
-    );
-
-    async function poll() {
-      try {
-        const res = await fetch(`${BASE}/api/config`);
-        if (res.ok) {
-          stopAnim();
-          overlay.style.opacity = '0';
-          setTimeout(() => { overlay.remove(); style.remove(); resolve(); }, 300);
-          return;
-        }
-      } catch { /* backend not up yet */ }
-      setTimeout(poll, 3000);
-    }
-    poll();
+    fetch(`${BASE}/api/config`).then(r => {
+      if (r.ok) { resolve(); return; }
+      _showOverlayAndPoll(BASE, resolve);
+    }).catch(() => _showOverlayAndPoll(BASE, resolve));
   });
+}
+
+function _showOverlayAndPoll(BASE, resolve) {
+  const style = document.createElement('style');
+  style.textContent = CSS;
+  document.head.appendChild(style);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'hg-overlay';
+  overlay.innerHTML = `
+    <div id="hg-title">⚡ PYRAMID SCHEME™ ⚡</div>
+    <div id="hg-wrap">
+      <canvas id="hg-canvas" width="160" height="220"></canvas>
+    </div>
+    <div id="hg-caption">THE GODS REQUIRE TIME</div>
+  `;
+  document.body.appendChild(overlay);
+
+  const stopAnim = _startHourglass(
+    document.getElementById('hg-canvas'),
+    document.getElementById('hg-wrap'),
+    document.getElementById('hg-caption'),
+  );
+
+  async function poll() {
+    try {
+      const res = await fetch(`${BASE}/api/config`);
+      if (res.ok) {
+        stopAnim();
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.remove(); style.remove(); resolve(); }, 320);
+        return;
+      }
+    } catch { /* backend not up yet */ }
+    setTimeout(poll, 3000);
+  }
+  poll();
 }
 
 function _startHourglass(canvas, wrap, caption) {
@@ -91,6 +97,7 @@ function _startHourglass(canvas, wrap, caption) {
 
   const particles = [];
   let running = true;
+  let _ts = 0;
 
   const LABELS = [
     'THE GODS REQUIRE TIME',
@@ -137,7 +144,7 @@ function _startHourglass(canvas, wrap, caption) {
       ctx.fillRect(CX-TOP_W/2-2, surf, TOP_W+4, NECK_YT-surf+4);
       ctx.beginPath();
       for (let x = CX-TOP_W/2; x <= CX+TOP_W/2; x += 2) {
-        const r = Math.sin(x*0.3 + Date.now()*0.002) * 0.7;
+        const r = Math.sin(x*0.3 + _ts*0.002) * 0.7;
         x === Math.ceil(CX-TOP_W/2) ? ctx.moveTo(x, surf+r) : ctx.lineTo(x, surf+r);
       }
       ctx.strokeStyle = 'rgba(240,220,80,0.35)'; ctx.lineWidth = 1; ctx.stroke();
@@ -186,6 +193,7 @@ function _startHourglass(canvas, wrap, caption) {
 
   function frame(ts) {
     if (!running) return;
+    _ts = ts;
     if (!lastTs) lastTs = ts;
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
