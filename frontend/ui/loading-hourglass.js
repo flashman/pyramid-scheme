@@ -125,7 +125,7 @@ function _startSandAudio() {
       gain.gain.cancelScheduledValues(ctx.currentTime);
       gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
       if (newState === 'draining') {
-        gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 0.3);
+        gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 3);
       } else {
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
       }
