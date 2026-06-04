@@ -74,7 +74,7 @@ function _pollUntilHealthy(BASE) {
 function _startSandAudio() {
   try {
     const ctx = new AudioContext();
-    ctx.resume();
+    ctx.resume().catch(() => {});
 
     const bufLen = ctx.sampleRate * 2;
     const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
@@ -99,7 +99,10 @@ function _startSandAudio() {
     gain.connect(ctx.destination);
     source.start();
 
+    let stopped = false;
     return () => {
+      if (stopped) return;
+      stopped = true;
       gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
       gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.32);
       setTimeout(() => { try { source.stop(); ctx.close(); } catch {} }, 350);
