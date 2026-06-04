@@ -1,0 +1,51 @@
+services:
+
+  # ── Backend (FastAPI + Alembic) ──────────────────────────
+  # Alembic migrations run automatically on startup.
+  - type: web
+    name: pyramid-scheme-backend
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    plan: free
+    envVars:
+      # Supabase session-pooler URL — set in Render dashboard.
+      # Format: postgresql+asyncpg://postgres.REF:PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+      - key: DATABASE_URL
+        sync: false
+      # Generate: python -c "import secrets; print(secrets.token_hex(32))"
+      - key: SECRET_KEY
+        sync: false
+      # Set to ["https://pyramid-scheme-frontend.onrender.com"] after frontend deploys
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DEBUG
+        value: "false"
+      # Set to https://pyramid-scheme-frontend.onrender.com after frontend deploys
+      - key: FRONTEND_URL
+        sync: false
+      # Resend SMTP — swap for mailhog values if testing locally via .env
+      - key: SMTP_HOST
+        value: smtp.resend.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_TLS
+        value: "true"
+      - key: SMTP_USER
+        value: resend
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+  # ── Frontend (vanilla JS static site) ───────────────────
+  # Build step injects the backend URL into index.html at deploy time.
+  - type: web
+    name: pyramid-scheme-frontend
+    runtime: static
+    buildCommand: sed -i "s|__API_BASE__|${API_BASE}|g" frontend/index.html
+    staticPublishPath: ./frontend
+    envVars:
+      # Set to https://pyramid-scheme-backend.onrender.com
+      - key: API_BASE
+        sync: false

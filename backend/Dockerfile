@@ -11,6 +11,6 @@ COPY . .
 
 # Run migrations then start the server.
 # Using a shell entrypoint so we can chain commands.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
 EXPOSE 8000
