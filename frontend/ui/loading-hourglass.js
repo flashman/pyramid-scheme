@@ -41,9 +41,10 @@ export async function waitForBackend() {
 }
 
 async function _probe(BASE) {
+  let timer;
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
+    timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
     const r = await fetch(`${BASE}/api/health`, { signal: ctrl.signal });
     clearTimeout(timer);
     return r.ok;
