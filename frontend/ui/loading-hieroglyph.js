@@ -152,6 +152,7 @@ function _startHieroglyph(overlay) {
   function frame(ts) {
     if (!running) return;
     if (!last) last = ts;
+    // TODO: clamp dt like hourglass does (Math.min(..., 0.05)) to avoid row teleport on tab resume
     const dt = (ts - last) / 1000;
     last = ts;
     rowSpeeds.forEach((spd, ri) => {
