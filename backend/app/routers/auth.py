@@ -19,7 +19,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already taken.")
 
-    # Resolve invite token → find inviter
+    # Resolve invite token → find inviter; a valid token is required to register
     invite: Invite | None = None
     if body.invite_token:
         inv_result = await db.execute(
@@ -29,7 +29,12 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             )
         )
         invite = inv_result.scalar_one_or_none()
-        # Silently ignore invalid/expired tokens — user can still register
+
+    if invite is None:
+        raise HTTPException(
+            status_code=400,
+            detail="A valid invite token is required to register.",
+        )
 
     user = User(
         username=body.username,

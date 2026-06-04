@@ -197,6 +197,10 @@ const HTML = `
         <label>CONFIRM PASSWORD</label>
         <input id="auth-confirm" type="password" autocomplete="new-password" placeholder="••••••••" maxlength="128" />
       </div>
+      <div class="auth-field" id="auth-token-wrap" style="display:none">
+        <label>INVITE TOKEN</label>
+        <input id="auth-token" type="text" autocomplete="off" placeholder="paste your token here" maxlength="64" />
+      </div>
       <div id="auth-tos-row" style="display:none;margin-bottom:10px;">
         <div style="display:flex;align-items:flex-start;gap:8px;">
           <input type="checkbox" id="auth-tos-check"
@@ -431,6 +435,8 @@ export async function requireAuth() {
     const tosOpen  = document.getElementById('auth-tos-open');
     const tosOverlay = document.getElementById('tos-overlay');
     const tosClose   = document.getElementById('tos-close');
+    const tokenWrap = document.getElementById('auth-token-wrap');
+    const tokenEl   = document.getElementById('auth-token');
 
     let mode = 'login'; // 'login' | 'register'
 
@@ -438,9 +444,11 @@ export async function requireAuth() {
     if (_inviteToken) {
       mode = 'register';
       tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === 'register'));
-      confirmW.style.display = 'block';
-      tosRow.style.display   = 'block';
-      submit.textContent     = '► FOUND YOUR DYNASTY';
+      confirmW.style.display  = 'block';
+      tokenWrap.style.display = 'block';
+      tosRow.style.display    = 'block';
+      tokenEl.value           = _inviteToken;
+      submit.textContent      = '► FOUND YOUR DYNASTY';
     }
 
     // ── ToS modal open / close ───────────────────────────
@@ -460,16 +468,17 @@ export async function requireAuth() {
         mode = tab.dataset.tab;
         tabs.forEach(t => t.classList.toggle('active', t === tab));
         const isReg = mode === 'register';
-        confirmW.style.display = isReg ? 'block' : 'none';
-        tosRow.style.display   = isReg ? 'block' : 'none';
-        if (!isReg) tosCheck.checked = false; // reset on leaving register
+        confirmW.style.display  = isReg ? 'block' : 'none';
+        tokenWrap.style.display = isReg ? 'block' : 'none';
+        tosRow.style.display    = isReg ? 'block' : 'none';
+        if (!isReg) { tosCheck.checked = false; tokenEl.value = ''; }
         submit.textContent = isReg ? '► FOUND YOUR DYNASTY' : '► ENTER THE DESERT';
         clearError();
       });
     });
 
     // ── Enter key ────────────────────────────────────────
-    [userEl, passEl, confirmEl].forEach(el => {
+    [userEl, passEl, confirmEl, tokenEl].forEach(el => {
       el.addEventListener('keydown', e => { if (e.key === 'Enter') doSubmit(); });
     });
 
@@ -484,8 +493,9 @@ export async function requireAuth() {
       if (password.length < 6)    { setError('Password must be 6+ characters.'); return; }
 
       if (mode === 'register') {
-        if (password !== confirmEl.value) { setError('Passwords do not match.'); return; }
-        if (!tosCheck.checked) { setError('You must agree to the Terms of Participation.'); return; }
+        if (password !== confirmEl.value)  { setError('Passwords do not match.'); return; }
+        if (!tokenEl.value.trim())         { setError('An invite token is required.'); return; }
+        if (!tosCheck.checked)             { setError('You must agree to the Terms of Participation.'); return; }
       }
 
       submit.disabled = true;
@@ -494,7 +504,7 @@ export async function requireAuth() {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
       const payload  = mode === 'login'
         ? { username, password }
-        : { username, password, invite_token: _inviteToken || undefined };
+        : { username, password, invite_token: tokenEl.value.trim() || undefined };
       const result = await Api.post(endpoint, payload);
 
       if (result.access_token) {

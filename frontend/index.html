@@ -127,9 +127,12 @@
   <button class="btn g" onclick="closeModal()" style="margin-top:6px">★ CONTINUE ★</button>
 </div></div>
 
-<!-- For local dev WITHOUT Docker: uncomment the line below to point at the backend.
-     In Docker, the nginx proxy handles this automatically. -->
-<!-- <script>window.API_BASE = 'http://localhost:8000';</script> -->
+<!-- API_BASE: set to backend URL by Render build step (sed replaces __API_BASE__).
+     If unreplaced (local Docker dev), falls back to '' for same-origin nginx proxy. -->
+<script>
+  window.API_BASE = "__API_BASE__";
+  if (window.API_BASE.indexOf("API_BASE") !== -1) window.API_BASE = "";
+</script>
 <script type="module" src="main.js"></script>
 </body>
 </html>
