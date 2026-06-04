@@ -199,7 +199,7 @@ const HTML = `
       </div>
       <div class="auth-field" id="auth-token-wrap" style="display:none">
         <label>INVITE TOKEN</label>
-        <input id="auth-token" type="text" placeholder="paste your token here" maxlength="64" />
+        <input id="auth-token" type="text" autocomplete="off" placeholder="paste your token here" maxlength="64" />
       </div>
       <div id="auth-tos-row" style="display:none;margin-bottom:10px;">
         <div style="display:flex;align-items:flex-start;gap:8px;">
@@ -471,7 +471,7 @@ export async function requireAuth() {
         confirmW.style.display  = isReg ? 'block' : 'none';
         tokenWrap.style.display = isReg ? 'block' : 'none';
         tosRow.style.display    = isReg ? 'block' : 'none';
-        if (!isReg) tosCheck.checked = false;
+        if (!isReg) { tosCheck.checked = false; tokenEl.value = ''; }
         submit.textContent = isReg ? '► FOUND YOUR DYNASTY' : '► ENTER THE DESERT';
         clearError();
       });
