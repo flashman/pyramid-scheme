@@ -18,6 +18,7 @@ import { closeModal }             from './ui/modal.js';
 import { GND }                    from './worlds/earth/constants.js';
 import { LH }                     from './worlds/constants.js';
 import { requireAuth }            from './ui/auth.js';
+import { waitForBackend }         from './ui/loading-hourglass.js';
 import { Api }                    from './game/api.js';
 import { openProfile }            from './ui/profile.js';
 import { SoundManager }           from './audio/sound.js';
@@ -135,6 +136,7 @@ function gameLoop(ts) {
 async function init() {
   initDevPanel();
 
+  await waitForBackend();
   const token = await requireAuth();
 
   if (token) {
