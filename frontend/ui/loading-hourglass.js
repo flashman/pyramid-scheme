@@ -1,5 +1,5 @@
 // Hourglass loading screen — shown while the Render backend cold-starts.
-// Exports waitForBackend(): resolves when GET /api/config returns 200.
+// Exports waitForBackend(): shows hourglass on cold start, resolves when GET /api/health returns 200.
 
 const CSS = `
 #hg-overlay {
@@ -48,6 +48,7 @@ async function _probe(BASE) {
     clearTimeout(timer);
     return r.ok;
   } catch {
+    clearTimeout(timer);
     return false;
   }
 }
