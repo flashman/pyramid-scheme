@@ -10,7 +10,7 @@ services:
     plan: free
     envVars:
       # Supabase session-pooler URL — set in Render dashboard.
-      # Format: postgresql+asyncpg://postgres.REF:PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+      # Format: postgresql+asyncpg://postgres.REF:PASSWORD@aws-1-us-west-2.pooler.supabase.com:5432/postgres
       - key: DATABASE_URL
         sync: false
       # Generate: python -c "import secrets; print(secrets.token_hex(32))"
