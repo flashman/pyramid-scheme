@@ -92,7 +92,7 @@ function _startSandAudio() {
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.8);
+    gain.gain.linearRampToValueAtTime(0.03, ctx.currentTime + 0.8);
 
     source.connect(filter);
     filter.connect(gain);
@@ -106,9 +106,9 @@ function _startSandAudio() {
       gain.gain.cancelScheduledValues(ctx.currentTime);
       gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
       if (newState === 'draining') {
-        gain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.3);
+        gain.gain.linearRampToValueAtTime(0.03, ctx.currentTime + 0.3);
       } else {
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
       }
     }
 
