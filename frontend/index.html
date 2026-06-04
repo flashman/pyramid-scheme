@@ -127,9 +127,12 @@
   <button class="btn g" onclick="closeModal()" style="margin-top:6px">★ CONTINUE ★</button>
 </div></div>
 
-<!-- API_BASE: empty = same-origin Docker dev (nginx proxy).
-     Vercel build replaces __API_BASE__ with the Render backend URL. -->
-<script>window.API_BASE = '__API_BASE__' === '__API_BASE__' ? '' : '__API_BASE__';</script>
+<!-- API_BASE: set to backend URL by Render build step (sed replaces __API_BASE__).
+     If unreplaced (local Docker dev), falls back to '' for same-origin nginx proxy. -->
+<script>
+  window.API_BASE = "__API_BASE__";
+  if (window.API_BASE.indexOf("API_BASE") !== -1) window.API_BASE = "";
+</script>
 <script type="module" src="main.js"></script>
 </body>
 </html>
