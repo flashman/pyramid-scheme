@@ -508,13 +508,10 @@ export function devPanelSetAuthMode(hasDebugEndpoint) {
     simSection.style.display = 'block';
     _simLog('Backend debug mode active — sim recruits enabled.', '#40d080');
   } else {
-    simSection.style.display = 'block';
-    document.getElementById('dev-sim-mode-badge').textContent = 'PROD';
-    document.getElementById('dev-sim-mode-badge').style.color = '#e04040';
-    document.getElementById('dev-sim-mode-badge').style.borderColor = '#e04040';
-    document.getElementById('dev-sim-btn').disabled = true;
-    document.getElementById('dev-sim-btn').title = '/api/dev/* not available in production';
-    _simLog('Production mode — simulation disabled.', '#e04040');
+    // Not in debug mode — remove the panel and toggle button entirely.
+    // Backtick listener still fires but operates on a detached node, so nothing shows.
+    document.getElementById('dev-toggle')?.remove();
+    document.getElementById('dev-panel')?.remove();
   }
 }
 
