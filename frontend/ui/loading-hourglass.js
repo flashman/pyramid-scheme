@@ -94,19 +94,10 @@ function _startSandAudio() {
     gain.gain.setValueAtTime(0, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 3);
 
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.002;
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 4;
-    lfo.connect(lfoGain);
-    lfoGain.connect(gain.gain);
-
     source.connect(filter);
     filter.connect(gain);
     gain.connect(ctx.destination);
     source.start();
-    lfo.start();
 
     let stopped = false;
 
@@ -128,7 +119,7 @@ function _startSandAudio() {
         gain.gain.cancelScheduledValues(ctx.currentTime);
         gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
-        setTimeout(() => { try { source.stop(); lfo.stop(); ctx.close(); } catch {} }, 350);
+        setTimeout(() => { try { source.stop(); ctx.close(); } catch {} }, 350);
       },
       setState,
     };
