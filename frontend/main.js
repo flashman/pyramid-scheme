@@ -134,9 +134,8 @@ function gameLoop(ts) {
 
 // ── Init ──────────────────────────────────────────────────
 async function init() {
-  initDevPanel();
-
   await waitForBackend();
+  initDevPanel();
   const token = await requireAuth();
 
   if (token) {
