@@ -16,12 +16,12 @@ services:
       # Generate: python -c "import secrets; print(secrets.token_hex(32))"
       - key: SECRET_KEY
         sync: false
-      # Set to ["https://pyramid-scheme-frontend.onrender.com"] after frontend deploys
+      # Set to ["https://pyramid-scheme.onrender.com"] after frontend deploys
       - key: CORS_ORIGINS
         sync: false
       - key: DEBUG
         value: "false"
-      # Set to https://pyramid-scheme-frontend.onrender.com after frontend deploys
+      # Set to https://pyramid-scheme.onrender.com after frontend deploys
       - key: FRONTEND_URL
         sync: false
       # Resend SMTP — swap for mailhog values if testing locally via .env
@@ -41,7 +41,7 @@ services:
   # ── Frontend (vanilla JS static site) ───────────────────
   # Build step injects the backend URL into index.html at deploy time.
   - type: web
-    name: pyramid-scheme-frontend
+    name: pyramid-scheme
     runtime: static
     buildCommand: sed -i "s|__API_BASE__|${API_BASE}|g" frontend/index.html
     staticPublishPath: ./frontend
