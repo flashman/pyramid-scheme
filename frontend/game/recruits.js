@@ -179,12 +179,13 @@ export function recruitFriend() {
   if (!G.bought || G.invitesLeft <= 0) { log('No scrolls left!', ''); return; }
 
   if (!Api.hasToken()) {
-    // ── Guest / demo mode: mock recruit with random name ──
-    G.invitesLeft--;
-    updateSlots();
-    const name = pickName();
-    log(`📜 Scroll sent to ${name}...`);
-    setTimeout(() => addRecruit(name, 1, null), 800 + Math.random() * 2200);
+    // ── Guest mode: show the dialog but don't actually send ──
+    showPrompt('📜 SEND SCROLL', 'Enter your recruit\'s email address:', 'pharaoh@example.com')
+      .then((email) => {
+        if (!email) return;
+        log('✗ Your scroll crumbles to dust. Ghosts cannot recruit.', 'r');
+        say('NO ACCOUNT,\nNO SCROLL!', 160);
+      });
     return;
   }
 
