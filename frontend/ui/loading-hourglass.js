@@ -108,8 +108,6 @@ function _startSandAudio() {
       }).catch(() => {});
     }
 
-    tryStart();
-
     const onGesture = () => {
       tryStart();
       document.removeEventListener('click',      onGesture);
