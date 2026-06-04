@@ -1,5 +1,5 @@
 // Hourglass loading screen — shown while the Render backend cold-starts.
-// Exports waitForBackend(): resolves when GET /api/config returns 200.
+// Exports waitForBackend(): shows hourglass on cold start, resolves when GET /api/health returns 200.
 
 const CSS = `
 #hg-overlay {
@@ -29,54 +29,164 @@ const CSS = `
 }
 `;
 
-export function waitForBackend() {
+const PROBE_TIMEOUT_MS = 500;
+const MIN_DISPLAY_MS   = 5000;
+const POLL_INTERVAL_MS = 3000;
+
+export async function waitForBackend() {
   const BASE = window.API_BASE || '';
+  const warm = await _probe(BASE);
+  if (warm) return;
+  await _showOverlayAndWait(BASE);
+}
+
+async function _probe(BASE) {
+  let timer;
+  try {
+    const ctrl = new AbortController();
+    timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
+    const r = await fetch(`${BASE}/api/health`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    return r.ok;
+  } catch {
+    clearTimeout(timer);
+    return false;
+  }
+}
+
+function _minDelay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function _pollUntilHealthy(BASE) {
   return new Promise(resolve => {
-    fetch(`${BASE}/api/config`).then(r => {
-      if (r.ok) { resolve(); return; }
-      _showOverlayAndPoll(BASE, resolve);
-    }).catch(() => _showOverlayAndPoll(BASE, resolve));
+    async function poll() {
+      try {
+        const r = await fetch(`${BASE}/api/health`);
+        if (r.ok) { resolve(); return; }
+      } catch { /* still starting */ }
+      setTimeout(poll, POLL_INTERVAL_MS);
+    }
+    poll();
   });
 }
 
-function _showOverlayAndPoll(BASE, resolve) {
-  const style = document.createElement('style');
-  style.textContent = CSS;
-  document.head.appendChild(style);
+function _startSandAudio() {
+  try {
+    const ctx = new AudioContext();
 
-  const overlay = document.createElement('div');
-  overlay.id = 'hg-overlay';
-  overlay.innerHTML = `
-    <div id="hg-title">⚡ PYRAMID SCHEME™ ⚡</div>
-    <div id="hg-wrap">
-      <canvas id="hg-canvas" width="160" height="220"></canvas>
-    </div>
-    <div id="hg-caption">THE GODS REQUIRE TIME</div>
-  `;
-  document.body.appendChild(overlay);
+    const bufLen = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
 
-  const stopAnim = _startHourglass(
-    document.getElementById('hg-canvas'),
-    document.getElementById('hg-wrap'),
-    document.getElementById('hg-caption'),
-  );
+    const source = ctx.createBufferSource();
+    source.buffer = buf;
+    source.loop = true;
 
-  async function poll() {
-    try {
-      const res = await fetch(`${BASE}/api/config`);
-      if (res.ok) {
-        stopAnim();
-        overlay.style.opacity = '0';
-        setTimeout(() => { overlay.remove(); style.remove(); resolve(); }, 320);
-        return;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1000;
+    filter.Q.value = 0.8;
+
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    let started = false;
+    function tryStart() {
+      if (started) return;
+      ctx.resume().then(() => {
+        if (started) return;
+        started = true;
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 3);
+        source.start();
+      }).catch(() => {});
+    }
+
+    const onGesture = () => {
+      tryStart();
+      document.removeEventListener('click',      onGesture);
+      document.removeEventListener('keydown',    onGesture);
+      document.removeEventListener('touchstart', onGesture);
+    };
+    document.addEventListener('click',      onGesture);
+    document.addEventListener('keydown',    onGesture);
+    document.addEventListener('touchstart', onGesture);
+
+    let stopped = false;
+
+    function setState(newState) {
+      if (stopped || !started) return;
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+      if (newState === 'draining') {
+        gain.gain.linearRampToValueAtTime(0.005, ctx.currentTime + 3);
+      } else {
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
       }
-    } catch { /* backend not up yet */ }
-    setTimeout(poll, 3000);
+    }
+
+    return {
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        document.removeEventListener('click',      onGesture);
+        document.removeEventListener('keydown',    onGesture);
+        document.removeEventListener('touchstart', onGesture);
+        if (started) {
+          gain.gain.cancelScheduledValues(ctx.currentTime);
+          gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
+        }
+        setTimeout(() => { try { source.stop(); ctx.close(); } catch {} }, 350);
+      },
+      setState,
+    };
+  } catch {
+    return { stop: () => {}, setState: () => {} };
   }
-  poll();
 }
 
-function _startHourglass(canvas, wrap, caption) {
+function _showOverlayAndWait(BASE) {
+  return new Promise(resolve => {
+    const style = document.createElement('style');
+    style.textContent = CSS;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement('div');
+    overlay.id = 'hg-overlay';
+    overlay.innerHTML = `
+      <div id="hg-title">⚡ PYRAMID SCHEME™ ⚡</div>
+      <div id="hg-wrap">
+        <canvas id="hg-canvas" width="160" height="220"></canvas>
+      </div>
+      <div id="hg-caption">THE GODS REQUIRE TIME</div>
+    `;
+    document.body.appendChild(overlay);
+
+    const { stop: stopAudio, setState: setAudioState } = _startSandAudio();
+    const stopAnim = _startHourglass(
+      document.getElementById('hg-canvas'),
+      document.getElementById('hg-wrap'),
+      document.getElementById('hg-caption'),
+      setAudioState,
+    );
+
+    Promise.all([_minDelay(MIN_DISPLAY_MS), _pollUntilHealthy(BASE)]).then(() => {
+      stopAudio();
+      stopAnim();
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.remove(); style.remove(); resolve(); }, 320);
+    });
+  });
+}
+
+function _startHourglass(canvas, wrap, caption, onStateChange) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const CX = W / 2, CY = H / 2;
@@ -85,13 +195,14 @@ function _startHourglass(canvas, wrap, caption) {
   const TOP_W = 54, BOT_W = 54;
   const NECK_YT = H * 0.47, NECK_YB = H * 0.53;
   const NECK_W = 3;
-  const SPEED = 0.00018;
+  const SPEED = 0.00012;
 
   let sandRatio = 0;
   let state = 'draining';
   let flipDeg = 0;
   let flipProg = 0;
   let pauseTimer = 0;
+  let turnIndex = 0;
   const PAUSE_DUR = 0.7;
   const FLIP_DUR = 1.1;
 
@@ -99,12 +210,11 @@ function _startHourglass(canvas, wrap, caption) {
   let running = true;
   let _ts = 0;
 
-  const LABELS = [
-    'THE GODS REQUIRE TIME',
-    'THE SANDS FALL...',
-    'PATIENCE, PHARAOH...',
-    'NEARLY THERE...',
-    'THE DESERT STIRS...',
+  const LABEL_SETS = [
+    ['THE GODS REQUIRE TIME', 'THE SANDS FALL...', 'PATIENCE, PHARAOH...', 'NEARLY THERE...', 'THE DESERT STIRS...'],
+    ['WAKING THE PHARAOH...', 'BRIBING THE SCRIBES...', 'STACKING THE STONES...', 'PYRAMID RISING...', 'ALMOST OPEN...'],
+    ['THE ORACLE SLEEPS...', 'SANDS OF ETERNITY...', 'THE ANCIENTS STIR...', 'THE VEIL THINS...', 'THE DESERT WAKES...'],
+    ['IN THE BEGINNING...', 'THE SANDS REMEMBER...', 'A WORLD STIRS...', 'A PHARAOH DREAMS...', 'THE EMPIRE WAKES...'],
   ];
 
   function makeWorldGrad() {
@@ -200,7 +310,7 @@ function _startHourglass(canvas, wrap, caption) {
 
     if (state === 'draining') {
       sandRatio = Math.min(1, sandRatio + SPEED * 1000 * dt);
-      caption.textContent = LABELS[Math.min(4, Math.floor(sandRatio * 5))];
+      caption.textContent = LABEL_SETS[turnIndex % 4][Math.min(4, Math.floor(sandRatio * 5))];
       ptTimer += dt;
       if (ptTimer > 0.09) {
         if (particles.length < 6 && sandRatio > 0.02 && sandRatio < 0.98) {
@@ -208,12 +318,12 @@ function _startHourglass(canvas, wrap, caption) {
         }
         ptTimer = 0;
       }
-      if (sandRatio >= 1) { state = 'pause'; pauseTimer = 0; particles.length = 0; }
+      if (sandRatio >= 1) { state = 'pause'; pauseTimer = 0; particles.length = 0; onStateChange?.('pause'); }
 
     } else if (state === 'pause') {
       pauseTimer += dt;
       caption.textContent = 'TURNING THE GLASS...';
-      if (pauseTimer >= PAUSE_DUR) { state = 'flipping'; flipProg = 0; }
+      if (pauseTimer >= PAUSE_DUR) { state = 'flipping'; flipProg = 0; onStateChange?.('flipping'); }
 
     } else if (state === 'flipping') {
       flipProg = Math.min(1, flipProg + dt / FLIP_DUR);
@@ -224,7 +334,9 @@ function _startHourglass(canvas, wrap, caption) {
         wrap.style.transform = 'rotate(0deg)';
         flipDeg = 0;
         sandRatio = 1 - sandRatio;
+        turnIndex++;
         state = 'draining';
+        onStateChange?.('draining');
       }
     }
 

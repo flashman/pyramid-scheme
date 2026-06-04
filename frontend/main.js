@@ -134,9 +134,8 @@ function gameLoop(ts) {
 
 // ── Init ──────────────────────────────────────────────────
 async function init() {
-  initDevPanel();
-
   await waitForBackend();
+  initDevPanel();
   const token = await requireAuth();
 
   if (token) {
@@ -152,6 +151,7 @@ async function init() {
   log('Click BUY IN to place your capstone!', '');
   Events.emit('game:started', {});
 
+  document.getElementById('boot-screen')?.remove();
   SoundManager.playRealm('world');
   requestAnimationFrame(gameLoop);
 }
