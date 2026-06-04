@@ -100,15 +100,31 @@ function _startSandAudio() {
     source.start();
 
     let stopped = false;
-    return () => {
+
+    function setState(newState) {
       if (stopped) return;
-      stopped = true;
+      gain.gain.cancelScheduledValues(ctx.currentTime);
       gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.32);
-      setTimeout(() => { try { source.stop(); ctx.close(); } catch {} }, 350);
+      if (newState === 'draining') {
+        gain.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 0.3);
+      } else {
+        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      }
+    }
+
+    return {
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        gain.gain.cancelScheduledValues(ctx.currentTime);
+        gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.32);
+        setTimeout(() => { try { source.stop(); ctx.close(); } catch {} }, 350);
+      },
+      setState,
     };
   } catch {
-    return () => {};
+    return { stop: () => {}, setState: () => {} };
   }
 }
 
@@ -129,12 +145,13 @@ function _showOverlayAndWait(BASE) {
     `;
     document.body.appendChild(overlay);
 
+    const { stop: stopAudio, setState: setAudioState } = _startSandAudio();
     const stopAnim = _startHourglass(
       document.getElementById('hg-canvas'),
       document.getElementById('hg-wrap'),
       document.getElementById('hg-caption'),
+      setAudioState,
     );
-    const stopAudio = _startSandAudio();
 
     Promise.all([_minDelay(MIN_DISPLAY_MS), _pollUntilHealthy(BASE)]).then(() => {
       stopAudio();
@@ -145,7 +162,7 @@ function _showOverlayAndWait(BASE) {
   });
 }
 
-function _startHourglass(canvas, wrap, caption) {
+function _startHourglass(canvas, wrap, caption, onStateChange) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const CX = W / 2, CY = H / 2;
@@ -277,12 +294,12 @@ function _startHourglass(canvas, wrap, caption) {
         }
         ptTimer = 0;
       }
-      if (sandRatio >= 1) { state = 'pause'; pauseTimer = 0; particles.length = 0; }
+      if (sandRatio >= 1) { state = 'pause'; pauseTimer = 0; particles.length = 0; onStateChange?.('pause'); }
 
     } else if (state === 'pause') {
       pauseTimer += dt;
       caption.textContent = 'TURNING THE GLASS...';
-      if (pauseTimer >= PAUSE_DUR) { state = 'flipping'; flipProg = 0; }
+      if (pauseTimer >= PAUSE_DUR) { state = 'flipping'; flipProg = 0; onStateChange?.('flipping'); }
 
     } else if (state === 'flipping') {
       flipProg = Math.min(1, flipProg + dt / FLIP_DUR);
@@ -295,6 +312,7 @@ function _startHourglass(canvas, wrap, caption) {
         sandRatio = 1 - sandRatio;
         turnIndex++;
         state = 'draining';
+        onStateChange?.('draining');
       }
     }
 
