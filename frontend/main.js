@@ -19,6 +19,7 @@ import { GND }                    from './worlds/earth/constants.js';
 import { LH }                     from './worlds/constants.js';
 import { requireAuth }            from './ui/auth.js';
 import { waitForBackend }         from './ui/loading-hourglass.js';
+import { initMobileControls }    from './ui/mobile-controls.js';
 import { Api }                    from './game/api.js';
 import { openProfile }            from './ui/profile.js';
 import { SoundManager }           from './audio/sound.js';
@@ -135,6 +136,7 @@ function gameLoop(ts) {
 // ── Init ──────────────────────────────────────────────────
 async function init() {
   await waitForBackend();
+  initMobileControls();
   initDevPanel();
   const token = await requireAuth();
 
