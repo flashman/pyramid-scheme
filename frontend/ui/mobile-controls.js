@@ -1,26 +1,4 @@
 const CSS = `
-#mc-fs {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  z-index: 1001;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(10,5,0,0.75);
-  border: 1.5px solid #8a6a20;
-  border-radius: 6px;
-  color: #f0c020;
-  font-family: monospace;
-  font-size: 16px;
-  cursor: pointer;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-#mc-fs:active { background: rgba(40,25,0,0.9); }
 #mc-pad {
   position: fixed;
   bottom: 20px;
@@ -90,20 +68,4 @@ export function initMobileControls() {
   pad.appendChild(makeBtn('⇧',     'Shift',      3, 3));
 
   document.body.appendChild(pad);
-
-  const fs = document.createElement('div');
-  fs.id = 'mc-fs';
-  fs.textContent = '⛶';
-  fs.addEventListener('touchstart', e => {
-    e.preventDefault();
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  }, { passive: false });
-  document.addEventListener('fullscreenchange', () => {
-    fs.textContent = document.fullscreenElement ? '⊠' : '⛶';
-  });
-  document.body.appendChild(fs);
 }
