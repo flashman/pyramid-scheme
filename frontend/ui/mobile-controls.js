@@ -58,13 +58,14 @@ export function initMobileControls() {
   const pad = document.createElement('div');
   pad.id = 'mc-pad';
 
+  pad.appendChild(makeBtn('Z',     'z',          1, 1));
   pad.appendChild(makeBtn('↑',     'ArrowUp',    2, 1));
+  pad.appendChild(makeBtn('⇧',     'Shift',      3, 1));
   pad.appendChild(makeBtn('←',     'ArrowLeft',  1, 2));
   pad.appendChild(makeBtn('space', ' ',          2, 2, '10px'));
   pad.appendChild(makeBtn('→',     'ArrowRight', 3, 2));
-  pad.appendChild(makeBtn('Z',     'z',          1, 3));
   pad.appendChild(makeBtn('↓',     'ArrowDown',  2, 3));
-  pad.appendChild(makeBtn('⇧',     'Shift',      3, 3));
+  pad.appendChild(makeBtn('esc',   'Escape',     3, 3, '9px'));
 
   document.body.appendChild(pad);
 }
