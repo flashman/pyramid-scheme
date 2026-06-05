@@ -49,6 +49,9 @@ services:
     restart: unless-stopped
     ports:
       - "5173:80"
+    volumes:
+      # Bind-mount source so JS/CSS changes are live without rebuilding the image.
+      - ./frontend:/usr/share/nginx/html
     depends_on:
       - backend
 
