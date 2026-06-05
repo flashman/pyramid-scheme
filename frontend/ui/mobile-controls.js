@@ -34,12 +34,13 @@ function fireKey(type, key) {
   document.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));
 }
 
-function makeBtn(label, key, col, row) {
+function makeBtn(label, key, col, row, fontSize) {
   const btn = document.createElement('div');
   btn.className = 'mc-btn';
   btn.textContent = label;
   btn.style.gridColumn = col;
   btn.style.gridRow = row;
+  if (fontSize) btn.style.fontSize = fontSize;
 
   btn.addEventListener('touchstart', e => { e.preventDefault(); fireKey('keydown', key); }, { passive: false });
   btn.addEventListener('touchend',   e => { e.preventDefault(); fireKey('keyup',   key); }, { passive: false });
@@ -58,11 +59,13 @@ export function initMobileControls() {
   const pad = document.createElement('div');
   pad.id = 'mc-pad';
 
-  pad.appendChild(makeBtn('↑', 'ArrowUp',    2, 1));
-  pad.appendChild(makeBtn('←', 'ArrowLeft',  1, 2));
-  pad.appendChild(makeBtn('⚡', ' ',          2, 2));
-  pad.appendChild(makeBtn('→', 'ArrowRight', 3, 2));
-  pad.appendChild(makeBtn('↓', 'ArrowDown',  2, 3));
+  pad.appendChild(makeBtn('↑',     'ArrowUp',    2, 1));
+  pad.appendChild(makeBtn('←',     'ArrowLeft',  1, 2));
+  pad.appendChild(makeBtn('space', ' ',          2, 2, '10px'));
+  pad.appendChild(makeBtn('→',     'ArrowRight', 3, 2));
+  pad.appendChild(makeBtn('Z',     'z',          1, 3));
+  pad.appendChild(makeBtn('↓',     'ArrowDown',  2, 3));
+  pad.appendChild(makeBtn('⇧',     'Shift',      3, 3));
 
   document.body.appendChild(pad);
 }
