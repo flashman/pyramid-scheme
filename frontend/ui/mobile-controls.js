@@ -2,16 +2,30 @@ const CSS = `
 #mc-pad {
   position: fixed;
   bottom: 20px;
-  left: 20px;
+  right: 20px;
   display: grid;
   grid-template-columns: repeat(3, 52px);
-  grid-template-rows: repeat(3, 52px);
+  grid-template-rows: repeat(2, 52px);
+  gap: 4px;
+  z-index: 1000;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#mc-aux {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 52px);
+  grid-template-rows: repeat(2, 52px);
   gap: 4px;
   z-index: 1000;
   user-select: none;
   -webkit-user-select: none;
 }
 .mc-btn {
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,14 +72,23 @@ export function initMobileControls() {
   const pad = document.createElement('div');
   pad.id = 'mc-pad';
 
-  pad.appendChild(makeBtn('esc',   'Escape',     1, 1, '9px'));
   pad.appendChild(makeBtn('↑',     'ArrowUp',    2, 1));
+  pad.appendChild(makeBtn('space', ' ',          3, 1, '10px'));
   pad.appendChild(makeBtn('←',     'ArrowLeft',  1, 2));
-  pad.appendChild(makeBtn('space', ' ',          2, 2, '10px'));
+  pad.appendChild(makeBtn('↓',     'ArrowDown',  2, 2));
   pad.appendChild(makeBtn('→',     'ArrowRight', 3, 2));
-  pad.appendChild(makeBtn('Z',     'z',          1, 3));
-  pad.appendChild(makeBtn('↓',     'ArrowDown',  2, 3));
-  pad.appendChild(makeBtn('⇧',     'Shift',      3, 3));
 
   document.body.appendChild(pad);
+
+  const aux = document.createElement('div');
+  aux.id = 'mc-aux';
+
+  const esc = makeBtn('esc', 'Escape', null, null, '9px');
+  esc.style.gridColumn = '1 / span 2';
+  esc.style.gridRow = '1';
+  aux.appendChild(esc);
+  aux.appendChild(makeBtn('Z', 'z',     1, 2));
+  aux.appendChild(makeBtn('⇧', 'Shift', 2, 2));
+
+  document.body.appendChild(aux);
 }
