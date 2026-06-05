@@ -2,8 +2,7 @@ const CSS = `
 #mc-pad {
   position: fixed;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 20px;
   display: grid;
   grid-template-columns: repeat(3, 52px);
   grid-template-rows: repeat(3, 52px);
