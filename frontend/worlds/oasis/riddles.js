@@ -5,7 +5,7 @@
 // elements — same as every other dialogue in the game.
 
 import { Flags }           from '../../engine/flags.js';
-import { MobileTextInput } from '../../ui/mobile-text-input.js';
+import { InAppKeyboard } from '../../ui/in-app-keyboard.js';
 
 // ── Riddle pool ───────────────────────────────────────────
 const RIDDLES = [
@@ -91,6 +91,7 @@ export const RiddleManager = (() => {
   let _riddle     = null;
   let _phase      = 'idle';      // 'reading' | 'typing' | 'wrong' | 'correct'
   let _input      = '';
+  let _cursorPos  = 0;
   let _typeLen    = 0;
   let _typeStart  = 0;
   let _respText   = '';
@@ -116,12 +117,18 @@ export const RiddleManager = (() => {
 
   function _openMobileInput() {
     if (navigator.maxTouchPoints > 0) {
-      MobileTextInput.open({
+      _cursorPos = _input.length;
+      InAppKeyboard.open({
         onChar(ch) {
           if (ch === '\b') {
-            _input = _input.slice(0, -1);
-          } else {
-            _input = (_input + ch.toUpperCase()).slice(0, 18);
+            if (_cursorPos > 0) {
+              _input = _input.slice(0, _cursorPos - 1) + _input.slice(_cursorPos);
+              _cursorPos--;
+            }
+          } else if (_input.length < 18) {
+            const upper = ch.toUpperCase();
+            _input = _input.slice(0, _cursorPos) + upper + _input.slice(_cursorPos);
+            _cursorPos++;
           }
         },
         onSubmit() {
@@ -130,9 +137,13 @@ export const RiddleManager = (() => {
         onEscape() {
           _active = false;
           _phase  = 'idle';
-          MobileTextInput.close();
+          InAppKeyboard.close();
           const el = document.getElementById('dlg');
           if (el) el.classList.remove('active');
+        },
+        onCursor(dir) {
+          if (dir === 'left')  _cursorPos = Math.max(0, _cursorPos - 1);
+          if (dir === 'right') _cursorPos = Math.min(_input.length, _cursorPos + 1);
         },
       });
     }
@@ -151,7 +162,7 @@ export const RiddleManager = (() => {
 
   function _submit() {
     const answer = _input.trim().toLowerCase();
-    MobileTextInput.close();
+    InAppKeyboard.close();
     if (_riddle.answers.includes(answer)) {
       _phase     = 'correct';
       _respText  = _riddle.response;
@@ -183,6 +194,7 @@ export const RiddleManager = (() => {
       _active    = true;
       _phase     = 'reading';
       _input     = '';
+      _cursorPos = 0;
       _typeLen   = 0;
       _typeStart = Date.now();
       _respText  = '';
@@ -195,7 +207,7 @@ export const RiddleManager = (() => {
       if (key === 'Escape') {
         _active = false;
         _phase  = 'idle';
-        MobileTextInput.close();
+        InAppKeyboard.close();
         const el = document.getElementById('dlg');
         if (el) el.classList.remove('active');
         return true;
@@ -227,6 +239,7 @@ export const RiddleManager = (() => {
         } else if (key === 'Enter' || key === ' ') {
           _phase     = 'typing';
           _input     = '';
+          _cursorPos = 0;
           _openMobileInput();
         }
         return true;
@@ -293,12 +306,13 @@ export const RiddleManager = (() => {
       // Typing phase: render an answer input row in the choices slot
       if (_phase === 'typing') {
         const cursor = Math.floor(t / 500) % 2 === 0 ? '█' : ' ';
-        // Escape input before injecting into innerHTML
-        const safeInput = _input.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const before = esc(_input.slice(0, _cursorPos));
+        const after  = esc(_input.slice(_cursorPos));
         choicesEl.innerHTML =
           `<div class="dlg-choice" style="margin-top:6px">` +
           `<span style="color:var(--gold-dim)">YOUR ANSWER &rsaquo; </span>` +
-          `<span style="color:var(--gold)">${safeInput}${cursor}</span></div>`;
+          `<span style="color:var(--gold)">${before}${cursor}${after}</span></div>`;
         hintEl.textContent = '[ENTER] SUBMIT     [ESC] LEAVE';
       } else {
         choicesEl.innerHTML = '';
