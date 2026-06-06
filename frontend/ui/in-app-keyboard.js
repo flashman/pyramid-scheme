@@ -279,7 +279,8 @@ export const InAppKeyboard = (() => {
       _mode123.style.display = 'none';
       if (_toggleBtn) _toggleBtn.textContent = '123';
 
-      document.getElementById('in-app-kb').classList.add('active');
+      const kb = document.getElementById('in-app-kb');
+      if (kb) kb.classList.add('active');
       document.getElementById('mc-pad')?.style.setProperty('display', 'none');
       document.getElementById('mc-aux')?.style.setProperty('display', 'none');
     },
@@ -291,7 +292,8 @@ export const InAppKeyboard = (() => {
       _onEscape = null;
       _onCursor = null;
 
-      document.getElementById('in-app-kb').classList.remove('active');
+      const kb = document.getElementById('in-app-kb');
+      if (kb) kb.classList.remove('active');
       const pad = document.getElementById('mc-pad');
       const aux = document.getElementById('mc-aux');
       if (pad) pad.style.display = '';

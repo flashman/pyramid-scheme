@@ -223,11 +223,13 @@ export const RiddleManager = (() => {
       if (_phase === 'typing') {
         if (key === 'Backspace') {
           _input = _input.slice(0, -1);
+          _cursorPos = _input.length;
         } else if (key === 'Enter') {
           if (_input.trim().length > 0) _submit();
         } else if (key.length === 1 && _input.length < 18) {
           // Accept letters, numbers, hyphens
           _input += key.toUpperCase();
+          _cursorPos = _input.length;
         }
         return true;
       }
