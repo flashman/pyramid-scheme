@@ -1,4 +1,5 @@
 import { MobileTextInput } from './mobile-text-input.js';
+import { InAppKeyboard } from './in-app-keyboard.js';
 
 const CSS = `
 #mc-pad {
@@ -99,4 +100,5 @@ export function initMobileControls() {
   document.body.appendChild(aux);
 
   MobileTextInput.init();
+  InAppKeyboard.init();
 }
