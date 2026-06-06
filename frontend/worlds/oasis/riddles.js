@@ -114,6 +114,30 @@ export const RiddleManager = (() => {
     return _typeLen >= _currentText().length;
   }
 
+  function _openMobileInput() {
+    if (navigator.maxTouchPoints > 0) {
+      MobileTextInput.open({
+        onChar(ch) {
+          if (ch === '\b') {
+            _input = _input.slice(0, -1);
+          } else if (_input.length < 18) {
+            _input += ch.toUpperCase();
+          }
+        },
+        onSubmit() {
+          if (_input.trim().length > 0) _submit();
+        },
+        onEscape() {
+          _active = false;
+          _phase  = 'idle';
+          MobileTextInput.close();
+          const el = document.getElementById('dlg');
+          if (el) el.classList.remove('active');
+        },
+      });
+    }
+  }
+
   function _skipOrAdvance() {
     if (!_typewriterDone()) {
       _typeLen = _currentText().length;
@@ -121,27 +145,7 @@ export const RiddleManager = (() => {
       _phase    = 'typing';
       _input    = '';
       _attempts = 0;
-      if (navigator.maxTouchPoints > 0) {
-        MobileTextInput.open({
-          onChar(ch) {
-            if (ch === '\b') {
-              _input = _input.slice(0, -1);
-            } else if (_input.length < 18) {
-              _input += ch.toUpperCase();
-            }
-          },
-          onSubmit() {
-            if (_input.trim().length > 0) _submit();
-          },
-          onEscape() {
-            _active = false;
-            _phase  = 'idle';
-            MobileTextInput.close();
-            const el = document.getElementById('dlg');
-            if (el) el.classList.remove('active');
-          },
-        });
-      }
+      _openMobileInput();
     }
   }
 
@@ -223,6 +227,7 @@ export const RiddleManager = (() => {
         } else if (key === 'Enter' || key === ' ') {
           _phase     = 'typing';
           _input     = '';
+          _openMobileInput();
         }
         return true;
       }
