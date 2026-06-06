@@ -4,7 +4,8 @@
 // Uses the shared #dlg / #dlg-speaker / #dlg-text / #dlg-choices / #dlg-hint
 // elements — same as every other dialogue in the game.
 
-import { Flags } from '../../engine/flags.js';
+import { Flags }           from '../../engine/flags.js';
+import { MobileTextInput } from '../../ui/mobile-text-input.js';
 
 // ── Riddle pool ───────────────────────────────────────────
 const RIDDLES = [
@@ -120,11 +121,33 @@ export const RiddleManager = (() => {
       _phase    = 'typing';
       _input    = '';
       _attempts = 0;
+      if (navigator.maxTouchPoints > 0) {
+        MobileTextInput.open({
+          onChar(ch) {
+            if (ch === '\b') {
+              _input = _input.slice(0, -1);
+            } else if (_input.length < 18) {
+              _input += ch.toUpperCase();
+            }
+          },
+          onSubmit() {
+            if (_input.trim().length > 0) _submit();
+          },
+          onEscape() {
+            _active = false;
+            _phase  = 'idle';
+            MobileTextInput.close();
+            const el = document.getElementById('dlg');
+            if (el) el.classList.remove('active');
+          },
+        });
+      }
     }
   }
 
   function _submit() {
     const answer = _input.trim().toLowerCase();
+    MobileTextInput.close();
     if (_riddle.answers.includes(answer)) {
       _phase     = 'correct';
       _respText  = _riddle.response;
@@ -168,6 +191,7 @@ export const RiddleManager = (() => {
       if (key === 'Escape') {
         _active = false;
         _phase  = 'idle';
+        MobileTextInput.close();
         const el = document.getElementById('dlg');
         if (el) el.classList.remove('active');
         return true;
