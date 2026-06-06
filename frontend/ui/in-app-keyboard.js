@@ -5,42 +5,44 @@
 
 const CSS = `
 #in-app-kb {
-  display: none;
   width: 780px;
   background: #0a0500;
   border: 4px solid #8a6a20;
   border-top: 2px solid #5a3a08;
-  padding: 10px 10px 14px;
   box-sizing: border-box;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.38s cubic-bezier(0.16, 1, 0.3, 1);
 }
-#in-app-kb.active { display: block; }
+#in-app-kb.active { max-height: 640px; }
 .kb-inner {
-  width: 676px;
+  width: 736px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  padding: 10px 0 14px;
 }
 .kb-row {
   display: flex;
   gap: 4px;
 }
-.kb-row.row-z { margin-left: 30px; }
+.kb-row.row-z { margin-left: 34px; }
 .kb-key {
   background: rgba(10,5,0,0.9);
   border: 1.5px solid #8a6a20;
-  border-radius: 4px;
+  border-radius: 5px;
   color: #f0c020;
   font-family: monospace;
-  height: 44px;
-  width: 64px;
+  height: 70px;
+  width: 70px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  font-size: 14px;
+  font-size: 18px;
   flex-shrink: 0;
   touch-action: none;
   box-sizing: border-box;
@@ -49,49 +51,49 @@ const CSS = `
   background: rgba(25,12,0,0.9);
   border-color: #b07830;
   color: #ffcc40;
-  font-size: 11px;
+  font-size: 13px;
 }
 .kb-key.kb-del {
   flex: 1;
   width: auto;
-  font-size: 11px;
+  font-size: 13px;
   background: rgba(25,12,0,0.9);
   border-color: #b07830;
   color: #ffcc40;
 }
 .kb-key.kb-esc {
-  width: 60px;
+  width: 70px;
   background: rgba(20,5,0,0.9);
   border-color: #8a3010;
   color: #d06030;
-  font-size: 11px;
+  font-size: 13px;
 }
 .kb-key.kb-enter {
-  width: 88px;
+  width: 100px;
   background: rgba(5,20,0,0.9);
   border-color: #207840;
   color: #40c060;
-  font-size: 11px;
+  font-size: 13px;
 }
 .kb-key.kb-toggle {
-  width: 68px;
+  width: 84px;
   background: rgba(20,15,5,0.9);
   border-color: #a08030;
   color: #e0c060;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: bold;
 }
 .kb-key.kb-space {
   flex: 1;
   width: auto;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 3px;
 }
 .kb-key.kb-arrow {
-  width: 52px;
-  font-size: 16px;
+  width: 70px;
+  font-size: 20px;
 }
-.kb-sep { width: 14px; flex-shrink: 0; }
+.kb-sep { width: 16px; flex-shrink: 0; }
 `;
 
 export const InAppKeyboard = (() => {
