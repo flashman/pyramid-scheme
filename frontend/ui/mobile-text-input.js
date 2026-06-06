@@ -39,7 +39,7 @@ export const MobileTextInput = (() => {
 
   function _makeBtn(label, col, row, spanCols, fontSize) {
     const btn = document.createElement('div');
-    btn.className = 'mc-btn';
+    btn.className = 'mc-btn'; // .mc-btn styling is defined in mobile-controls.js (shared)
     btn.textContent = label;
     btn.style.gridColumn = spanCols ? `${col} / span ${spanCols}` : String(col);
     btn.style.gridRow = String(row);
