@@ -104,7 +104,7 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 #dlg.active{display:block}
 #dlg-speaker{color:var(--gold);font-size:7px;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid var(--amber-dark)}
 #dlg-text{color:#e8c878;font-size:6px;line-height:1.9;min-height:52px;white-space:pre-wrap}
-#dlg-choices{margin-top:8px;min-height:20px}
+#dlg-choices{margin-top:8px;min-height:28px}
 .dlg-choice{color:var(--tan);font-size:6px;line-height:2;cursor:default;white-space:pre}
 .dlg-choice.sel{color:var(--gold)}
-#dlg-hint{color:var(--gold-dim);font-size:5px;text-align:right;margin-top:4px;min-height:7px}
+#dlg-hint{color:var(--gold-dim);font-size:5px;text-align:right;margin-top:4px;min-height:14px}

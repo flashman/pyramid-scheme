@@ -22,7 +22,7 @@ const CSS = `
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   padding: 10px 0 14px;
 }
 .kb-row {

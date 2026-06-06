@@ -97,7 +97,47 @@ export const RiddleManager = (() => {
   let _respText   = '';
   let _attempts   = 0;
   const _used     = new Set();
+
+  // Stable DOM refs for the answer row — created once per typing phase,
+  // then updated via textContent only (avoids full innerHTML reflow every frame)
+  let _answerBeforeEl = null;
+  let _answerCursorEl = null;
+  let _answerAfterEl  = null;
   const TYPE_MS   = 36;          // ms per character
+
+  function _buildAnswerRow() {
+    const choicesEl = document.getElementById('dlg-choices');
+    if (!choicesEl || _answerBeforeEl) return;
+
+    const row = document.createElement('div');
+    row.className = 'dlg-choice';
+    row.style.paddingTop = '6px';
+
+    const label = document.createElement('span');
+    label.style.color = 'var(--gold-dim)';
+    label.textContent = 'YOUR ANSWER › ';
+
+    _answerBeforeEl = document.createElement('span');
+    _answerBeforeEl.style.color = 'var(--gold)';
+
+    _answerCursorEl = document.createElement('span');
+    _answerCursorEl.style.color = 'var(--gold)';
+
+    _answerAfterEl = document.createElement('span');
+    _answerAfterEl.style.color = 'var(--gold)';
+
+    row.appendChild(label);
+    row.appendChild(_answerBeforeEl);
+    row.appendChild(_answerCursorEl);
+    row.appendChild(_answerAfterEl);
+    choicesEl.appendChild(row);
+  }
+
+  function _destroyAnswerRow() {
+    const choicesEl = document.getElementById('dlg-choices');
+    if (choicesEl) choicesEl.innerHTML = '';
+    _answerBeforeEl = _answerCursorEl = _answerAfterEl = null;
+  }
 
   function _pick() {
     let pool = RIDDLES.filter(r => !_used.has(r.id));
@@ -199,6 +239,7 @@ export const RiddleManager = (() => {
       _typeStart = Date.now();
       _respText  = '';
       _attempts  = 0;
+      _answerBeforeEl = _answerCursorEl = _answerAfterEl = null;
     },
 
     onKeyDown(key) {
@@ -305,19 +346,18 @@ export const RiddleManager = (() => {
         : _currentText().substring(0, _typeLen);
       textEl.textContent = displayText;
 
-      // Typing phase: render an answer input row in the choices slot
+      // Typing phase: answer input row, built once then updated via textContent
       if (_phase === 'typing') {
-        const cursor = Math.floor(t / 500) % 2 === 0 ? '█' : ' ';
-        const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        const before = esc(_input.slice(0, _cursorPos));
-        const after  = esc(_input.slice(_cursorPos));
-        choicesEl.innerHTML =
-          `<div class="dlg-choice" style="margin-top:6px">` +
-          `<span style="color:var(--gold-dim)">YOUR ANSWER &rsaquo; </span>` +
-          `<span style="color:var(--gold)">${before}${cursor}${after}</span></div>`;
+        _buildAnswerRow();
+        if (_answerBeforeEl) {
+          const cursor = Math.floor(t / 500) % 2 === 0 ? '|' : ' ';
+          _answerBeforeEl.textContent = _input.slice(0, _cursorPos);
+          _answerCursorEl.textContent = cursor;
+          _answerAfterEl.textContent  = _input.slice(_cursorPos);
+        }
         hintEl.textContent = '[ENTER] SUBMIT     [ESC] LEAVE';
       } else {
-        choicesEl.innerHTML = '';
+        if (_answerBeforeEl) _destroyAnswerRow();
         const done = _typewriterDone();
         if (!done) {
           hintEl.textContent = '';
