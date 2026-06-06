@@ -138,6 +138,7 @@ export const InAppKeyboard = (() => {
 
   function _buildAbcRows() {
     const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px';
 
     // Q–P row
     const qRow = document.createElement('div');
@@ -167,6 +168,7 @@ export const InAppKeyboard = (() => {
 
   function _build123Rows() {
     const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px';
 
     // 1–0 row
     const numRow = document.createElement('div');
