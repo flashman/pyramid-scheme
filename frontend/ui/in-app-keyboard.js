@@ -18,7 +18,7 @@ const CSS = `
   border-top: 2px solid #5a3a08;
 }
 .kb-inner {
-  width: 736px;
+  width: 760px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -29,7 +29,8 @@ const CSS = `
   display: flex;
   gap: 4px;
 }
-.kb-row.row-z { margin-left: 34px; }
+.kb-row.row-a { margin-left: 20px; }
+.kb-row.row-z { margin-left: 40px; }
 .kb-key {
   background: rgba(10,5,0,0.9);
   border: 1.5px solid #8a6a20;
@@ -146,7 +147,7 @@ export const InAppKeyboard = (() => {
 
     // A–L row + DEL (fills remaining width)
     const aRow = document.createElement('div');
-    aRow.className = 'kb-row';
+    aRow.className = 'kb-row row-a';
     for (const ch of 'ASDFGHJKL') aRow.appendChild(_charKey(ch));
     const del1 = _key('⌫ DEL', 'kb-del');
     _touchKey(del1, () => _onChar?.('\b'));
@@ -175,7 +176,7 @@ export const InAppKeyboard = (() => {
 
     // Symbols row 1 + DEL
     const sym1Row = document.createElement('div');
-    sym1Row.className = 'kb-row';
+    sym1Row.className = 'kb-row row-a';
     for (const ch of ['-', '/', ':', ';', '(', ')', '$', '&', '@']) {
       sym1Row.appendChild(_charKey(ch));
     }
