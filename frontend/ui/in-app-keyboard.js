@@ -6,15 +6,17 @@
 const CSS = `
 #in-app-kb {
   width: 780px;
-  background: #0a0500;
-  border: 4px solid #8a6a20;
-  border-top: 2px solid #5a3a08;
   box-sizing: border-box;
   overflow: hidden;
   max-height: 0;
   transition: max-height 0.38s cubic-bezier(0.16, 1, 0.3, 1);
 }
-#in-app-kb.active { max-height: 640px; }
+#in-app-kb.active {
+  max-height: 640px;
+  background: #0a0500;
+  border: 4px solid #8a6a20;
+  border-top: 2px solid #5a3a08;
+}
 .kb-inner {
   width: 736px;
   margin: 0 auto;
