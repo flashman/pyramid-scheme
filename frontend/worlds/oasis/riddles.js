@@ -120,8 +120,8 @@ export const RiddleManager = (() => {
         onChar(ch) {
           if (ch === '\b') {
             _input = _input.slice(0, -1);
-          } else if (_input.length < 18) {
-            _input += ch.toUpperCase();
+          } else {
+            _input = (_input + ch.toUpperCase()).slice(0, 18);
           }
         },
         onSubmit() {
