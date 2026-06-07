@@ -122,6 +122,8 @@ export const RiddleManager = (() => {
 
     _answerCursorEl = document.createElement('span');
     _answerCursorEl.style.color = 'var(--gold)';
+    _answerCursorEl.textContent = '█';
+    _answerCursorEl.className = 'kb-cursor';
 
     _answerAfterEl = document.createElement('span');
     _answerAfterEl.style.color = 'var(--gold)';
@@ -239,7 +241,7 @@ export const RiddleManager = (() => {
       _typeStart = Date.now();
       _respText  = '';
       _attempts  = 0;
-      _answerBeforeEl = _answerCursorEl = _answerAfterEl = null;
+      _destroyAnswerRow();
     },
 
     onKeyDown(key) {
@@ -350,9 +352,7 @@ export const RiddleManager = (() => {
       if (_phase === 'typing') {
         _buildAnswerRow();
         if (_answerBeforeEl) {
-          const cursor = Math.floor(t / 500) % 2 === 0 ? '|' : ' ';
           _answerBeforeEl.textContent = _input.slice(0, _cursorPos);
-          _answerCursorEl.textContent = cursor;
           _answerAfterEl.textContent  = _input.slice(_cursorPos);
         }
         hintEl.textContent = '[ENTER] SUBMIT     [ESC] LEAVE';
@@ -362,11 +362,11 @@ export const RiddleManager = (() => {
         if (!done) {
           hintEl.textContent = '';
         } else if (_phase === 'reading') {
-          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '▼ SPACE — ANSWER THE RIDDLE' : '';
+          hintEl.textContent = '▼ SPACE — ANSWER THE RIDDLE';
         } else if (_phase === 'wrong') {
-          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '[ENTER] TRY AGAIN     [ESC] LEAVE' : '';
+          hintEl.textContent = '[ENTER] TRY AGAIN     [ESC] LEAVE';
         } else if (_phase === 'correct') {
-          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '▼ SPACE / ENTER' : '';
+          hintEl.textContent = '▼ SPACE / ENTER';
         }
       }
     },

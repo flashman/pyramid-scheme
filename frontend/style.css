@@ -108,3 +108,5 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 .dlg-choice{color:var(--tan);font-size:6px;line-height:2;cursor:default;white-space:pre}
 .dlg-choice.sel{color:var(--gold)}
 #dlg-hint{color:var(--gold-dim);font-size:5px;text-align:right;margin-top:4px;min-height:14px}
+.kb-cursor{animation:kb-cursor-blink 1s step-end infinite}
+@keyframes kb-cursor-blink{0%,100%{opacity:1}50%{opacity:0}}

@@ -6,7 +6,6 @@
 const CSS = `
 #in-app-kb {
   width: 780px;
-  box-sizing: border-box;
   overflow: hidden;
   max-height: 0;
   transition: max-height 0.38s cubic-bezier(0.16, 1, 0.3, 1);
@@ -14,17 +13,18 @@ const CSS = `
 #in-app-kb.active {
   max-height: 640px;
   background: #0a0500;
-  border: 4px solid #8a6a20;
-  border-top: 2px solid #5a3a08;
 }
 .kb-inner {
-  width: 760px;
-  margin: 0 auto;
+  width: 780px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 0 14px;
+  padding: 10px 14px 14px;
+  border: 4px solid #8a6a20;
+  border-top: 2px solid #5a3a08;
 }
+.kb-action-row { margin-top: 4px; }
 .kb-row {
   display: flex;
   gap: 4px;
@@ -138,7 +138,7 @@ export const InAppKeyboard = (() => {
 
   function _buildAbcRows() {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:8px';
 
     // Q–P row
     const qRow = document.createElement('div');
@@ -168,7 +168,7 @@ export const InAppKeyboard = (() => {
 
   function _build123Rows() {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:8px';
 
     // 1–0 row
     const numRow = document.createElement('div');
@@ -211,7 +211,7 @@ export const InAppKeyboard = (() => {
 
   function _buildActionRow() {
     const row = document.createElement('div');
-    row.className = 'kb-row';
+    row.className = 'kb-row kb-action-row';
 
     const escBtn = _key('ESC', 'kb-esc');
     _touchKey(escBtn, () => _onEscape?.());
