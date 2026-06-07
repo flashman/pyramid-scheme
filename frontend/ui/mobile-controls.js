@@ -1,3 +1,6 @@
+import { MobileTextInput } from './mobile-text-input.js';
+import { InAppKeyboard } from './in-app-keyboard.js';
+
 const CSS = `
 #mc-pad {
   position: fixed;
@@ -55,7 +58,11 @@ function makeBtn(label, key, col, row, fontSize) {
   btn.style.gridRow = row;
   if (fontSize) btn.style.fontSize = fontSize;
 
-  btn.addEventListener('touchstart', e => { e.preventDefault(); fireKey('keydown', key); }, { passive: false });
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    fireKey('keydown', key);
+    MobileTextInput.syncFocus();
+  }, { passive: false });
   btn.addEventListener('touchend',   e => { e.preventDefault(); fireKey('keyup',   key); }, { passive: false });
   btn.addEventListener('touchcancel',e => { e.preventDefault(); fireKey('keyup',   key); }, { passive: false });
 
@@ -91,4 +98,7 @@ export function initMobileControls() {
   aux.appendChild(makeBtn('⇧', 'Shift', 2, 2));
 
   document.body.appendChild(aux);
+
+  MobileTextInput.init();
+  InAppKeyboard.init();
 }

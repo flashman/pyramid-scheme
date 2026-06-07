@@ -4,7 +4,8 @@
 // Uses the shared #dlg / #dlg-speaker / #dlg-text / #dlg-choices / #dlg-hint
 // elements — same as every other dialogue in the game.
 
-import { Flags } from '../../engine/flags.js';
+import { Flags }           from '../../engine/flags.js';
+import { InAppKeyboard } from '../../ui/in-app-keyboard.js';
 
 // ── Riddle pool ───────────────────────────────────────────
 const RIDDLES = [
@@ -90,12 +91,55 @@ export const RiddleManager = (() => {
   let _riddle     = null;
   let _phase      = 'idle';      // 'reading' | 'typing' | 'wrong' | 'correct'
   let _input      = '';
+  let _cursorPos  = 0;
   let _typeLen    = 0;
   let _typeStart  = 0;
   let _respText   = '';
   let _attempts   = 0;
   const _used     = new Set();
+
+  // Stable DOM refs for the answer row — created once per typing phase,
+  // then updated via textContent only (avoids full innerHTML reflow every frame)
+  let _answerBeforeEl = null;
+  let _answerCursorEl = null;
+  let _answerAfterEl  = null;
   const TYPE_MS   = 36;          // ms per character
+
+  function _buildAnswerRow() {
+    const choicesEl = document.getElementById('dlg-choices');
+    if (!choicesEl || _answerBeforeEl) return;
+
+    const row = document.createElement('div');
+    row.className = 'dlg-choice';
+    row.style.paddingTop = '6px';
+
+    const label = document.createElement('span');
+    label.style.color = 'var(--gold-dim)';
+    label.textContent = 'YOUR ANSWER › ';
+
+    _answerBeforeEl = document.createElement('span');
+    _answerBeforeEl.style.color = 'var(--gold)';
+
+    _answerCursorEl = document.createElement('span');
+    _answerCursorEl.style.color = 'var(--gold)';
+    _answerCursorEl.textContent = '█';
+    _answerCursorEl.className = 'kb-cursor';
+
+    _answerAfterEl = document.createElement('span');
+    _answerAfterEl.style.color = 'var(--gold)';
+
+    row.appendChild(label);
+    row.appendChild(_answerBeforeEl);
+    row.appendChild(_answerCursorEl);
+    row.appendChild(_answerAfterEl);
+    choicesEl.appendChild(row);
+  }
+
+  function _destroyAnswerRow() {
+    const choicesEl = document.getElementById('dlg-choices');
+    if (choicesEl) choicesEl.innerHTML = '';
+    _answerBeforeEl = _answerCursorEl = _answerAfterEl = null;
+  }
 
   function _pick() {
     let pool = RIDDLES.filter(r => !_used.has(r.id));
@@ -113,6 +157,40 @@ export const RiddleManager = (() => {
     return _typeLen >= _currentText().length;
   }
 
+  function _openMobileInput() {
+    if (navigator.maxTouchPoints > 0) {
+      _cursorPos = _input.length;
+      InAppKeyboard.open({
+        onChar(ch) {
+          if (ch === '\b') {
+            if (_cursorPos > 0) {
+              _input = _input.slice(0, _cursorPos - 1) + _input.slice(_cursorPos);
+              _cursorPos--;
+            }
+          } else if (_input.length < 18) {
+            const upper = ch.toUpperCase();
+            _input = _input.slice(0, _cursorPos) + upper + _input.slice(_cursorPos);
+            _cursorPos++;
+          }
+        },
+        onSubmit() {
+          if (_input.trim().length > 0) _submit();
+        },
+        onEscape() {
+          _active = false;
+          _phase  = 'idle';
+          InAppKeyboard.close();
+          const el = document.getElementById('dlg');
+          if (el) el.classList.remove('active');
+        },
+        onCursor(dir) {
+          if (dir === 'left')  _cursorPos = Math.max(0, _cursorPos - 1);
+          if (dir === 'right') _cursorPos = Math.min(_input.length, _cursorPos + 1);
+        },
+      });
+    }
+  }
+
   function _skipOrAdvance() {
     if (!_typewriterDone()) {
       _typeLen = _currentText().length;
@@ -120,11 +198,13 @@ export const RiddleManager = (() => {
       _phase    = 'typing';
       _input    = '';
       _attempts = 0;
+      _openMobileInput();
     }
   }
 
   function _submit() {
     const answer = _input.trim().toLowerCase();
+    InAppKeyboard.close();
     if (_riddle.answers.includes(answer)) {
       _phase     = 'correct';
       _respText  = _riddle.response;
@@ -156,10 +236,12 @@ export const RiddleManager = (() => {
       _active    = true;
       _phase     = 'reading';
       _input     = '';
+      _cursorPos = 0;
       _typeLen   = 0;
       _typeStart = Date.now();
       _respText  = '';
       _attempts  = 0;
+      _destroyAnswerRow();
     },
 
     onKeyDown(key) {
@@ -168,6 +250,7 @@ export const RiddleManager = (() => {
       if (key === 'Escape') {
         _active = false;
         _phase  = 'idle';
+        InAppKeyboard.close();
         const el = document.getElementById('dlg');
         if (el) el.classList.remove('active');
         return true;
@@ -183,11 +266,13 @@ export const RiddleManager = (() => {
       if (_phase === 'typing') {
         if (key === 'Backspace') {
           _input = _input.slice(0, -1);
+          _cursorPos = _input.length;
         } else if (key === 'Enter') {
           if (_input.trim().length > 0) _submit();
         } else if (key.length === 1 && _input.length < 18) {
           // Accept letters, numbers, hyphens
           _input += key.toUpperCase();
+          _cursorPos = _input.length;
         }
         return true;
       }
@@ -199,6 +284,8 @@ export const RiddleManager = (() => {
         } else if (key === 'Enter' || key === ' ') {
           _phase     = 'typing';
           _input     = '';
+          _cursorPos = 0;
+          _openMobileInput();
         }
         return true;
       }
@@ -261,27 +348,25 @@ export const RiddleManager = (() => {
         : _currentText().substring(0, _typeLen);
       textEl.textContent = displayText;
 
-      // Typing phase: render an answer input row in the choices slot
+      // Typing phase: answer input row, built once then updated via textContent
       if (_phase === 'typing') {
-        const cursor = Math.floor(t / 500) % 2 === 0 ? '█' : ' ';
-        // Escape input before injecting into innerHTML
-        const safeInput = _input.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        choicesEl.innerHTML =
-          `<div class="dlg-choice" style="margin-top:6px">` +
-          `<span style="color:var(--gold-dim)">YOUR ANSWER &rsaquo; </span>` +
-          `<span style="color:var(--gold)">${safeInput}${cursor}</span></div>`;
+        _buildAnswerRow();
+        if (_answerBeforeEl) {
+          _answerBeforeEl.textContent = _input.slice(0, _cursorPos);
+          _answerAfterEl.textContent  = _input.slice(_cursorPos);
+        }
         hintEl.textContent = '[ENTER] SUBMIT     [ESC] LEAVE';
       } else {
-        choicesEl.innerHTML = '';
+        if (_answerBeforeEl) _destroyAnswerRow();
         const done = _typewriterDone();
         if (!done) {
           hintEl.textContent = '';
         } else if (_phase === 'reading') {
-          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '▼ SPACE — ANSWER THE RIDDLE' : '';
+          hintEl.textContent = '▼ SPACE — ANSWER THE RIDDLE';
         } else if (_phase === 'wrong') {
-          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '[ENTER] TRY AGAIN     [ESC] LEAVE' : '';
+          hintEl.textContent = '[ENTER] TRY AGAIN     [ESC] LEAVE';
         } else if (_phase === 'correct') {
-          hintEl.textContent = Math.floor(t / 500) % 2 === 0 ? '▼ SPACE / ENTER' : '';
+          hintEl.textContent = '▼ SPACE / ENTER';
         }
       }
     },
