@@ -1,6 +1,5 @@
 *The following project is for educational and artistic purposes only.  It is generated almost
-entirely by Claude (Sonnet 4.5+, extended, free-tier) as a personal experiment in agentic software
-development. User discretion is advised.*
+entirely by Claude  as a personal experiment in agentic software development.*
 
 # ⚡ PYRAMID SCHEME™
 
@@ -10,12 +9,6 @@ development. User discretion is advised.*
 
 This project is currently under active development. Some features may not work as expected, and
 documentation may be incomplete.
-
----
-
-## Preview
-
-An early _static_ version of the game is available [here](https://claude.ai/public/artifacts/aa812c14-6458-4591-8fcf-d084fb2ebd7d). 
 
 ---
 
