@@ -87,12 +87,20 @@ const CSS = `
   letter-spacing: 0.5px;
 }
 
-#auth-demo {
-  margin-top: 12px; text-align: center;
-  font-size: 6px; color: #3a2800; cursor: pointer;
-  letter-spacing: 1px;
+#auth-guest-wrap {
+  margin-top: 16px; text-align: center;
+  border-top: 1px solid #2a1800;
+  padding-top: 14px;
 }
-#auth-demo:hover { color: #6a4020; }
+#auth-demo {
+  font-size: 6px; color: #8a6a20; cursor: pointer;
+  letter-spacing: 1px; margin-bottom: 6px;
+}
+#auth-demo:hover { color: #c0a060; }
+#auth-dream {
+  font-size: 5px; color: #6a4820;
+  letter-spacing: 1px; line-height: 2;
+}
 
 /* ── Terms of Use modal ─────────────────────────────── */
 #tos-overlay {
@@ -218,7 +226,11 @@ const HTML = `
     </div>
     <button id="auth-submit">► ENTER THE DESERT</button>
     <div id="auth-error"></div>
-    <div id="auth-demo">[ play as guest — no account needed ]</div>
+    <div id="auth-guest-wrap">
+
+      <div id="auth-demo">play as guest — no account needed</div>
+      <div id="auth-dream">no coin is real, no scroll is sent<br>we are but a dream of the gods.</div>
+    </div>
   </div>
 </div>
 `;

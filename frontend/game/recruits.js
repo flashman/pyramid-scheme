@@ -10,8 +10,7 @@ import { COL }                                            from '../engine/colors
 import { Flags, QuestManager }                            from '../engine/flags.js';
 import { Events }                                         from '../engine/events.js';
 import { getTier, pickName, nextId }                      from './tiers.js';
-import { showModal }                                      from '../ui/modal.js';
-import { showPrompt }                                     from '../ui/modal.js';
+import { showModal, showPrompt, showBuyInDialog }         from '../ui/modal.js';
 import { updateStats, updateSlots, addFriendUI, log, updateInvitePanel } from '../ui/panels.js';
 import { CW }                                             from '../engine/canvas.js';
 import { Api }                                            from './api.js';
@@ -222,8 +221,12 @@ export function recruitFriend() {
     });
 }
 
-export function buyIn() {
+export async function buyIn() {
   if (G.bought && G.invitesLeft > 0) { showModal('ALREADY IN!', 'Keep recruiting, Pharaoh!'); return; }
+
+  const confirmed = await showBuyInDialog(!Api.hasToken());
+  if (!confirmed) return;
+
   const rebuy = G.bought;
   G.bought = true; G.invested += getCFG().entryFee; G.invitesLeft = 4;
   if (!rebuy) {
