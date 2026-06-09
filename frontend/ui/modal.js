@@ -146,7 +146,7 @@ export function showPrompt(title, body, placeholder = '') {
 // Auth path:   stripe placeholder, confirms before Api.buyIn()
 
 import { PAYMENT_QR_DATA }        from '../game/payment.js';
-import { drawQR, decodeQRString } from './qr.js';
+import { drawQR, decodeQRString, randomQRMatrix } from './qr.js';
 
 let _buyInResolve = null;
 
@@ -235,13 +235,9 @@ export function showBuyInDialog(isGuest) {
       'THE PYRAMID HUNGERS.\n\nScan the Sacred Glyph™\nand sacrifice to the gods:';
     document.getElementById('bi-sub').textContent   =
       '— or just press confirm —\nThe Pharaoh is patient.\nAll debts settle\nin the next life.\n\n★ TOTALLY LEGAL ™ ★';
-    const matrix = decodeQRString(PAYMENT_QR_DATA);
-    if (matrix) {
-      qr.style.display = 'block';
-      setTimeout(() => drawQR(qr, matrix), 10);
-    } else {
-      qr.style.display = 'none';
-    }
+    const matrix = decodeQRString(PAYMENT_QR_DATA) ?? randomQRMatrix();
+    qr.style.display = 'block';
+    setTimeout(() => drawQR(qr, matrix), 10);
   } else {
     document.getElementById('bi-ok').textContent    = 'CONFIRM ►';
     document.getElementById('bi-title').textContent = '💰 CONFIRM BUY-IN';

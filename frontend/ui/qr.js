@@ -23,6 +23,13 @@ export function decodeQRString(str) {
   );
 }
 
+/** Generate a random QR-sized noise matrix (for placeholder/fallback display). */
+export function randomQRMatrix(size = 41) {
+  return Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => Math.random() < 0.5 ? 1 : 0)
+  );
+}
+
 /** Draw a 2D matrix onto an existing canvas element. */
 export function drawQR(canvas, matrix) {
   const size = matrix.length;
