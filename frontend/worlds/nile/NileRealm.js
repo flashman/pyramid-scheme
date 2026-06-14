@@ -77,6 +77,9 @@ export class NileRealm extends PhysicsRealm {
   onExit() { G.shake = 4; }
 
   update(ts) {
+    // INVARIANT: the current applies iff pZ === -1 (every frame, no jump on the
+    // river), so the river is strictly one-way; the pZ 0 towpath is continuous
+    // end-to-end and current-free — the guaranteed two-way return path.
     if (RealmManager.isTransitioning || DialogueManager.isActive()) return;
 
     const dx = inputDx(SPEED);
