@@ -11,14 +11,17 @@ import { log }                            from '../../ui/panels.js';
 import { nileTransRender }                from '../transitions.js';
 import {
   NILE_W, TOWPATH_Y, RIVER_FLOOR, CURRENT_SPD,
-  NILE_ENTRY_X, NILE_RETURN_X, NILE_GATE_X,
+  NILE_ENTRY_X, NILE_RETURN_X,
 } from './constants.js';
 import { drawNile } from './draw/nile.js';
 
 export class NileRealm extends PhysicsRealm {
   constructor() {
     super('nile', 'THE NILE', {
-      gravity: 0.5, worldW: NILE_W, floor: TOWPATH_Y, maxFallSpeed: 14,
+      gravity:      0.5,
+      worldW:       NILE_W,
+      floor:        TOWPATH_Y,
+      maxFallSpeed: 14,
     });
 
     this.registry = new InteractableRegistry();
@@ -36,7 +39,7 @@ export class NileRealm extends PhysicsRealm {
     PortalRegistry.register({
       from: 'world', to: 'nile',
       key: 'ArrowUp', trigger: 'nile-gate',
-      condition:  () => G.bought && G.px < NILE_GATE_X,
+      condition:  () => G.bought,
       onUse:      () => { G.shake = 6; },
       transition: nileTransRender, duration: 1100,
     });
@@ -87,6 +90,7 @@ export class NileRealm extends PhysicsRealm {
       // ── River: flat plane + one-way westward current (every frame). ──
       G.py = RIVER_FLOOR; G.pvy = 0;
       G.px = this._clampX(G.px - CURRENT_SPD, SPDHALF);
+      G.pmoving = true;   // current counts as motion for the walk animation
     }
 
     if (G.pmoving && ts - G.legT > 120) { G.legT = ts; G.pframe = 1 - G.pframe; }
@@ -110,7 +114,7 @@ export class NileRealm extends PhysicsRealm {
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
 
     // ↓ : towpath → river.
-    if (key === 'ArrowDown' && G.pZ === 0) { G.pZ = -1; G.py = RIVER_FLOOR; G.pvy = 0; return true; }
+    if (key === 'ArrowDown' && G.pZ === 0) { G.pZ = -1; G.py = RIVER_FLOOR; G.pvy = 0; return true; } // instant snap onto the river plane (only a ~42px drop)
 
     // ↑ : portal first (return gate from towpath); else river → towpath.
     if (key === 'ArrowUp') {

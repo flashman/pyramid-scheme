@@ -5,6 +5,7 @@ import { drawRealmPharaoh } from '../../../draw/pharaoh.js';
 import { TOWPATH_Y, RIVER_FLOOR, NILE_W } from '../constants.js';
 
 export function drawNile(realm) {
+  // screen-space sky (drawn before camera translate)
   // Dusk sky (west bank = setting sun = death).
   const g = X.createLinearGradient(0, 0, 0, CH);
   g.addColorStop(0, '#e8a23c');
