@@ -11,6 +11,7 @@ import { COL }                            from '../../engine/colors.js';
 import { GND, WORLD_W, Z_LAYERS }         from './constants.js';
 import { SPEED, SPDHALF, LH, inputDx }   from '../constants.js';
 import { OASIS_ENTRY_X }                  from '../oasis/constants.js';
+import { NILE_GATE_X }                    from '../nile/constants.js';
 import { oasisTransRender, launchTransRender } from '../transitions.js';
 import { PortalRegistry }                      from '../../engine/portal.js';
 import { spawnParts }                     from '../../draw/utils.js';
@@ -55,6 +56,14 @@ export class WorldRealm extends PhysicsRealm {
       condition: () => G.pZ === 0,
       hint:      '[↑] ENTER THE OASIS',
       onEnter:   () => log('The east wind pulls you forward.', ''),
+    }));
+
+    this.triggers.add(new TriggerZone('nile-gate', {
+      x1:        0,
+      x2:        NILE_GATE_X,
+      condition: () => G.pZ === 0,
+      hint:      '[↑] FOLLOW THE RIVER WEST',
+      onEnter:   () => log('A damp wind comes off the water to the west.', ''),
     }));
 
     // Crypt door and capstone-ascend zones are registered lazily in

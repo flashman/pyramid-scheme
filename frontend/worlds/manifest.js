@@ -12,6 +12,7 @@
 // main.js never needs to change for new realms.
 
 import { WorldRealm }    from './earth/WorldRealm.js';
+import { NileRealm }     from './nile/NileRealm.js';
 import { OasisRealm }    from './oasis/OasisRealm.js';
 import { VaultRealm }    from './oasis/VaultRealm.js';
 import { AtlantisRealm } from './atlantis/AtlantisRealm.js';
@@ -23,6 +24,7 @@ import { CouncilRealm }  from './council/CouncilRealm.js';
 // (each constructor calls PortalRegistry.register() internally).
 export const ALL_REALMS = [
   new WorldRealm(),
+  new NileRealm(),
   new OasisRealm(),
   new VaultRealm(),
   new AtlantisRealm(),

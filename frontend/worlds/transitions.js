@@ -168,6 +168,16 @@ export function vaultTransRender(progress) {
   }
 }
 
+// ── Nile entry / exit ─────────────────────────────────────
+// Westward sand-to-water wipe — a dark water panel slides in from the right.
+
+export function nileTransRender(p) {
+  // p: 0→1 progress. Westward sand-to-water wipe.
+  const w = CW * p;
+  X.fillStyle = 'rgba(20,40,50,0.92)';
+  X.fillRect(CW - w, 0, w, CH);
+}
+
 // ── Descent into The Deep ─────────────────────────────────
 // Crushing darkness. Purple crack-light, then absolute void.
 // Used when descending through the Atlantis vault floor.
