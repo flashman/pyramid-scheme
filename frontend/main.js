@@ -21,6 +21,8 @@ import { requireAuth }            from './ui/auth.js';
 import { waitForBackend }         from './ui/loading-hourglass.js';
 import { initMobileControls }    from './ui/mobile-controls.js';
 import { Api }                    from './game/api.js';
+import { loadConfig }             from './game/config.js';
+import { renderPayoutTable }      from './ui/config-editor.js';
 import { openProfile }            from './ui/profile.js';
 import { SoundManager }           from './audio/sound.js';
 
@@ -145,6 +147,8 @@ async function init() {
   } else {
     G.isGuest = true;
     log('Playing as guest — progress will not be saved.', '');
+    await loadConfig(Api);
+    renderPayoutTable();
     Api.get('/api/health')
       .then(h => devPanelSetAuthMode(h.debug === true))
       .catch(() => devPanelSetAuthMode(false));
