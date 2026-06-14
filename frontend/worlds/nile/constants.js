@@ -19,3 +19,12 @@ export const FERRY_X  = 4300;
 export const SOBEK_X  = 3450;
 export const JOSEPH_X = 2550;
 export const DELTA_X  = 500;
+
+// Crocodiles patrol the river plane (pZ -1) at RIVER_FLOOR.
+export const CROCS = [
+  { id: 'croc-1', x: 4000, x1: 3700, x2: 4200 },
+  { id: 'croc-2', x: 3000, x1: 2750, x2: 3250 },
+  { id: 'croc-3', x: 1900, x1: 1650, x2: 2150 },
+];
+export const CROC_SPEED = 1.6;
+export const CROC_HURT  = 26;

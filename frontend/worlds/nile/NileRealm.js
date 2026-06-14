@@ -12,8 +12,17 @@ import { nileTransRender }                from '../transitions.js';
 import {
   NILE_W, TOWPATH_Y, RIVER_FLOOR, CURRENT_SPD,
   NILE_ENTRY_X, NILE_RETURN_X,
+  CROCS, CROC_SPEED, CROC_HURT,
 } from './constants.js';
-import { drawNile } from './draw/nile.js';
+import { drawNile }      from './draw/nile.js';
+import { Enemy }         from '../../engine/entity.js';
+import { HealthSystem }  from '../../engine/health.js';
+
+const _CROC_DEATH = [
+  'SOBEK HAS REVIEWED YOUR ACCOUNT.\nYOU DID NOT PAY UP THE CHAIN.',
+  'THE CROCODILE WEEPS AS IT WORKS.\nIT ALWAYS WEEPS.\nIT ALWAYS WORKS.',
+  'YOU HAVE BEEN PROCESSED DOWNSTREAM.\nLIKE EVERYONE BELOW YOU.',
+];
 
 export class NileRealm extends PhysicsRealm {
   constructor() {
@@ -25,6 +34,22 @@ export class NileRealm extends PhysicsRealm {
     });
 
     this.registry = new InteractableRegistry();
+
+    this.health = new HealthSystem({
+      respawnDelay: 2200, immunityAfterSpawn: 2500,
+      onKill:   () => { G.shake = 20; },
+      onRespawn: () => {
+        G.px = NILE_ENTRY_X; G.py = TOWPATH_Y; G.pvy = 0; G.pZ = 0;
+        G.camX = Math.max(0, G.px - CW / 2); G.shake = 8;
+        log('✦ You wash up on the entry bank. The river returned you.', 'hi');
+      },
+    });
+
+    this.crocs = CROCS.map(c => new Enemy(c.id, c.x, RIVER_FLOOR, {
+      speed: CROC_SPEED, patrol: { x1: c.x1, x2: c.x2 },
+      hurtRange: CROC_HURT, surfaceFn: () => RIVER_FLOOR,
+    }));
+    this.crocs.forEach(c => this.registry.register(c));
 
     this.triggers = new TriggerRegistry();
     this.triggers.add(new TriggerZone('return-gate', {
@@ -80,7 +105,9 @@ export class NileRealm extends PhysicsRealm {
     // INVARIANT: the current applies iff pZ === -1 (every frame, no jump on the
     // river), so the river is strictly one-way; the pZ 0 towpath is continuous
     // end-to-end and current-free — the guaranteed two-way return path.
-    if (RealmManager.isTransitioning || DialogueManager.isActive()) return;
+    if (RealmManager.isTransitioning) return;
+    if (this.health.update()) { G.camX = this._trackCameraX(G.camX, G.px); return; }
+    if (DialogueManager.isActive()) return;
 
     const dx = inputDx(SPEED);
     if (dx !== 0) G.px = this._clampX(G.px + dx, SPDHALF);
@@ -103,6 +130,16 @@ export class NileRealm extends PhysicsRealm {
 
     this.registry.updateEntities(ts);
     G.nearEntity = this.registry.update(G.px, G.py - 24);
+
+    if (G.pZ === -1 && this.health.canTakeDamage()) {
+      for (const c of this.crocs) {
+        if (c.hurtCheck(G.px, G.py)) {
+          this.health.kill('croc', _CROC_DEATH[Math.floor(Math.random() * _CROC_DEATH.length)]);
+          break;
+        }
+      }
+    }
+
     this.triggers.update(G.px);
   }
 

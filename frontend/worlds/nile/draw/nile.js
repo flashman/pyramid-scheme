@@ -25,6 +25,13 @@ export function drawNile(realm) {
   X.fillStyle = '#7a5a2a';
   X.fillRect(0, TOWPATH_Y, NILE_W, RIVER_FLOOR - TOWPATH_Y + 4);
 
+  // Crocodiles (river plane, pZ -1).
+  for (const c of realm.crocs) {
+    X.fillStyle = c.isStunned ? '#6a7a3a' : '#3a5a2a';
+    X.fillRect(c.worldX - 24, c.worldY - 12, 48, 12);                          // body
+    X.fillRect(c.worldX + (c._dir > 0 ? 18 : -30), c.worldY - 16, 12, 8);    // snout
+  }
+
   X.restore();
 
   drawRealmPharaoh(realm);   // reads realm.getPlayerPose() (includes pZ)
