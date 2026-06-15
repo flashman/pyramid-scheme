@@ -563,6 +563,61 @@ const THEMES = {
         ]},
     ],
   },
+
+  // ── THE NILE (nile) ───────────────────────────────────────
+  // A Phrygian: A Bb C D E F G — the flat-2 (Bb) carries the modal
+  // darkness; the natural A root gives it a different gravity than the
+  // D-rooted vault/atlantis themes. 60 bpm — a slow river current, dusk
+  // light dissolving into dark water. Drifting toward death, not panic.
+  //
+  // Structural model: atlantis. Noise layers carry the river texture;
+  // sparse sine voices surface and sink. Everything reverb-washed.
+  // Total duration: 32 beats per track.
+  nile: {
+    bpm: 60,
+    tracks: [
+      // ── River bed rumble — deep bandpass noise, lower than ocean floor
+      // (~160 Hz centre, below atlantis's 210 Hz) — sediment and current.
+      { wave: 'noise', gain: 0.048, pan: 0.0,
+        filter: { type: 'bandpass', freq: 160, Q: 0.4 },
+        reverb: true,
+        seq: [[1, 32]] },                                       // 32 beats
+
+      // ── Water surface murmur — high-mid bandpass, dusk reeds/ripples.
+      // (~2400 Hz, softer than atlantis 3100 Hz — less cold, more amber.)
+      { wave: 'noise', gain: 0.020, pan: 0.0,
+        filter: { type: 'bandpass', freq: 2400, Q: 0.9 },
+        reverb: true,
+        seq: [[1, 32]] },                                       // 32 beats
+
+      // ── Deep bass pulse — sine, very sparse, the river bottom breathing
+      { wave: 'sine', gain: 0.09, pan: 0.0,
+        filter: { type: 'lowpass', freq: 280 },
+        reverb: true,
+        seq: [
+          // ── A section (16 beats) ─────────────────
+          [N.A2,  3],  [_,  2],   [N.D2, 2.5], [_,  2.5], // 10
+          [N.F2,  2],  [_,  1.5], [N.E2, 1.5], [_,  1],   //  6
+          // ── B section (16 beats) ─────────────────
+          [_,     3],  [N.A2, 3.5],[_,   1.5],             //  8
+          [N.Bb2, 2],  [_,   2],   [N.A2, 2],  [_,  2],   //  8
+        ]},                                                      // 32 beats
+
+      // ── Sparse melodic drift — sine, notes floating up like lanterns
+      { wave: 'sine', gain: 0.050, pan: -0.25,
+        filter: { type: 'lowpass', freq: 1800 },
+        vibrato: { rate: 1.4, depth: 3 },
+        reverb: true,
+        seq: [
+          // ── A section (16 beats) ─────────────────
+          [_,     4],   [N.A3,  2.5], [_,  1.5],           //  8
+          [N.C4,  1.5], [_,     2.5], [N.E4, 1.5],[_,2.5], //  8
+          // ── B section (16 beats) ─────────────────
+          [_,     3.5], [N.D4,  2],   [_,  2.5],           //  8
+          [_,     2],   [N.F4,  1.5], [_,  3],  [N.A3,1.5],//  8
+        ]},                                                      // 32 beats
+    ],
+  },
 };
 
 // Realm ID → theme name.
@@ -573,6 +628,7 @@ const REALM_THEME = {
   chamber: 'chamber',
   council:  'council',
   atlantis: 'atlantis',
+  nile:     'nile',
 };
 
 // ── SoundManager singleton ────────────────────────────────
