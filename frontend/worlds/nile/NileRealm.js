@@ -13,11 +13,12 @@ import {
   NILE_W, TOWPATH_Y, RIVER_FLOOR, CURRENT_SPD,
   NILE_ENTRY_X, NILE_RETURN_X,
   CROCS, CROC_SPEED, CROC_HURT,
-  DELTA_START_X,
+  DELTA_START_X, BAZAAR_X,
 } from './constants.js';
-import { drawNile }      from './draw/nile.js';
-import { Enemy }         from '../../engine/entity.js';
-import { HealthSystem }  from '../../engine/health.js';
+import { drawNile }                  from './draw/nile.js';
+import { Enemy, NPC }               from '../../engine/entity.js';
+import { HealthSystem }             from '../../engine/health.js';
+import { buildMerchantDialogue }    from './dialogue.js';
 
 const _CROC_DEATH = [
   'SOBEK HAS REVIEWED YOUR ACCOUNT.\nYOU DID NOT PAY UP THE CHAIN.',
@@ -54,6 +55,10 @@ export class NileRealm extends PhysicsRealm {
       speed: CROC_SPEED, patrol: { x1: c.x1, x2: c.x2 },
       hurtRange: CROC_HURT, surfaceFn: () => RIVER_FLOOR,
     }));
+
+    const merchant = new NPC('merchant', BAZAAR_X, RIVER_FLOOR, 'THE MERCHANT', buildMerchantDialogue());
+    merchant.interactRange = 90;
+    this.registry.register(merchant);
 
     this.triggers = new TriggerRegistry();
     this.triggers.add(new TriggerZone('return-gate', {
