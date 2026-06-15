@@ -14,11 +14,17 @@ import {
   NILE_ENTRY_X, NILE_RETURN_X,
   CROCS, CROC_SPEED, CROC_HURT,
   DELTA_START_X, BAZAAR_X,
+  FERRY_X, SOBEK_X, JOSEPH_X,
 } from './constants.js';
 import { drawNile }                  from './draw/nile.js';
 import { Enemy, NPC }               from '../../engine/entity.js';
 import { HealthSystem }             from '../../engine/health.js';
-import { buildMerchantDialogue }    from './dialogue.js';
+import {
+  buildMerchantDialogue,
+  buildFerrymanDialogue,
+  buildSobekDialogue,
+  buildJosephDialogue,
+} from './dialogue.js';
 
 const _CROC_DEATH = [
   'SOBEK HAS REVIEWED YOUR ACCOUNT.\nYOU DID NOT PAY UP THE CHAIN.',
@@ -59,6 +65,18 @@ export class NileRealm extends PhysicsRealm {
     const merchant = new NPC('merchant', BAZAAR_X, RIVER_FLOOR, 'THE MERCHANT', buildMerchantDialogue());
     merchant.interactRange = 90;
     this.registry.register(merchant);
+
+    const ferryman = new NPC('ferryman', FERRY_X, RIVER_FLOOR, 'THE FERRYMAN', buildFerrymanDialogue());
+    ferryman.interactRange = 90;
+    this.registry.register(ferryman);
+
+    const sobek = new NPC('sobek', SOBEK_X, RIVER_FLOOR, 'SOBEK', buildSobekDialogue());
+    sobek.interactRange = 90;
+    this.registry.register(sobek);
+
+    const joseph = new NPC('joseph', JOSEPH_X, RIVER_FLOOR, 'JOSEPH', buildJosephDialogue());
+    joseph.interactRange = 90;
+    this.registry.register(joseph);
 
     this.triggers = new TriggerRegistry();
     this.triggers.add(new TriggerZone('return-gate', {
