@@ -37,7 +37,10 @@ export class NileRealm extends PhysicsRealm {
 
     this.health = new HealthSystem({
       respawnDelay: 2200, immunityAfterSpawn: 2500,
-      onKill:   () => { G.shake = 20; },
+      onKill:   (cause, msg) => {
+        G.shake = 20;
+        setTimeout(() => log('✦ ' + msg.split('\n')[0], 'hi'), 300);
+      },
       onRespawn: () => {
         G.px = NILE_ENTRY_X; G.py = TOWPATH_Y; G.pvy = 0; G.pZ = 0;
         G.camX = Math.max(0, G.px - CW / 2); G.shake = 8;
@@ -49,7 +52,6 @@ export class NileRealm extends PhysicsRealm {
       speed: CROC_SPEED, patrol: { x1: c.x1, x2: c.x2 },
       hurtRange: CROC_HURT, surfaceFn: () => RIVER_FLOOR,
     }));
-    this.crocs.forEach(c => this.registry.register(c));
 
     this.triggers = new TriggerRegistry();
     this.triggers.add(new TriggerZone('return-gate', {
@@ -94,6 +96,7 @@ export class NileRealm extends PhysicsRealm {
       G.px = NILE_ENTRY_X; G.py = TOWPATH_Y; G.pvy = 0; G.pZ = 0;
       G.camX = Math.max(0, G.px - CW / 2);
     }
+    this.health.setImmunity(1500);   // brief spawn grace, matching the Atlantis contract
     G.camY = 0;          // insurance: never inherit a negative camY from another realm
     G.shake = 6;
     log('✦ You walk west, and the sand turns to mud.', 'hi');
@@ -130,6 +133,8 @@ export class NileRealm extends PhysicsRealm {
 
     this.registry.updateEntities(ts);
     G.nearEntity = this.registry.update(G.px, G.py - 24);
+
+    for (const c of this.crocs) c.update(ts);
 
     if (G.pZ === -1 && this.health.canTakeDamage()) {
       for (const c of this.crocs) {
