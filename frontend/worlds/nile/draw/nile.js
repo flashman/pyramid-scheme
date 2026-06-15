@@ -56,6 +56,21 @@ export function drawNile(realm) {
 
   drawDownline();
 
+  // The reed boat at the river mouth — pointed west at the open sea (toward Crete).
+  const bx = DELTA_MIN_X + 40;
+  X.fillStyle = '#6b4a22';
+  X.fillRect(bx - 26, RIVER_FLOOR - 6, 52, 7);             // hull
+  X.beginPath();                                           // pointed prow (west)
+  X.moveTo(bx - 26, RIVER_FLOOR - 6);
+  X.lineTo(bx - 40, RIVER_FLOOR - 1);
+  X.lineTo(bx - 26, RIVER_FLOOR + 1);
+  X.fill();
+  X.strokeStyle = '#caa060';                               // mast
+  X.beginPath();
+  X.moveTo(bx, RIVER_FLOOR - 6);
+  X.lineTo(bx, RIVER_FLOOR - 28);
+  X.stroke();
+
   X.restore();
 
   drawRealmPharaoh(realm);   // reads realm.getPlayerPose() (includes pZ)

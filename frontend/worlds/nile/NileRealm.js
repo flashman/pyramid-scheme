@@ -13,11 +13,11 @@ import {
   NILE_W, TOWPATH_Y, RIVER_FLOOR, CURRENT_SPD,
   NILE_ENTRY_X, NILE_RETURN_X,
   CROCS, CROC_SPEED, CROC_HURT,
-  DELTA_START_X, BAZAAR_X,
+  DELTA_START_X, DELTA_MIN_X, BAZAAR_X,
   FERRY_X, SOBEK_X, JOSEPH_X,
 } from './constants.js';
 import { drawNile }                  from './draw/nile.js';
-import { Enemy, NPC }               from '../../engine/entity.js';
+import { Enemy, NPC, Entity }        from '../../engine/entity.js';
 import { HealthSystem }             from '../../engine/health.js';
 import {
   buildMerchantDialogue,
@@ -77,6 +77,16 @@ export class NileRealm extends PhysicsRealm {
     const joseph = new NPC('joseph', JOSEPH_X, RIVER_FLOOR, 'JOSEPH', buildJosephDialogue());
     joseph.interactRange = 90;
     this.registry.register(joseph);
+
+    // The boat at the river mouth — seeds the future Crete chapter (no travel yet).
+    const boat = new Entity('boat', DELTA_MIN_X + 40, RIVER_FLOOR);
+    boat.interactRange = 70;
+    boat.onInteract = () => {
+      log('✦ A reed boat, pointed at the open sea.', 'hi');
+      setTimeout(() => log('Across the water: Crete. Minos. The Labyrinth.', ''), 600);
+      setTimeout(() => log('Not yet. The sea is not ready for you.', ''), 1200);
+    };
+    this.registry.register(boat);
 
     this.triggers = new TriggerRegistry();
     this.triggers.add(new TriggerZone('return-gate', {
