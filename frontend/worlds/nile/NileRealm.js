@@ -13,6 +13,7 @@ import {
   NILE_W, TOWPATH_Y, RIVER_FLOOR, CURRENT_SPD,
   NILE_ENTRY_X, NILE_RETURN_X,
   CROCS, CROC_SPEED, CROC_HURT,
+  DELTA_START_X,
 } from './constants.js';
 import { drawNile }      from './draw/nile.js';
 import { Enemy }         from '../../engine/entity.js';
@@ -148,7 +149,7 @@ export class NileRealm extends PhysicsRealm {
 
     this.triggers.update(G.px);
 
-    if (G.px < 1100 && !this._deltaSeen) {
+    if (G.px < DELTA_START_X && !this._deltaSeen) {
       this._deltaSeen = true;
       log(G.recruits.length
         ? '✦ The Delta. Everyone you sent downstream is here.'
