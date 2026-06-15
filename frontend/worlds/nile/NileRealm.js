@@ -34,6 +34,8 @@ import {
   DELTA_START_X, BOAT_X,
 } from './constants.js';
 import { drawNile }                  from './draw/nile.js';
+import { spawnParts }                from '../../draw/utils.js';
+import { drawParts }                 from '../../draw/hud.js';
 import { Enemy, NPC, Entity }        from '../../engine/entity.js';
 import { HealthSystem }              from '../../engine/health.js';
 import {
@@ -68,6 +70,8 @@ export class NileRealm extends PhysicsRealm {
       respawnDelay: 2200, immunityAfterSpawn: 2500,
       onKill:   (cause, msg) => {
         G.shake = 20;
+        spawnParts(G.px, G.py - 10, '#7a2018', 26);   // the river takes its cut
+        spawnParts(G.px, G.py - 10, '#bfe2dc', 10);
         setTimeout(() => log('✦ ' + msg.split('\n')[0], 'hi'), 300);
       },
       onRespawn: () => {
@@ -241,6 +245,11 @@ export class NileRealm extends PhysicsRealm {
     const r = this._gravityStep(G.py, G.pvy, surf);
     G.py = r.py; G.pvy = r.pvy;
 
+    // splash when the player breaks the surface (falling/wading in)
+    if (pyPrev < WATER_Y && G.py >= WATER_Y && G.pvy > 1.2) {
+      spawnParts(G.px, WATER_Y, '#bfe2dc', 12);
+    }
+
     // ── Walk / wade animation ─────────────────────────────
     if (G.pmoving && ts - G.legT > 120) { G.legT = ts; G.pframe = 1 - G.pframe; }
     else if (!G.pmoving) G.pframe = 0;
@@ -276,6 +285,7 @@ export class NileRealm extends PhysicsRealm {
 
   render() {
     drawNile(this);
+    drawParts();                       // water splashes (screen-space; handles camX)
     if (!RealmManager.isTransitioning) this.triggers.renderHints(G.camX);
     DialogueManager.render();
   }
