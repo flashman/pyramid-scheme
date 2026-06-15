@@ -28,3 +28,8 @@ export const CROCS = [
 ];
 export const CROC_SPEED = 1.6;
 export const CROC_HURT  = 26;
+
+// Delta: recruits are laid out west of DELTA_START_X, spaced by index.
+export const DELTA_START_X = 1100;
+export const DELTA_SPACING = 70;    // px between consecutive recruit markers
+export const DELTA_MIN_X   = 120;   // do not place west of here

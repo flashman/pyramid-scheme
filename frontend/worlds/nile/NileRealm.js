@@ -34,6 +34,7 @@ export class NileRealm extends PhysicsRealm {
     });
 
     this.registry = new InteractableRegistry();
+    this._deltaSeen = false;
 
     this.health = new HealthSystem({
       respawnDelay: 2200, immunityAfterSpawn: 2500,
@@ -146,6 +147,13 @@ export class NileRealm extends PhysicsRealm {
     }
 
     this.triggers.update(G.px);
+
+    if (G.px < 1100 && !this._deltaSeen) {
+      this._deltaSeen = true;
+      log(G.recruits.length
+        ? '✦ The Delta. Everyone you sent downstream is here.'
+        : '✦ The Delta. Empty water, all the way to the sea.', 'hi');
+    }
   }
 
   render() {
