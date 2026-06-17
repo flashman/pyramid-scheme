@@ -43,6 +43,18 @@ const rep = (pattern, n) => {
   return out;
 };
 
+// Swing curve: remap a beat position so the 2nd half of each eighth-cell
+// lands late — the same long-short feel drumGrid bakes into its step pairs.
+// amount 0.5 = straight; 0.58 ≈ the doumbek's lilt. Cell boundaries (whole
+// eighths) are fixed points, so total length is preserved.
+const _swung = (b, amount, cell = 0.5) => {
+  const idx  = Math.floor(b / cell);
+  const frac = (b - idx * cell) / cell;
+  const nf   = frac < 0.5 ? frac * 2 * amount
+                          : amount + (frac - 0.5) * 2 * (1 - amount);
+  return (idx + nf) * cell;
+};
+
 // ── Step-grid drum machine ────────────────────────────────
 // A tiny pattern compiler so drum grooves can be written as a readable grid
 // instead of hand-counted duration arrays. Each voice is a string where one
@@ -644,7 +656,7 @@ const THEMES = {
       // / Bb2→A2 — the Hijaz pull) leading each phrase back. Root↔fifth↔octave
       // per chord: E/B/E3 over the E half, A/E3/A3 over the A half. Dry so it
       // grooves. An 8-beat phrase (with a built-in variation bar) ×2 per chord.
-      { wave: 'triangle', gain: 0.085, pan: 0.0,
+      { wave: 'triangle', gain: 0.085, pan: 0.0, swing: 0.58,
         filter: { type: 'lowpass', freq: 380 },
         seq: [
           ...rep([
@@ -963,7 +975,11 @@ class SoundManagerClass {
     let prevFreq = null;
 
     for (const [freq, dur, vel] of track.seq) {
-      const durSec = dur * beatLen;
+      // Swing (optional): reshape this note's onset + length through the same
+      // curve drumGrid uses, so a melodic part can lock to a swung groove.
+      const ns     = track.swing ? startT + _swung(beats, track.swing) * beatLen : t;
+      const durSec = (track.swing ? startT + _swung(beats + dur, track.swing) * beatLen
+                                  : t + dur * beatLen) - ns;
       if (freq !== null) {
         const osc  = ctx.createOscillator();
         const env  = ctx.createGain();
@@ -973,10 +989,10 @@ class SoundManagerClass {
 
         // Portamento — slide from the previous pitch into this one.
         if (track.glide && prevFreq !== null) {
-          osc.frequency.setValueAtTime(prevFreq, t);
-          osc.frequency.linearRampToValueAtTime(freq, t + Math.min(track.glide, durSec * 0.6));
+          osc.frequency.setValueAtTime(prevFreq, ns);
+          osc.frequency.linearRampToValueAtTime(freq, ns + Math.min(track.glide, durSec * 0.6));
         } else {
-          osc.frequency.setValueAtTime(freq, t);
+          osc.frequency.setValueAtTime(freq, ns);
         }
 
         // Vibrato LFO — adds expressiveness to melodic leads
@@ -986,36 +1002,36 @@ class SoundManagerClass {
           lfo.frequency.value  = track.vibrato.rate;
           lfoGain.gain.value   = track.vibrato.depth;
           // Delay vibrato onset slightly (natural performer gesture)
-          const vibratoOnset = t + Math.min(0.12, durSec * 0.3);
-          lfoGain.gain.setValueAtTime(0,                   t);
+          const vibratoOnset = ns + Math.min(0.12, durSec * 0.3);
+          lfoGain.gain.setValueAtTime(0,                   ns);
           lfoGain.gain.linearRampToValueAtTime(0,          vibratoOnset);
           lfoGain.gain.linearRampToValueAtTime(track.vibrato.depth,
                                                vibratoOnset + 0.06);
           lfo.connect(lfoGain);
           lfoGain.connect(osc.frequency);
-          lfo.start(t);
-          lfo.stop(t + durSec + 0.01);
+          lfo.start(ns);
+          lfo.stop(ns + durSec + 0.01);
           this._oscillators.push(lfo);
         }
 
         // ADSR: fast attack, full sustain, clean release — no clicks
         const attack  = Math.min(0.018, durSec * 0.05);
         const release = Math.min(0.055, durSec * 0.15);
-        env.gain.setValueAtTime(0,    t);
-        env.gain.linearRampToValueAtTime(peak, t + attack);
-        env.gain.setValueAtTime(peak, t + durSec - release);
-        env.gain.linearRampToValueAtTime(0,    t + durSec);
+        env.gain.setValueAtTime(0,    ns);
+        env.gain.linearRampToValueAtTime(peak, ns + attack);
+        env.gain.setValueAtTime(peak, ns + durSec - release);
+        env.gain.linearRampToValueAtTime(0,    ns + durSec);
 
         osc.connect(env);
         env.connect(filter);
-        osc.start(t);
-        osc.stop(t + durSec + 0.005);
+        osc.start(ns);
+        osc.stop(ns + durSec + 0.005);
         this._oscillators.push(osc);
         prevFreq = freq;
       } else {
         prevFreq = null; // a rest breaks the glide chain
       }
-      t     += durSec;
+      t     += dur * beatLen;
       beats += dur;
     }
     return beats;
