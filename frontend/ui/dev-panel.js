@@ -227,6 +227,13 @@ const REALMS = [
       _unlockDeep();
     },
   },
+  {
+    id: 'nile', label: '🐊 NILE',
+    setup() {
+      if (!G.bought) _grantBuyIn();
+      _ensurePlayerPyramid();
+    },
+  },
 ];
 
 // ── Flag toggles ──────────────────────────────────────────
@@ -280,6 +287,13 @@ const FLAG_GROUPS = [
       { key: 'poseidon_spoken',      label: 'Poseidon spoken'       },
       { key: 'okeanos_spoken',       label: 'Okeanos spoken'        },
       { key: 'deep_primordial_read', label: 'Primordial tablet read' },
+    ],
+  },
+  {
+    label: 'Nile',
+    flags: [
+      { key: 'nile_ferry_paid',    label: 'Ferryman paid'  },
+      { key: 'nile_moses_adopted', label: 'Moses adopted'  },
     ],
   },
 ];
