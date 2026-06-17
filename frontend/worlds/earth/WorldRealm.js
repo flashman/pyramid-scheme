@@ -148,6 +148,20 @@ export class WorldRealm extends PhysicsRealm {
   onEnter(fromId) {
     G.shake = 4;
     if (fromId === 'chamber') log('You emerge from the pyramid.', '');
+    if (fromId === 'nile') {
+      // The Nile lies WEST — return to the gate on the desert's west edge,
+      // just east of the trigger zone so it doesn't immediately re-fire.
+      G.px = NILE_GATE_X + 40; G.py = GND; G.pZ = 0; G.pvy = 0;
+      G.camX = 0;
+      log('You climb the bank back into the desert.', '');
+    }
+    if (fromId === 'oasis') {
+      // The Oasis (and the Sphinx) lie EAST — return to its gate on the
+      // desert's east side, just west of the zone so it doesn't re-fire.
+      G.px = OASIS_ENTRY_X - OASIS_GATE_RANGE - 40; G.py = GND; G.pZ = 0; G.pvy = 0;
+      G.camX = Math.max(0, Math.min(WORLD_W - CW, G.px - CW / 2));
+      log('You come back out of the east, into the desert.', '');
+    }
     if (fromId === 'council') {
       const pp = G.pyramids.find(p => p.isPlayer);
       if (pp) { G.px = pp.wx; G.py = GND - pp.layers * LH; }

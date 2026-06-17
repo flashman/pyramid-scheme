@@ -23,7 +23,8 @@ import { G }                              from '../../game/state.js';
 import { inputDx, SPEED, SPDHALF }        from '../constants.js';
 import { CW }                             from '../../engine/canvas.js';
 import { log }                            from '../../ui/panels.js';
-import { nileTransRender }                from '../transitions.js';
+import { cityTransRender,
+         desertTransRender }              from '../transitions.js';
 import {
   NILE_W, BANK_Y, WATER_Y, RIVERBED_Y, REED_TOP, CROC_BACK,
   CURRENT_SPD, SWIM_SPD, JUMP_VY,
@@ -142,7 +143,7 @@ export class NileRealm extends PhysicsRealm {
       key: 'ArrowUp', trigger: 'nile-gate',
       condition:  () => G.bought,
       onUse:      () => { G.shake = 6; },
-      transition: nileTransRender, duration: 1100,
+      transition: cityTransRender, duration: 3000,
     });
 
     // ── Outbound portal back to the Desert (from the bank). ──
@@ -150,7 +151,7 @@ export class NileRealm extends PhysicsRealm {
       from: 'nile', to: 'world',
       key: 'ArrowUp', trigger: 'return-gate',
       onUse: () => { G.shake = 6; },
-      transition: nileTransRender, duration: 1100,
+      transition: desertTransRender, duration: 2600,
     });
 
     // ── Disabled outbound portal — seeds the future across-the-sea chapter.

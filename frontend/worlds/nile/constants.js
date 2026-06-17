@@ -16,7 +16,8 @@
 //   • ↓ drops you through the bank/reed into the water; Z jumps; ↑ at the gate
 //     returns to the Desert.
 
-export const NILE_W = 6400;          // world width (player travels west → Delta)
+export const NILE_W = 7400;          // world width (player travels west → Delta); the
+                                     // east end is the city district you arrive into
 
 // ── Vertical geometry (screen Y; the player's feet sit at G.py) ──────────────
 export const BANK_Y       = 400;     // towpath bank surface — one-way, continuous, current-free
@@ -40,7 +41,7 @@ export const NILE_RETURN_X  = NILE_W - 120; // return-to-Desert gate (east end, 
 export const NILE_GATE_X    = 150;          // Desert-side: player must be at/below this X to enter
 
 // ── Beat anchor X positions (east → west = sunlit bazaar → cold Delta) ────────
-export const BAZAAR_X = 5900;   // The Bazaar of Believers (Merchant) — on dry bank
+export const BAZAAR_X = 5800;   // The Bazaar of Believers (Merchant) — riverside, at the city's west foot
 export const MOSES_X  = 5480;   // Moses-in-the-bulrushes basket — among the reeds (in water)
 export const FERRY_X  = 4640;   // The Ferryman & the crossing — on dry bank, water's edge
 export const SOBEK_X  = 3720;   // Sobek, the crocodile-god enforcer (idol) — on dry bank
@@ -50,7 +51,7 @@ export const JOSEPH_X = 2720;   // Joseph's granary & the Nilometer — on dry b
 // Everywhere ELSE is open water (a gap to be crossed by reed/croc hopping).
 // The east segment holds the entry + return gate; segments shrink toward the Delta.
 export const BANK_SEGMENTS = [
-  { x1: 5680, x2: 6400 },   // entry + Bazaar + return gate (big, sunlit, safe)
+  { x1: 5680, x2: 7400 },   // the city: entry + return gate + Bazaar (big, sunlit, safe)
   { x1: 4480, x2: 4820 },   // the Ferry landing
   { x1: 3540, x2: 3900 },   // Sobek's idol
   { x1: 2540, x2: 2920 },   // Joseph's granary

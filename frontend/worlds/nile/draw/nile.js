@@ -43,6 +43,7 @@ const BANK_FOOT = BANK_Y + 30;  // quay base — sits in the water
 
 // ── Tall date palms framing the dry banks ([x, scale]) ────
 const PALMS = [
+  [7050, 1.35], [7290, 1.2],                // frame the new eastern entry/gate
   [5700, 1.4], [6090, 1.2], [6280, 1.5],
   [4500, 1.3], [4800, 1.15],
   [3560, 1.25], [3880, 1.2],
@@ -505,28 +506,139 @@ function drawCrocs(realm, t) {
   }
 }
 
+// ── The city district — mud-brick buildings behind the bazaar (east end) ──
+// Matches the desert→city transition's vocabulary: flat roofs + parapets, a
+// warm sunset wash on the east face, domes, a minaret, warm-lit windows and a
+// great arched gate (near the return gate). Clusters at the east where you
+// arrive and tapers west into the river wilds. A backdrop — drawn first, so
+// the river, banks, palms and bazaar all render in front of it.
+const _cityRnd = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+function _cityLamp(lx, ly, t, s) {
+  const a = s * (0.7 + 0.3 * Math.sin(t / 500 + lx));
+  X.save();
+  const g = X.createRadialGradient(lx, ly, 0, lx, ly, 14 * s);
+  g.addColorStop(0,   `rgba(255,214,120,${0.9 * a})`);
+  g.addColorStop(0.5, `rgba(240,150,55,${0.4 * a})`);
+  g.addColorStop(1,   'transparent');
+  X.fillStyle = g; X.fillRect(lx - 14 * s, ly - 14 * s, 28 * s, 28 * s);
+  X.fillStyle = `rgba(255,234,170,${Math.min(1, a)})`; X.fillRect(lx - 1.5, ly - 1.5, 3, 3);
+  X.restore();
+}
+
+function drawCityscape(t) {
+  const rnd = _cityRnd;
+  const baseY  = BANK_Y;
+  const X0 = 5950, X1 = 7380;          // the city — east of (right of) the riverside bazaar
+  const GATE_X = 7280;                  // the great arched gate (by the return gate)
+
+  // cull: the district only sits at the east end — skip it entirely elsewhere
+  if (G.camX + CW < X0 - 40 || G.camX > X1 + 40) return;
+
+  // back row — distant, cooler, hazy rooftops for depth
+  X.save();
+  X.globalAlpha = 0.5; X.fillStyle = '#2c2340';
+  for (let x = X0 - 30, i = 0; x < X1 + 40; i++) {
+    const bw = 40 + rnd(i * 5.1) * 50;
+    const east = (x - X0) / (X1 - X0);
+    const bh = (30 + rnd(i * 3.3 + 2) * 46) * (0.5 + Math.max(0, east) * 0.7);
+    X.fillRect(x, baseY - bh - 26, bw + 1, bh + 26);
+    if (rnd(i * 4 + 1) > 0.8) { X.beginPath(); X.arc(x + bw / 2, baseY - bh - 26, bw * 0.4, Math.PI, 0); X.fill(); }
+    x += bw;
+  }
+  X.restore();
+
+  // near row — the main mud-brick buildings
+  for (let x = X0, i = 0; x < X1; i++) {
+    const bw   = 50 + rnd(i * 1.3) * 66;
+    const east = (x - X0) / (X1 - X0);                 // 0 west .. 1 east
+    const bh   = (60 + rnd(i * 2.1 + 3) * 84) * (0.82 + east * 0.34);  // full city, gentle east lift
+    const topY = baseY - bh;
+    const isTower = rnd(i * 6 + 2) > 0.8;
+    const hasDome = !isTower && rnd(i * 3 + 7) > 0.7;
+    const isGate  = x <= GATE_X && x + bw > GATE_X;
+
+    // body + a warm sunset wash on the east (right) face
+    X.fillStyle = '#241a30'; X.fillRect(x, topY, bw, bh + 4);
+    const lit = X.createLinearGradient(x, 0, x + bw, 0);
+    lit.addColorStop(0, 'rgba(150,90,46,0)');
+    lit.addColorStop(1, 'rgba(168,100,50,0.7)');
+    X.fillStyle = lit; X.fillRect(x, topY, bw, bh + 4);
+    X.fillStyle = '#2e2236'; X.fillRect(x - 2, topY, bw + 4, 5);                 // parapet
+    X.fillStyle = 'rgba(176,104,54,0.55)'; X.fillRect(x - 2, topY, bw + 4, 1);   // sunlit lip
+
+    if (isTower) {
+      const tw = bw * 0.44;
+      X.fillStyle = '#241a30'; X.fillRect(x + bw / 2 - tw / 2, topY - 22, tw, 22);
+      X.fillStyle = '#2e2236';
+      X.beginPath();
+      X.moveTo(x + bw / 2 - tw / 2, topY - 22);
+      X.lineTo(x + bw / 2, topY - 40);
+      X.lineTo(x + bw / 2 + tw / 2, topY - 22); X.fill();
+      _cityLamp(x + bw / 2, topY - 14, t, 1.2);
+    } else if (hasDome) {
+      X.fillStyle = '#2a2038';
+      X.beginPath(); X.arc(x + bw / 2, topY, bw * 0.42, Math.PI, 0); X.fill();
+      X.fillStyle = 'rgba(168,100,50,0.4)';
+      X.beginPath(); X.arc(x + bw / 2, topY, bw * 0.42, Math.PI, Math.PI * 1.5); X.fill();
+    }
+
+    if (isGate) {
+      const gw = Math.min(bw * 0.6, 44), gx = GATE_X, gy = baseY;
+      const gg = X.createLinearGradient(0, gy - bh * 0.55, 0, gy);
+      gg.addColorStop(0, 'rgba(255,196,96,0.35)');
+      gg.addColorStop(1, 'rgba(255,150,60,0.8)');
+      X.fillStyle = gg;
+      X.beginPath();
+      X.moveTo(gx - gw / 2, gy);
+      X.lineTo(gx - gw / 2, gy - bh * 0.4);
+      X.quadraticCurveTo(gx, gy - bh * 0.6, gx + gw / 2, gy - bh * 0.4);
+      X.lineTo(gx + gw / 2, gy);
+      X.fill();
+      _cityLamp(gx - gw / 2, gy - bh * 0.36, t, 0.9);
+      _cityLamp(gx + gw / 2, gy - bh * 0.36, t, 0.9);
+    }
+
+    // warm-lit windows (you arrive at dusk into a lit city)
+    const cols = Math.max(1, Math.floor(bw / 18));
+    const rows = Math.max(1, Math.floor(bh / 30));
+    for (let r = 0; r < rows; r++) {
+      for (let cc = 0; cc < cols; cc++) {
+        const wx = x + 10 + cc * 18, wy = topY + 16 + r * 28;
+        if (wy > baseY - 8) continue;
+        if (rnd(i * 41 + r * 7 + cc * 3) > 0.4) {
+          const fl = 0.7 + 0.3 * Math.sin(t / 600 + wx);
+          X.fillStyle = `rgba(255,150,50,${0.22 * fl})`; X.fillRect(wx - 3, wy - 4, 7, 9);
+          X.fillStyle = `rgba(255,206,110,${0.9 * fl})`; X.fillRect(wx - 1.5, wy - 2, 3, 5);
+        } else {
+          X.fillStyle = 'rgba(18,10,26,0.5)'; X.fillRect(wx - 1.5, wy - 2, 3, 5);
+        }
+      }
+    }
+    x += bw;
+  }
+}
+
 // ── The Bazaar of Believers (world-space, on the east bank) ──
 function drawBazaar(t) {
   const baseY = BANK_Y;
-  // festival bunting over the whole bazaar
+  // festival bunting over the two tents
   X.save(); X.globalAlpha = 0.85;
-  for (let i = 0; i < 16; i++) {
-    const bx = BAZAAR_X - 170 + i * 24;
+  for (let i = 0; i < 11; i++) {
+    const bx = BAZAAR_X - 124 + i * 24;
     X.fillStyle = ['#b8483a', '#c8a040', '#3a6a8a', '#caa060'][i % 4];
     X.beginPath(); X.moveTo(bx, baseY - 90); X.lineTo(bx + 6, baseY - 82); X.lineTo(bx + 12, baseY - 90); X.fill();
   }
   X.restore();
 
-  drawStall(BAZAAR_X - 96, baseY, t, '#b8483a');
-  drawStall(BAZAAR_X + 96, baseY, t, '#3a6a8a');
-  drawStall(BAZAAR_X,       baseY, t, '#c89030');
+  // two tent areas — a small riverside market
+  drawStall(BAZAAR_X - 60, baseY, t, '#b8483a');
+  drawStall(BAZAAR_X + 60, baseY, t, '#3a6a8a');
 
-  // the crowd of the faithful, east of the stalls, facing the wares
-  drawBeliever(BAZAAR_X + 150, baseY, 0, t, false);
-  drawBeliever(BAZAAR_X + 174, baseY, 1, t, true);
-  drawBeliever(BAZAAR_X + 200, baseY, 2, t, false);
-  drawBeliever(BAZAAR_X + 226, baseY, 1, t, false);
-  drawBeliever(BAZAAR_X + 138, baseY, 2, t, true);
+  // a few of the faithful at the wares
+  drawBeliever(BAZAAR_X + 108, baseY, 0, t, false);
+  drawBeliever(BAZAAR_X + 132, baseY, 1, t, true);
+  drawBeliever(BAZAAR_X -  96, baseY, 2, t, false);
 
   drawMerchant(BAZAAR_X, baseY - 4, t);
 }
@@ -928,6 +1040,7 @@ export function drawNile(realm) {
   X.save();
   X.translate(-Math.round(camX), 0);
 
+  drawCityscape(t);                  // backdrop: the city behind the east-end bazaar
   drawWater(t);
   drawPalms(t);
   drawBanks(t);
