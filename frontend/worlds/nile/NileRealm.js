@@ -1,5 +1,5 @@
 // ── FILE: worlds/nile/NileRealm.js ───────────────────────
-// The Nile — west of the Desert. The living downline.
+// The Nile — west of the Desert. The river runs to the Delta and the sea.
 //
 // MOVEMENT (position/surface-based — see constants.js for the model):
 //   • Dry bank segments are solid, current-free ground (the beats live there).
@@ -43,6 +43,7 @@ import {
   buildFerrymanDialogue,
   buildSobekDialogue,
   buildJosephDialogue,
+  buildBabyDialogue,
 } from './dialogue.js';
 
 const CROC_BACK_HW = 20;   // half-width of a crocodile's standable back
@@ -104,30 +105,28 @@ export class NileRealm extends PhysicsRealm {
     joseph.interactRange = 80;
     this.registry.register(joseph);
 
-    // The reed boat at the river mouth — seeds the future Crete chapter (no travel yet).
+    // The reed boat at the river mouth — seeds a future chapter across the sea
+    // (no travel yet; the destination is unrevealed to the player).
     const boat = new Entity('boat', BOAT_X, RIVERBED_Y - 8);
     boat.interactRange = 72;
     boat.onInteract = () => {
       log('✦ A reed boat, pointed at the open sea.', 'hi');
-      setTimeout(() => log('Across the water: Crete. Minos. The Labyrinth.', ''), 600);
+      setTimeout(() => log('It faces something past the horizon. Too far to make out what.', ''), 600);
       setTimeout(() => log('Not yet. The sea is not ready for you.', ''), 1200);
     };
     this.registry.register(boat);
 
-    // Moses-in-the-bulrushes — a basket adrift in the reeds you can "adopt".
+    // The basket in the bulrushes — a fork. Take it or drown it (see
+    // buildBabyDialogue). The choice is decided once; after that the reeds
+    // just report what you did. Downstream layers read Ledger('nile_baby').
     const moses = new Entity('moses', MOSES_X, WATER_Y - 2);
     moses.interactRange = 58;
     moses.onInteract = () => {
-      if (Flags.get('nile_moses_adopted')) {
-        log('✦ The basket is empty now. You already took what was inside. Downstream, presumably.', '');
-        return;
-      }
-      Flags.set('nile_moses_adopted', true);
-      log('✦ A basket in the bulrushes. Inside: a future founder, or a future recruit.', 'hi');
-      setTimeout(() => log('You cannot tell the difference yet. Neither could the river.', ''), 700);
-      setTimeout(() => log('You adopt it. It will need a downline of its own someday.', ''), 1400);
+      if (Flags.get('nile_baby')) return;          // decided once — life is a downline
+      DialogueManager.start(buildBabyDialogue());
     };
     this.registry.register(moses);
+    this._baby = moses;                            // deactivated in update() once processed
 
     this.triggers = new TriggerRegistry();
     this.triggers.add(new TriggerZone('return-gate', {
@@ -154,9 +153,10 @@ export class NileRealm extends PhysicsRealm {
       transition: nileTransRender, duration: 1100,
     });
 
-    // ── Disabled Crete portal (seeds the future chapter). ──
+    // ── Disabled outbound portal — seeds the future across-the-sea chapter.
+    //    Destination intentionally unnamed (the player doesn't know it yet). ──
     PortalRegistry.register({
-      from: 'nile', to: 'crete',
+      from: 'nile', to: 'sea',
       key: null, condition: () => false,
     });
   }
@@ -226,8 +226,8 @@ export class NileRealm extends PhysicsRealm {
       if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { sdx = -SWIM_SPD; G.facing = -1; }
       if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { sdx =  SWIM_SPD; G.facing =  1; }
       G.pmoving = sdx !== 0;
-      // Firm current everywhere except the Delta, where the river spreads and slows
-      // so you can wade freely among your downline. Also no push mid-jump-launch.
+      // Firm current everywhere except the Delta, where the river spreads and
+      // slows so you can wade freely toward the boat. Also no push mid-jump-launch.
       const inDelta = G.px < DELTA_START_X;
       const cur = (G.pvy >= -0.5 && !inDelta) ? CURRENT_SPD : 0;
       const tryX = G.px + sdx - cur;
@@ -260,11 +260,20 @@ export class NileRealm extends PhysicsRealm {
     // ── Entities / proximity ──────────────────────────────
     this.registry.updateEntities(ts);
     G.nearEntity = this.registry.update(G.px, G.py - 24);
-    for (const c of this.crocs) c.update(ts);
+
+    // The basket fork is decided once; afterwards the basket can no longer be
+    // handled — life is a downline, and this one has already gone downstream.
+    if (this._baby?.active && Flags.get('nile_baby')) this._baby.active = false;
+
+    // LAYER 1 of the baby fork: drowning the child feeds Sobek. A fed river is
+    // owed nothing — the crocs stop hunting (they go still and bask) and spare
+    // you. Otherwise they patrol as normal.
+    const sobekFavor = Flags.get('nile_baby') === 'drowned';
+    for (const c of this.crocs) { c.sated = sobekFavor; if (!sobekFavor) c.update(ts); }
 
     // ── Croc bite — only while actually in the water (riding a back is safe,
     //    since then your feet are above the waterline and this never runs). ──
-    if (feetInWater && this.health.canTakeDamage()) {
+    if (feetInWater && !sobekFavor && this.health.canTakeDamage()) {
       for (const c of this.crocs) {
         if (c.hurtCheck(G.px, G.py)) {
           this.health.kill('croc', _CROC_DEATH[Math.floor(Math.random() * _CROC_DEATH.length)]);
@@ -277,9 +286,7 @@ export class NileRealm extends PhysicsRealm {
 
     if (G.px < DELTA_START_X && !this._deltaSeen) {
       this._deltaSeen = true;
-      log(G.recruits.length
-        ? '✦ The Delta. Everyone you sent downstream is here.'
-        : '✦ The Delta. Empty water, all the way to the sea.', 'hi');
+      log('✦ The Delta. The river spreads wide, all the way to the sea.', 'hi');
     }
   }
 

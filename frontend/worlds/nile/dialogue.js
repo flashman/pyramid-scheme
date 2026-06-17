@@ -4,9 +4,11 @@
 //   • buildFerrymanDialogue  — the toll-collector of the crossing
 //   • buildSobekDialogue     — the crocodile-god, divine collections agent
 //   • buildJosephDialogue    — the original founder; insider of the flood
+//   • buildBabyDialogue      — the basket fork: take it or drown it
 
 import { Dialogue } from '../../engine/dialogue.js';
 import { Flags }    from '../../engine/flags.js';
+import { Ledger }   from '../../engine/ledger.js';
 import { log }      from '../../ui/panels.js';
 
 export function buildMerchantDialogue() {
@@ -364,6 +366,50 @@ export function buildJosephDialogue() {
       speaker: 'JOSEPH  ✦  GOVERNOR OF GRAIN',
       text: 'YOU BOUGHT IN.\nYOU SENT PEOPLE DOWNSTREAM.\nYOU ARE HERE.\n\nI RECOGNISE YOU.\nNOT YOUR FACE.\nTHE SHAPE OF WHAT YOU HAVE DONE.\n\nIN 4,000 YEARS\nTHE SHAPE HAS NOT CHANGED.\nNEITHER HAS THE RIVER.\nNEITHER HAS THE WELL.',
       onComplete: () => log('✦ Joseph watches the river. He has been watching it for four thousand years.', 'hi'),
+      next: null,
+    },
+  });
+}
+
+// ── The basket in the bulrushes — a fork ──────────────────
+// Take it or drown it. The choice writes one mark to the Ledger, read at three
+// depths: the river here and now (Sobek), the chapter past the sea (a rival
+// that rises, or doesn't), and the apex that tallies every fork at the end.
+// The Ledger does not judge. It records — "at face amount."
+
+function _decideBaby(choice) {
+  Flags.set('nile_baby', choice);
+  Ledger.record('nile_baby', choice, { realm: 'nile' });
+}
+
+export function buildBabyDialogue() {
+  return new Dialogue({
+
+    // NOTE: side-effects live on the CHOICES — the dialogue engine only runs
+    // action() for a selected choice, never for a plain node.
+    start: {
+      speaker: 'A BASKET IN THE BULRUSHES',
+      text: 'A basket, caught in the reeds. Inside: a child.\nNo papers. No upline. No one downstream to miss it.\nThe river is patient. It will decide, if you do not.',
+      choices: [
+        { label: 'Take it',  action: () => _decideBaby('adopted'), next: 'taken'   },
+        { label: 'Drown it', action: () => _decideBaby('drowned'), next: 'drowned' },
+        { label: 'Leave it', next: null },
+      ],
+    },
+
+    // ── Take it — you recruit a future founder (or your own rival) ──
+    taken: {
+      speaker: 'YOU TAKE THE CHILD',
+      text: 'You lift it from the water. A future founder, or a future\nrecruit — you cannot tell the difference yet. Neither could\nthe river. It will need a downline of its own someday.\nSo will you. The ledger notes a new name. At face amount.',
+      onComplete: () => log('✦ You adopt the child. Something downstream shifts to make room for it.', 'hi'),
+      next: null,
+    },
+
+    // ── Drown it — you feed Sobek; no rival rises from this water ──
+    drowned: {
+      speaker: 'YOU HOLD IT UNDER',
+      text: 'The reeds go still. Sobek’s eyes break the surface — and\napprove. The river takes what it is owed and remembers who\npaid it. No rival will rise from this water.\nThe ledger notes the deposit. At face amount.',
+      onComplete: () => log('✦ The river goes quiet. Sobek has reviewed your account favourably.', 'hi'),
       next: null,
     },
   });

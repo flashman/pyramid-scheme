@@ -11,13 +11,14 @@
 
 import { X, CW, CH }        from '../../../engine/canvas.js';
 import { G }                from '../../../game/state.js';
+import { Flags }            from '../../../engine/flags.js';
 import { drawRealmPharaoh } from '../../../draw/pharaoh.js';
 import { DialogueManager }  from '../../../engine/dialogue.js';
 import {
   NILE_W, BANK_Y, WATER_Y, WATER_BOTTOM,
   REED_TOP, BANK_SEGMENTS, REEDS,
   BAZAAR_X, MOSES_X, FERRY_X, SOBEK_X, JOSEPH_X,
-  DELTA_START_X, DELTA_MIN_X, DELTA_SPACING, BOAT_X,
+  BOAT_X,
 } from '../constants.js';
 
 // ── Palette ──────────────────────────────────────────────
@@ -472,7 +473,8 @@ function drawCrocs(realm, t) {
     const x = c.worldX;
     const dir = (c._dir || 1) > 0 ? 1 : -1;
     const stunned = c.isStunned;
-    const submerge = Math.sin(t / 1600 + x * 0.03) * 2;
+    const calm = c.sated;                                  // fed (Sobek favor) → basking
+    const submerge = Math.sin(t / 1600 + x * 0.03) * 2 + (calm ? 3 : 0);
     const backY = REED_TOP + 6 + submerge;
 
     X.save();
@@ -489,9 +491,13 @@ function drawCrocs(realm, t) {
     X.fillStyle = '#e8e2cc';
     for (let i = 0; i < 5; i++) X.fillRect(28 + i * 4, backY + 6, 1, 2);
     X.fillStyle = CROC_DK; X.fillRect(16, backY - 3, 5, 4);
-    X.fillStyle = stunned ? '#caca60' : '#f0d24a'; X.fillRect(17, backY - 2, 3, 2);
-    X.fillStyle = '#1a1000'; X.fillRect(18, backY - 2, 1, 2);
-    if (!stunned && Math.sin(t / 900 + x) > 0.6) { X.fillStyle = '#bfe2f0'; X.fillRect(17, backY + 1, 1, 2); }
+    if (calm) {
+      X.fillStyle = CROC_DK; X.fillRect(17, backY - 1, 4, 1);   // eye shut — sated, no hunt
+    } else {
+      X.fillStyle = stunned ? '#caca60' : '#f0d24a'; X.fillRect(17, backY - 2, 3, 2);
+      X.fillStyle = '#1a1000'; X.fillRect(18, backY - 2, 1, 2);
+      if (!stunned && Math.sin(t / 900 + x) > 0.6) { X.fillStyle = '#bfe2f0'; X.fillRect(17, backY + 1, 1, 2); }
+    }
     X.restore();
 
     X.save(); X.globalAlpha = 0.4; X.fillStyle = WATER_DK;
@@ -629,18 +635,31 @@ function drawMerchant(x, baseY, t) {
 // ── Moses-in-the-bulrushes (world-space, in the reeds) ────
 function drawMosesBasket(t) {
   const x = MOSES_X;
+  const decided = Flags.get('nile_baby');           // 'adopted' | 'drowned' | false
   const bob = Math.sin(t / 800) * 1.5;
   const y = WATER_Y + 2 + bob;
+
+  // reeds always sway here, marking the place
   X.strokeStyle = REED_GRN; X.lineWidth = 1;
   for (let i = -3; i <= 3; i++) {
     const rx = x + i * 5; const h = 16 + (i % 2) * 6; const sway = Math.sin(t / 1200 + rx) * 1.4;
     X.beginPath(); X.moveTo(rx, y + 2); X.lineTo(rx + sway, y - h); X.stroke();
   }
+
+  // drowned: no basket — it sank. Just the reeds and a slow ripple.
+  if (decided === 'drowned') {
+    X.save(); X.globalAlpha = 0.3; X.strokeStyle = '#bfe2dc';
+    X.beginPath(); X.ellipse(x, y + 5, 14, 3, 0, 0, Math.PI * 2); X.stroke(); X.restore();
+    return;
+  }
+
+  // the basket itself
   X.fillStyle = '#8a6a30'; X.fillRect(x - 8, y - 6, 16, 8);
   X.fillStyle = '#a07c38'; X.fillRect(x - 8, y - 6, 16, 2);
   X.fillStyle = '#6a4f22';
   for (let i = 0; i < 4; i++) X.fillRect(x - 8 + i * 4, y - 6, 1, 8);
-  X.fillStyle = '#d8c8b0'; X.fillRect(x - 5, y - 8, 10, 3);
+  // swaddle/lid only while the child is still inside (before the choice)
+  if (!decided) { X.fillStyle = '#d8c8b0'; X.fillRect(x - 5, y - 8, 10, 3); }
   X.save(); X.globalAlpha = 0.3; X.strokeStyle = '#bfe2dc';
   X.beginPath(); X.ellipse(x, y + 5, 14, 3, 0, 0, Math.PI * 2); X.stroke(); X.restore();
 }
@@ -829,35 +848,6 @@ function drawGranary(t) {
   drawJoseph(cx, baseY, t);
 }
 
-// ── The Delta — the living downline, half-submerged, fading to the sea ──
-function drawDownlineFigure(x, y, s, rec, fade, t) {
-  const col = rec.depth === 1 ? '#e8c060' : rec.depth === 2 ? '#b89048' : '#8a6a38';
-  const H = 11 * s, hd = 7 * s;
-  X.save();
-  // submerged body hint below the waterline
-  X.globalAlpha = fade * 0.28; X.fillStyle = col;
-  X.fillRect(x - 4 * s, y, 8 * s, 14 * s);
-  X.globalAlpha = fade;
-  // torso/shoulders above the water
-  X.fillStyle = col; X.fillRect(x - 5.5 * s, y - H, 11 * s, H + 2);
-  X.fillStyle = '#00000022'; X.fillRect(x - 5.5 * s, y - 1, 11 * s, 2);
-  // head + headcloth
-  X.fillStyle = '#c2926a'; X.fillRect(x - hd / 2, y - H - hd, hd, hd);
-  X.fillStyle = col; X.fillRect(x - hd / 2 - 1, y - H - hd - 1, hd + 2, 2.5 * s);
-  // a hand reaching up out of the water (every few figures)
-  if ((rec.depth || 0) % 3 === 0) {
-    X.fillStyle = '#c2926a'; X.fillRect(x + 5 * s, y - H - 4 * s, 2 * s, 6 * s);
-  }
-  // waterline ripple around them
-  X.globalAlpha = fade * 0.4; X.strokeStyle = '#bfe2dc'; X.lineWidth = 1;
-  X.beginPath(); X.ellipse(x, y + 1, 8 * s, 2, 0, 0, Math.PI * 2); X.stroke();
-  // subtle label — name + what they paid up to you
-  X.globalAlpha = fade * 0.7; X.font = '4px monospace'; X.textAlign = 'center';
-  X.fillStyle = '#e8d0a0'; X.fillText(rec.name || '?', x, y - H - hd - 5);
-  X.fillStyle = '#86b894'; X.fillText(`+$${(rec.payoutToPlayer ?? 0).toFixed(2)}`, x, y - H - hd - 0.5);
-  X.textAlign = 'left'; X.restore();
-}
-
 function drawBoat(x, t) {
   const y = WATER_Y + 6 + Math.sin(t / 900) * 1.5;
   X.fillStyle = '#6b4a22'; X.fillRect(x - 26, y, 52, 7);
@@ -885,26 +875,6 @@ function drawDelta(realm, t) {
       const rx = sx - sw / 2 + i * 16;
       X.beginPath(); X.moveTo(rx, WATER_Y + 26); X.lineTo(rx + Math.sin(t / 1200 + rx) * 2, WATER_Y + 12); X.stroke();
     }
-  }
-
-  // the downline — the player's real recruits
-  const recs = G.recruits || [];
-  if (!recs.length) {
-    X.save(); X.globalAlpha = 0.75; X.font = '6px monospace'; X.textAlign = 'center';
-    X.fillStyle = '#caa060';
-    X.fillText('THE RIVER IS EMPTY HERE.', DELTA_START_X - 140, BANK_Y - 22);
-    X.fillText('NO ONE IS DOWNSTREAM. NOT YET.', DELTA_START_X - 140, BANK_Y - 12);
-    X.textAlign = 'left'; X.restore();
-  } else {
-    recs.forEach((rec, i) => {
-      const x = Math.max(DELTA_MIN_X, DELTA_START_X - i * DELTA_SPACING);
-      // hash the index → a stable depth offset so the crowd fills the foreground water
-      const h = Math.abs((Math.sin(i * 12.9898) * 43758.5453) % 1);
-      const yy = WATER_Y + 18 + h * (RIVERBED_Y - WATER_Y - 24);
-      const s = 0.9 + ((yy - WATER_Y) / (RIVERBED_Y - WATER_Y)) * 0.7;   // nearer (lower) = bigger
-      const fade = Math.max(0.3, 1 - i * 0.03);
-      drawDownlineFigure(x, yy, s, rec, fade, t);
-    });
   }
 
   drawBoat(BOAT_X, t);

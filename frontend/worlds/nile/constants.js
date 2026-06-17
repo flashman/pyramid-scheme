@@ -85,8 +85,6 @@ export const CROCS = [
 export const CROC_SPEED = 1.5;
 export const CROC_HURT  = 22;
 
-// ── Delta: recruits laid out west of DELTA_START_X, spaced by depth/index ─────
+// ── Delta: the river mouth, west of DELTA_START_X — opens to the sea ─────────
 export const DELTA_START_X = 1180;
-export const DELTA_SPACING = 64;     // px between consecutive recruit figures
-export const DELTA_MIN_X   = 150;    // do not place a figure west of here
-export const BOAT_X        = 230;    // the reed boat at the river mouth (Crete tease)
+export const BOAT_X        = 230;    // the reed boat at the river mouth (sea exit — a future chapter)
