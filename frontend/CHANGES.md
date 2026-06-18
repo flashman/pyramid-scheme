@@ -2,6 +2,30 @@
 
 ---
 
+## v1.44 — THE NILE: new realm (the living downline), west of the Desert
+
+> *Every other realm climbs up (Council, cosmos) or down into the buried past (Atlantis, the Deep). The Nile is the missing fourth axis — west, downstream, toward the setting sun and the people the scheme shed on its way up. It is a live mirror of your real `G.recruits`: empty and eerie for a new player, teeming and damning for a veteran.*
+
+### New realm: `worlds/nile/`
+- **`NileRealm`** (`PhysicsRealm`) — position/surface-based movement over dry `BANK_SEGMENTS` (solid, current-free) and open-water gaps. While the player's feet are in the water a **one-way westward current** sweeps them downstream every frame (current > swim speed); reeds and crocodile backs are one-way platforms that lift you out of it. Riverbed is standable everywhere, so no soft-lock; death washes you back to the entry bank.
+- **The four beats** (sunlit → cold, east → west): the **Bazaar of Believers** (the Merchant, a full peaked market tent, a counter of distinct wares, a balance scale); the **Ferryman** (a toll to descend); **Sobek**, divine collections agent (a monumental weeping idol; crocodiles sated if the river is fed); and **Joseph** (Genesis 47 — the granary, the Nilometer as ancient insider trading).
+- **The basket fork** — Moses in the bulrushes: **take it or drown it**, recorded to the Ledger (`nile_baby`).
+- **The Delta** renders your real `G.recruits` by name, depth, and the payout they trickled up; a reed boat at the mouth seeds a future across-the-sea chapter (disabled portal).
+- **Crocodiles** — `Enemy` patrols + `HealthSystem`, in-voice death messages; their backs double as rideable moving platforms.
+
+### New engine system: the Ledger (`engine/ledger.js`)
+Flags-backed append-only accumulator of one-way story forks (`Ledger.record/choice/count`). Records "at face amount" — no judgment — for a future endgame reckoning. First consumer: the basket fork.
+
+### Audio (`audio/sound.js`)
+A Phrygian `nile` river theme plus a snake-charmer performance engine (step-grid drums locked to a doumbek, a swung bassline).
+
+### World gating
+- The lands **east (Oasis) and west (Nile) of the Desert** now open only after the player **sends their first scroll**, gated on a new monotonic `first_scroll_sent` flag (set at both send sites, in `addRecruit()`, and backfilled on restore) — not an `invitesLeft` count, which buy-in accumulation could re-lock.
+- New optional `TriggerZone.hintCondition` — hides a gate's `[↑]` prompt until the destination is accessible, while its suggestive `onEnter` log still fires.
+- Desert→city transition + an eastern city district backdrop at the Nile's arrival end.
+
+---
+
 ## v1.43 — GameSession: authenticated lifecycle extracted from main
 
 > *All post-auth setup logic has been moved out of `main.js` into a dedicated `GameSession` class. `main.js` is now purely boot wiring — realm registration, event bus plumbing, input, and the game loop.*
