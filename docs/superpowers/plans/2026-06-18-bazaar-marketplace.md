@@ -768,6 +768,12 @@ git commit -m "feat(shop): purchase flow (pure planPurchase + guest/account path
 
 ---
 
+## Tasks 8–9 execution notes (read first)
+
+**Render order is already verified.** `main.js`'s loop is `update → render() → renderTransition()`, wrapped in a `G.shake` translate + `clearRect`. The HUD, stats, log, and dialogue box are **HTML DOM elements** (updated via `panels.js` / `DialogueManager` writing to `#dlg`), **not** canvas draws — so the stall, painted on the canvas inside `NileRealm.render()`, is the topmost *canvas* content. No later draw hook is needed. (The HTML side-panels remain visible beside the canvas, which is fine; the `#dlg` box is inactive while shopping because the opening choice closed the dialogue with `next: null`.)
+
+**Recommended sequencing — skeleton before art.** To surface any wiring/order bugs while they're cheap, implement Task 9 (NileRealm + dialogue wiring) against a *stub* `render()` first — e.g. dim the screen and draw the word `STALL` — confirm in-browser that the stall opens from the merchant, swallows keys, freezes movement, and closes on Esc. *Then* replace the stub with Task 8's full render. (This reverses the written task order; do Task 9's wiring against a stub, validate, then Task 8.)
+
 ## Task 8: The first-person stall overlay (`StallOverlay.js`)
 
 **Files:**
@@ -806,6 +812,7 @@ export class StallOverlay {
   async open() {
     this._open = true;
     this._sel  = 0;
+    G.shake = 0;                    // steady frame — the loop applies G.shake around render()
     if (!shopLoaded()) {            // guests skip GameSession → no prices yet
       this._loading = true;
       try { await loadConfig(Api); } catch { /* leave _loading; render shows a notice */ }
