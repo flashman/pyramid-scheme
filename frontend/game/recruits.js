@@ -113,6 +113,11 @@ export function addRecruit(name, depth, parentRec, opts = {}) {
   G.recruits.push(rec);
   G.earned += payout;
 
+  // A recruit existing implies a scroll was sent — keep the onboarding gate in
+  // sync for every live recruit path (guest stir, WS join, dev sim), not just
+  // the send sites. The send sites still set it earlier, for immediacy.
+  if (!Flags.get('first_scroll_sent')) Flags.set('first_scroll_sent', true);
+
   Events.emit('recruit', rec);
 
   // Patch visual layout back to server for real recruits (arrived via WS).
@@ -185,6 +190,7 @@ export function recruitFriend() {
         log('✗ Your scroll crumbles to dust. Ghosts cannot recruit.', 'r');
         say('NO ACCOUNT,\nNO SCROLL!', 160);
         G.invitesLeft--;
+        Flags.set('first_scroll_sent', true);   // monotonic — gates the east/west lands
         updateSlots();
         const name = pickName();
         log(`📜 And yet... ${name} stirs in the desert.`, '');
@@ -211,6 +217,7 @@ export function recruitFriend() {
         updateSlots();
       }
 
+      Flags.set('first_scroll_sent', true);   // monotonic — gates the east/west lands
       log(`📜 Scroll sent to ${email}`, 'hi');
       say('SCROLL SENT!', 120);
 

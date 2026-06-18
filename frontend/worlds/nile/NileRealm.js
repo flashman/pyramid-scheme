@@ -141,7 +141,9 @@ export class NileRealm extends PhysicsRealm {
     PortalRegistry.register({
       from: 'world', to: 'nile',
       key: 'ArrowUp', trigger: 'nile-gate',
-      condition:  () => G.bought,
+      // Locked until the first scroll is sent — set once at the send site in
+      // recruits.js (monotonic; immune to invite-count accumulation).
+      condition:  () => Flags.get('first_scroll_sent'),
       onUse:      () => { G.shake = 6; },
       transition: cityTransRender, duration: 3000,
     });

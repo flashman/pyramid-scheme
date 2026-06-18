@@ -53,17 +53,19 @@ export class WorldRealm extends PhysicsRealm {
     this.triggers.add(new TriggerZone('oasis-gate', {
       x1:        OASIS_ENTRY_X - OASIS_GATE_RANGE,
       x2:        OASIS_ENTRY_X + OASIS_GATE_RANGE,
-      condition: () => G.pZ === 0,
-      hint:      '[↑] ENTER THE OASIS',
-      onEnter:   () => log('The east wind pulls you forward.', ''),
+      condition:     () => G.pZ === 0,
+      hint:          '[↑] ENTER THE OASIS',
+      hintCondition: () => Flags.get('first_scroll_sent'),   // prompt hidden until first scroll sent
+      onEnter:       () => log('The east wind pulls you forward.', ''),
     }));
 
     this.triggers.add(new TriggerZone('nile-gate', {
-      x1:        0,
-      x2:        NILE_GATE_X,
-      condition: () => G.pZ === 0,
-      hint:      '[↑] FOLLOW THE RIVER WEST',
-      onEnter:   () => log('A damp wind comes off the water to the west.', ''),
+      x1:            0,
+      x2:            NILE_GATE_X,
+      condition:     () => G.pZ === 0,
+      hint:          '[↑] FOLLOW THE RIVER WEST',
+      hintCondition: () => Flags.get('first_scroll_sent'),   // prompt hidden until first scroll sent
+      onEnter:       () => log('A damp wind comes off the water to the west.', ''),
     }));
 
     // Crypt door and capstone-ascend zones are registered lazily in
@@ -79,7 +81,10 @@ export class WorldRealm extends PhysicsRealm {
     PortalRegistry.register({
       from: 'world', to: 'oasis',
       key: 'ArrowUp', trigger: 'oasis-gate',
-      condition:  () => G.bought,
+      // Locked until the first scroll is sent. `first_scroll_sent` is set once,
+      // at the send site in recruits.js — monotonic and immune to invite-count
+      // accumulation (each buy-in adds +4), unlike an `invitesLeft < 4` test.
+      condition:  () => Flags.get('first_scroll_sent'),
       onUse:      () => { G.shake = 6; },
       transition: oasisTransRender, duration: 1200,
     });
