@@ -41,7 +41,8 @@ export const NILE_RETURN_X  = NILE_W - 120; // return-to-Desert gate (east end, 
 export const NILE_GATE_X    = 150;          // Desert-side: player must be at/below this X to enter
 
 // ── Beat anchor X positions (east → west = sunlit bazaar → cold Delta) ────────
-export const BAZAAR_X = 5800;   // The Bazaar of Believers (Merchant) — riverside, at the city's west foot
+export const BAZAAR_X = 5900;   // The Bazaar of Believers (Merchant) — riverside, at the city's west foot
+                                // (set so the full tent + flanking stalls stay east of the G1 water gap at 5680)
 export const MOSES_X  = 5480;   // Moses-in-the-bulrushes basket — among the reeds (in water)
 export const FERRY_X  = 4640;   // The Ferryman & the crossing — on dry bank, water's edge
 export const SOBEK_X  = 3720;   // Sobek, the crocodile-god enforcer (idol) — on dry bank

@@ -43,7 +43,7 @@ const BANK_FOOT = BANK_Y + 30;  // quay base — sits in the water
 
 // ── Tall date palms framing the dry banks ([x, scale]) ────
 const PALMS = [
-  [7050, 1.35], [7290, 1.2],                // frame the new eastern entry/gate
+  [7050, 1.35], [7340, 1.2],                // frame the new eastern entry/gate (clear of the arch at 7280)
   [5700, 1.4], [6090, 1.2], [6280, 1.5],
   [4500, 1.3], [4800, 1.15],
   [3560, 1.25], [3880, 1.2],
@@ -529,7 +529,8 @@ function _cityLamp(lx, ly, t, s) {
 function drawCityscape(t) {
   const rnd = _cityRnd;
   const baseY  = BANK_Y;
-  const X0 = 5950, X1 = 7380;          // the city — east of (right of) the riverside bazaar
+  const X0 = 6120, X1 = 7380;          // the city — east of (right of) the riverside bazaar
+                                       // (west edge pulled back to clear the shifted bazaar)
   const GATE_X = 7280;                  // the great arched gate (by the return gate)
 
   // cull: the district only sits at the east end — skip it entirely elsewhere
@@ -622,25 +623,136 @@ function drawCityscape(t) {
 // ── The Bazaar of Believers (world-space, on the east bank) ──
 function drawBazaar(t) {
   const baseY = BANK_Y;
-  // festival bunting over the two tents
+
+  // festival bunting strung across the whole market
   X.save(); X.globalAlpha = 0.85;
-  for (let i = 0; i < 11; i++) {
-    const bx = BAZAAR_X - 124 + i * 24;
+  for (let i = 0; i < 15; i++) {
+    const bx = BAZAAR_X - 168 + i * 24;
     X.fillStyle = ['#b8483a', '#c8a040', '#3a6a8a', '#caa060'][i % 4];
-    X.beginPath(); X.moveTo(bx, baseY - 90); X.lineTo(bx + 6, baseY - 82); X.lineTo(bx + 12, baseY - 90); X.fill();
+    X.beginPath(); X.moveTo(bx, baseY - 96); X.lineTo(bx + 6, baseY - 88); X.lineTo(bx + 12, baseY - 96); X.fill();
   }
   X.restore();
 
-  // two tent areas — a small riverside market
-  drawStall(BAZAAR_X - 60, baseY, t, '#b8483a');
-  drawStall(BAZAAR_X + 60, baseY, t, '#3a6a8a');
+  // the lesser vendors flank the Merchant's tent, pushed out to clear it
+  drawStall(BAZAAR_X - 124, baseY, t, '#b8483a');
+  drawStall(BAZAAR_X + 124, baseY, t, '#3a6a8a');
 
-  // a few of the faithful at the wares
-  drawBeliever(BAZAAR_X + 108, baseY, 0, t, false);
-  drawBeliever(BAZAAR_X + 132, baseY, 1, t, true);
-  drawBeliever(BAZAAR_X -  96, baseY, 2, t, false);
+  // the faithful, browsing the market
+  drawBeliever(BAZAAR_X +  78, baseY, 0, t, false);   // at the tent mouth
+  drawBeliever(BAZAAR_X + 150, baseY, 1, t, true);    // kneeling by the right stall
+  drawBeliever(BAZAAR_X - 150, baseY, 2, t, false);   // by the left stall
 
+  // the Merchant's own full tent — back wall + roof drawn first, he stands in it
+  drawMerchantTent(BAZAAR_X, baseY, t);
   drawMerchant(BAZAAR_X, baseY - 4, t);
+
+  // his trade dressing, in front of him: the scale of belief and the wares
+  drawBalanceScale(BAZAAR_X - 30, baseY, t);
+  drawWareTable(BAZAAR_X + 32, baseY, t);
+}
+
+// The Merchant's full tent — a proper peaked market pavilion he stands inside.
+// Back wall + poles + canopy are drawn behind the figure; the valance, side
+// drapes, lantern and sign hang at/above head height so the figure reads as
+// sheltered within it.
+function drawMerchantTent(cx, baseY, t) {
+  const HW = 54;                       // half-width at the base
+  const ridgeY = baseY - 120;          // roof peak
+  const eaveY  = baseY - 84;           // where the canopy meets the poles
+  const TENT = '#7a3a30', TENT_LT = '#9a4f42', TENT_DK = '#5a281f';
+  const POLE = '#5a3a16', POLE_LT = '#7a5224';
+
+  // back wall (interior fabric) — the Merchant stands in front of this
+  X.fillStyle = '#3a1d18'; X.fillRect(cx - HW + 6, eaveY, (HW - 6) * 2, baseY - eaveY);
+  X.fillStyle = '#46241d';
+  for (let i = 0; i < 10; i++) X.fillRect(cx - HW + 8 + i * 10, eaveY, 4, baseY - eaveY);   // seams
+  X.fillStyle = '#00000033'; X.fillRect(cx - HW + 6, baseY - 4, (HW - 6) * 2, 4);           // floor shadow
+
+  // two front poles + gilt finials
+  X.fillStyle = POLE;    X.fillRect(cx - HW, eaveY, 5, baseY - eaveY); X.fillRect(cx + HW - 5, eaveY, 5, baseY - eaveY);
+  X.fillStyle = POLE_LT; X.fillRect(cx - HW, eaveY, 2, baseY - eaveY); X.fillRect(cx + HW - 5, eaveY, 2, baseY - eaveY);
+  X.fillStyle = '#caa040'; X.fillRect(cx - HW - 1, eaveY - 4, 7, 4); X.fillRect(cx + HW - 6, eaveY - 4, 7, 4);
+
+  // peaked canopy
+  X.fillStyle = TENT;
+  X.beginPath(); X.moveTo(cx, ridgeY); X.lineTo(cx + HW + 8, eaveY); X.lineTo(cx - HW - 8, eaveY); X.closePath(); X.fill();
+  X.fillStyle = TENT_LT;                                                                  // lit left slope
+  X.beginPath(); X.moveTo(cx, ridgeY); X.lineTo(cx - HW - 8, eaveY); X.lineTo(cx - HW + 4, eaveY); X.lineTo(cx - 2, ridgeY + 4); X.closePath(); X.fill();
+  X.fillStyle = TENT_DK; X.fillRect(cx - 1, ridgeY, 2, 12);                               // ridge
+  X.save(); X.globalAlpha = 0.45; X.strokeStyle = '#caa040'; X.lineWidth = 1;             // gilt seams
+  for (let i = 1; i <= 3; i++) {
+    X.beginPath(); X.moveTo(cx, ridgeY + i * 8); X.lineTo(cx + (HW + 8) * i / 4, eaveY); X.stroke();
+    X.beginPath(); X.moveTo(cx, ridgeY + i * 8); X.lineTo(cx - (HW + 8) * i / 4, eaveY); X.stroke();
+  }
+  X.restore();
+
+  // scalloped valance hanging from the eave
+  X.fillStyle = TENT_DK;
+  for (let i = 0; i < 11; i++) {
+    const vx = cx - HW - 6 + i * ((HW * 2 + 12) / 10);
+    X.beginPath(); X.moveTo(vx - 5, eaveY); X.lineTo(vx, eaveY + 7); X.lineTo(vx + 5, eaveY); X.closePath(); X.fill();
+  }
+  X.fillStyle = '#caa040'; X.fillRect(cx - HW - 6, eaveY - 2, HW * 2 + 12, 2);            // valance rail
+
+  // side drapes tied back at the poles
+  X.fillStyle = TENT_DK;
+  X.beginPath(); X.moveTo(cx - HW, eaveY); X.lineTo(cx - HW + 11, eaveY + 8); X.lineTo(cx - HW + 4, baseY); X.lineTo(cx - HW, baseY); X.closePath(); X.fill();
+  X.beginPath(); X.moveTo(cx + HW, eaveY); X.lineTo(cx + HW - 11, eaveY + 8); X.lineTo(cx + HW - 4, baseY); X.lineTo(cx + HW, baseY); X.closePath(); X.fill();
+  X.fillStyle = '#caa040'; X.fillRect(cx - HW + 6, eaveY + 7, 2, 2); X.fillRect(cx + HW - 8, eaveY + 7, 2, 2);  // ties
+
+  // hanging lantern at the right of the mouth
+  const la = 0.6 + 0.3 * Math.sin(t / 500);
+  X.save(); X.globalAlpha = 0.5 * la;
+  const lg = X.createRadialGradient(cx + 40, eaveY + 16, 1, cx + 40, eaveY + 16, 20);
+  lg.addColorStop(0, '#ffcf80'); lg.addColorStop(1, 'transparent');
+  X.fillStyle = lg; X.fillRect(cx + 20, eaveY - 4, 40, 40); X.restore();
+  X.strokeStyle = '#3a2410'; X.lineWidth = 1; X.beginPath(); X.moveTo(cx + 40, eaveY + 2); X.lineTo(cx + 40, eaveY + 12); X.stroke();
+  X.fillStyle = '#c8902c'; X.fillRect(cx + 38, eaveY + 12, 5, 6);
+
+  // signboard across the front, above the Merchant's head
+  X.save(); X.globalAlpha = 0.94;
+  X.fillStyle = '#e8dcc0'; X.fillRect(cx - 42, eaveY + 1, 84, 11);
+  X.fillStyle = '#caa040'; X.fillRect(cx - 42, eaveY + 1, 84, 1);
+  X.fillStyle = '#9a3a2a'; X.font = '5px monospace'; X.textAlign = 'center';
+  X.fillText('BAZAAR OF BELIEVERS', cx, eaveY + 9);
+  X.textAlign = 'left'; X.restore();
+}
+
+// A standing balance — he values belief "at face amount". The beam tips slowly.
+function drawBalanceScale(px, baseY, t) {
+  const postH = 40, baseTop = baseY - postH;
+  X.fillStyle = '#5a3a16'; X.fillRect(px - 7, baseY - 3, 16, 3);     // foot
+  X.fillStyle = '#7a5a2a'; X.fillRect(px - 1, baseTop, 3, postH);    // post
+  const tip = Math.sin(t / 1500) * 2.2;
+  const bx1 = px - 13, bx2 = px + 15, by1 = baseTop - tip, by2 = baseTop + tip;
+  X.strokeStyle = '#caa040'; X.lineWidth = 1.5;
+  X.beginPath(); X.moveTo(bx1, by1); X.lineTo(bx2, by2); X.stroke();
+  X.strokeStyle = '#9a7c3a'; X.lineWidth = 1;
+  X.beginPath(); X.moveTo(bx1, by1); X.lineTo(bx1, by1 + 7); X.stroke();
+  X.beginPath(); X.moveTo(bx2, by2); X.lineTo(bx2, by2 + 7); X.stroke();
+  X.fillStyle = '#b8902c';
+  X.beginPath(); X.ellipse(bx1, by1 + 8, 5, 2, 0, 0, Math.PI * 2); X.fill();
+  X.beginPath(); X.ellipse(bx2, by2 + 8, 5, 2, 0, 0, Math.PI * 2); X.fill();
+}
+
+// The wares laid out, finally distinct: a blue scarab, a sealed protection
+// scroll, and the upright blank "bundle" scroll (the premium product is potential).
+function drawWareTable(tx, baseY, t) {
+  const top = baseY - 20;
+  X.fillStyle = '#6a461c'; X.fillRect(tx - 22, top, 44, 4);          // table top
+  X.fillStyle = '#3a2410'; X.fillRect(tx - 22, top, 44, 1);
+  X.fillStyle = '#4a3014'; X.fillRect(tx - 20, top + 4, 3, 16); X.fillRect(tx + 17, top + 4, 3, 16);  // legs
+  // scarab amulet (blue, winged)
+  X.fillStyle = '#2f6a8a'; X.beginPath(); X.ellipse(tx - 13, top - 3, 5, 4, 0, 0, Math.PI * 2); X.fill();
+  X.fillStyle = '#5aa6c8'; X.fillRect(tx - 14, top - 6, 2, 2);
+  X.fillStyle = '#1a3a4a'; X.fillRect(tx - 13, top - 4, 1, 5);
+  // rolled protection scroll, ribboned
+  X.fillStyle = '#d8c8a0'; X.fillRect(tx - 3, top - 6, 8, 6);
+  X.fillStyle = '#b8a276'; X.fillRect(tx - 3, top - 6, 8, 1); X.fillRect(tx - 3, top - 1, 8, 1);
+  X.fillStyle = '#9a3a2a'; X.fillRect(tx + 0, top - 5, 1, 4);
+  // upright blank bundle scroll, tied
+  X.fillStyle = '#e8dcc0'; X.fillRect(tx + 12, top - 9, 6, 9);
+  X.fillStyle = '#caa040'; X.fillRect(tx + 12, top - 5, 6, 1);
 }
 
 function drawStall(cx, baseY, t, awning) {
@@ -728,20 +840,38 @@ function drawBeliever(x, baseY, variant, t, kneel) {
 
 function drawMerchant(x, baseY, t) {
   const y = baseY;
+  const look = Math.max(-1, Math.min(1, (G.px - x) / 140));   // eyes track the mark
+
+  // robe — richer purple, lit shoulders, shaded side, gold hem
   X.fillStyle = '#7a2f6a'; X.fillRect(x - 8, y - 42, 16, 42);
   X.fillStyle = '#9a4f8a'; X.fillRect(x - 8, y - 42, 16, 4);
+  X.fillStyle = '#5a1f4e'; X.fillRect(x + 6, y - 40, 2, 38);
+  X.fillStyle = '#caa040'; X.fillRect(x - 8, y - 4, 16, 3);
   X.fillStyle = '#d8b040'; X.fillRect(x - 8, y - 22, 16, 3);          // sash
-  X.fillStyle = '#c2926a'; X.fillRect(x - 5, y - 54, 10, 12);         // head
-  X.fillStyle = '#8a2020'; X.fillRect(x - 6, y - 64, 12, 10);         // fez
-  X.fillStyle = '#d8b040'; X.fillRect(x - 1, y - 66, 2, 4);           // tassel
-  X.fillStyle = '#1a1008'; X.fillRect(x - 3, y - 48, 2, 2); X.fillRect(x + 1, y - 48, 2, 2);
-  // raised arm holding a charm identical to all the others
+  // coin-pouch slung on the sash
+  X.fillStyle = '#6a4a1a'; X.beginPath(); X.ellipse(x + 6, y - 17, 4, 5, 0, 0, Math.PI * 2); X.fill();
+  X.fillStyle = '#caa040'; X.fillRect(x + 3, y - 22, 6, 2);
+  // head, jaw shade, fez + tassel
+  X.fillStyle = '#c2926a'; X.fillRect(x - 5, y - 54, 10, 12);
+  X.fillStyle = '#a8744c'; X.fillRect(x - 5, y - 47, 10, 1);
+  X.fillStyle = '#8a2020'; X.fillRect(x - 6, y - 64, 12, 10);
+  X.fillStyle = '#a83030'; X.fillRect(x - 6, y - 64, 12, 2);
+  X.fillStyle = '#d8b040'; X.fillRect(x - 1, y - 66, 2, 4);
+  // tracking eyes (whites + shifting pupils)
+  X.fillStyle = '#e8e2d0'; X.fillRect(x - 4, y - 49, 3, 2); X.fillRect(x + 1, y - 49, 3, 2);
+  X.fillStyle = '#1a1008'; X.fillRect(x - 3 + Math.round(look), y - 49, 1, 2); X.fillRect(x + 2 + Math.round(look), y - 49, 1, 2);
+  // sly grin with a gold-tooth glint
+  X.fillStyle = '#3a1810'; X.fillRect(x - 3, y - 45, 6, 1);
+  X.save(); X.globalAlpha = 0.5 + 0.4 * Math.sin(t / 300);
+  X.fillStyle = '#ffe9b0'; X.fillRect(x + 1, y - 45, 1, 1); X.restore();
+  // raised arm — a scarab held up to the light, gold ring on the hand
   const wav = Math.sin(t / 600) * 2;
   X.fillStyle = '#7a2f6a'; X.fillRect(x + 6, y - 46 + wav, 4, 12);
-  X.fillStyle = '#2e7a4e'; X.fillRect(x + 6, y - 52 + wav, 5, 5);
-  X.fillStyle = '#7fe0a0'; X.fillRect(x + 7, y - 51 + wav, 1, 1);
+  X.fillStyle = '#2f6a8a'; X.beginPath(); X.ellipse(x + 9, y - 50 + wav, 4, 3, 0, 0, Math.PI * 2); X.fill();
+  X.fillStyle = '#5aa6c8'; X.fillRect(x + 7, y - 52 + wav, 2, 1);
+  X.fillStyle = '#caa040'; X.fillRect(x + 7, y - 37 + wav, 4, 2);     // ring
   X.save(); X.globalAlpha = 0.4 + 0.2 * Math.sin(t / 400);
-  X.fillStyle = '#ffe9b0'; X.fillRect(x + 8, y - 54 + wav, 1, 1); X.restore();
+  X.fillStyle = '#ffe9b0'; X.fillRect(x + 10, y - 51 + wav, 1, 1); X.restore();
 }
 
 // ── Moses-in-the-bulrushes (world-space, in the reeds) ────
