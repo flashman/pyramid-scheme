@@ -6,6 +6,7 @@
 import { G }               from '../game/state.js';
 import { earthLayout }     from '../game/recruits.js';
 import { Flags }           from '../engine/flags.js';
+import { Ledger }          from '../engine/ledger.js';
 import { RealmManager }    from '../engine/realm.js';
 import { Api }             from '../game/api.js';
 import { updateStats, updateSlots, log } from './panels.js';
@@ -227,6 +228,13 @@ const REALMS = [
       _unlockDeep();
     },
   },
+  {
+    id: 'nile', label: '🐊 NILE',
+    setup() {
+      if (!G.bought) _grantBuyIn();
+      _ensurePlayerPyramid();
+    },
+  },
 ];
 
 // ── Flag toggles ──────────────────────────────────────────
@@ -280,6 +288,12 @@ const FLAG_GROUPS = [
       { key: 'poseidon_spoken',      label: 'Poseidon spoken'       },
       { key: 'okeanos_spoken',       label: 'Okeanos spoken'        },
       { key: 'deep_primordial_read', label: 'Primordial tablet read' },
+    ],
+  },
+  {
+    label: 'Nile',
+    flags: [
+      { key: 'nile_ferry_paid', label: 'Ferryman paid' },
     ],
   },
 ];
@@ -387,6 +401,12 @@ function _meetAllGods() {
     Flags.set(`${g}_spoken`, true);
   }
   log('[DEV] All gods met.', '');
+}
+
+function _decideBaby(choice) {
+  Flags.set('nile_baby', choice);
+  Ledger.record('nile_baby', choice, { realm: 'nile' });
+  log(`[DEV] baby fork → ${choice} (Sobek favor: ${choice === 'drowned'})`, '');
 }
 
 function _resetAll() {
@@ -595,6 +615,8 @@ export function initDevPanel() {
     { label: '👤 ADD LOCAL REC',    fn: _addLocalRecruit     },
     { label: '🔺 GROW PYRAMID +2',  fn: _growPlayerPyramid   },
     { label: '🌙 MEET ALL GODS',    fn: _meetAllGods         },
+    { label: '👶 BABY: TAKE',       fn: () => _decideBaby('adopted') },
+    { label: '🐊 BABY: DROWN',      fn: () => _decideBaby('drowned') },
     { label: '💀 FULL RESET',       fn: _resetAll, danger: true },
   ];
 

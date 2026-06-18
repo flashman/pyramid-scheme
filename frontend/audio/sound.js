@@ -35,6 +35,60 @@ const N = {
 };
 const _ = null; // rest
 
+// Repeat a rhythm/melody pattern n times → flat seq. Keeps drum grooves
+// readable instead of a 64-element literal.
+const rep = (pattern, n) => {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(...pattern);
+  return out;
+};
+
+// Swing curve: remap a beat position so the 2nd half of each eighth-cell
+// lands late — the same long-short feel drumGrid bakes into its step pairs.
+// amount 0.5 = straight; 0.58 ≈ the doumbek's lilt. Cell boundaries (whole
+// eighths) are fixed points, so total length is preserved.
+const _swung = (b, amount, cell = 0.5) => {
+  const idx  = Math.floor(b / cell);
+  const frac = (b - idx * cell) / cell;
+  const nf   = frac < 0.5 ? frac * 2 * amount
+                          : amount + (frac - 0.5) * 2 * (1 - amount);
+  return (idx + nf) * cell;
+};
+
+// ── Step-grid drum machine ────────────────────────────────
+// A tiny pattern compiler so drum grooves can be written as a readable grid
+// instead of hand-counted duration arrays. Each voice is a string where one
+// character = one step; the string length sets the resolution (16 chars =
+// 16th notes over a 4-beat bar). Characters set velocity:
+//   '.' / ' '  rest      'X' accent (1.0)   'x' normal (0.7)
+//   'o' ghost (0.4)      '1'-'9' = n/9      (anything else → normal)
+// Returns an ARRAY of drum tracks (one per voice) to spread into a theme's
+// `tracks`. swing (0.5 = straight, up to ~0.7) delays every odd step — the
+// shuffle. reps repeats the one-bar grid to fill the loop.
+//   kit:  { name: { freq, gain, pan?, reverb? }, … }
+//   grid: { name: "x.x.…", … }
+const _VEL = { '.': null, ' ': null, X: 1.0, x: 0.7, o: 0.4 };
+function drumGrid(kit, grid, { swing = 0.5, reps = 1 } = {}) {
+  return Object.entries(grid).map(([name, str]) => {
+    const v = kit[name];
+    const steps   = str.length;
+    const stepLen = 4 / steps;               // beats per step (4-beat bar)
+    const seq = [];
+    for (let i = 0; i < steps; i++) {
+      const ch  = str[i];
+      // Pair-swing: lengthen the even step, shorten the odd step after it.
+      const dur = swing === 0.5 ? stepLen
+                : (i % 2 === 0 ? 2 * stepLen * swing : 2 * stepLen * (1 - swing));
+      const vel = ch in _VEL ? _VEL[ch] : (ch >= '1' && ch <= '9' ? +ch / 9 : 0.7);
+      seq.push(vel === null ? [_, dur] : [v.freq, dur, vel]);
+    }
+    return {
+      wave: 'drum', gain: v.gain, pan: v.pan ?? 0, reverb: v.reverb ?? false,
+      seq: reps > 1 ? rep(seq, reps) : seq,
+    };
+  });
+}
+
 // ── Theme definitions ─────────────────────────────────────
 // bpm     — tempo
 // tracks  — oscillator layers:
@@ -563,6 +617,88 @@ const THEMES = {
         ]},
     ],
   },
+
+  // ── THE NILE (nile) ───────────────────────────────────────
+  // E Hijaz: E F G#(Ab) A B C D. The iconic "cobra rising from the basket"
+  // (Indiana Jones / 60s adventure) sound, built on the engine's new
+  // PERFORMANCE features: the lead GLIDES between pitches (portamento — the
+  // snake uncoiling) and every note has its own VELOCITY (the swell). The
+  // melody is the snake-charmer archetype — a slow gliding rise, a swaying
+  // cry at the top on the aug-2nd, then a half-step slither back down. It
+  // floats over a quiet open-fifth drone (the been/pungi bed) with a swung,
+  // dynamically-accented doumbek underneath. Three voices, dry and exposed —
+  // no bass/gator mud. 100 bpm. Total duration: 32 beats per track.
+  nile: {
+    bpm: 100,
+    tracks: [
+      // ── Snake-charmer lead — reedy sawtooth through a resonant lowpass
+      // (a double-reed/shehnai formant), wide vibrato, and PORTAMENTO so the
+      // line slithers. Velocities crescendo through each rise and accent the
+      // top cry; rests are breaths (they also break the glide chain).
+      { wave: 'sawtooth', gain: 0.13, pan: -0.1, glide: 0.10,
+        filter: { type: 'lowpass', freq: 2000, Q: 4 },
+        vibrato: { rate: 6, depth: 14 },
+        seq: [
+          // ── A section (oct 4) — rise, sway, slither down ─────
+          [N.E4,1,.40],[N.F4,1,.55],[N.Ab4,1.5,.70],[N.A4,.5,.85],            // 4  (cobra rises)
+          [N.B4,1,1.0],[N.A4,.5,.80],[N.Ab4,.5,.70],[N.A4,1,.90],[_,1],       // 4  (top cry + breath)
+          [N.F4,.5,.70],[N.Ab4,.5,.80],[N.A4,1,.95],[N.Ab4,.5,.70],[N.F4,.5,.60],[N.E4,1,.70], // 4 (descend)
+          [N.F4,.5,.60],[N.E4,.5,.55],[N.F4,.5,.60],[N.E4,.5,.55],[N.E4,2,.50],// 4  (half-step settle)
+          // ── B section (oct 5) — higher, more intense ─────────
+          [N.E5,1,.60],[N.F5,1,.75],[N.Ab5,1.5,.90],[N.A5,.5,1.0],            // 4
+          [N.B5,1,1.0],[N.A5,.5,.85],[N.Ab5,.5,.75],[N.A5,1,.90],[_,1],       // 4
+          [N.F5,.5,.75],[N.Ab5,.5,.85],[N.A5,1,1.0],[N.Ab5,.5,.75],[N.F5,.5,.65],[N.E5,1,.75], // 4
+          [N.D5,.5,.60],[N.C5,.5,.55],[N.B4,.5,.60],[N.C5,.5,.60],[N.E4,2,.50],// 4  (sink to root)
+        ]},                                                                    // 32 beats
+
+      // ── Bassline — a syncopated riff, not an oom-pah pump. Notes pushed off
+      // the beat, an octave pop (E3/A3) for bounce, and a ♭2 turnaround (F2→E2
+      // / Bb2→A2 — the Hijaz pull) leading each phrase back. Root↔fifth↔octave
+      // per chord: E/B/E3 over the E half, A/E3/A3 over the A half. Dry so it
+      // grooves. An 8-beat phrase (with a built-in variation bar) ×2 per chord.
+      { wave: 'triangle', gain: 0.085, pan: 0.0, swing: 0.58,
+        filter: { type: 'lowpass', freq: 380 },
+        seq: [
+          ...rep([
+            [N.E2,.75],[_,.25],[N.E2,.5],[N.B2,.5],[_,.5],[N.E3,.5],[_,.5],[N.B2,.5],
+            [N.E2,.75],[_,.25],[N.E2,.5],[N.B2,.5],[_,.25],[N.E3,.25],[N.B2,.5],[N.F2,.5],[N.E2,.5],
+          ], 2),
+          ...rep([
+            [N.A2,.75],[_,.25],[N.A2,.5],[N.E3,.5],[_,.5],[N.A3,.5],[_,.5],[N.E3,.5],
+            [N.A2,.75],[_,.25],[N.A2,.5],[N.E3,.5],[_,.25],[N.A3,.25],[N.E3,.5],[N.Bb2,.5],[N.A2,.5],
+          ], 2),
+        ]},                                                                    // E half, then A half
+      // ── Mid pad — the third + fifth, sustained, the harmonic glue over the
+      // bassline. Still moves E-major (G# B) → A-minor (A C) at the halfway
+      // point, with half-step voice leading. Slight detune = wider, living.
+      { wave: 'triangle', gain: 0.045, pan: -0.12, detune: 5,
+        filter: { type: 'lowpass', freq: 1200 },
+        reverb: true,
+        seq: [[N.Ab3, 16], [N.A3, 16]] },                                      // third→: G# → A
+      { wave: 'triangle', gain: 0.038, pan: 0.12, detune: -5,
+        filter: { type: 'lowpass', freq: 1200 },
+        reverb: true,
+        seq: [[N.B3, 16], [N.C4, 16]] },                                       // fifth→: B → C
+
+      // ── Percussion — written as a step grid (see drumGrid). One char per
+      // 16th; swing shuffles it. dum = body, tek = crack, sagat = the high
+      // ringing finger-cymbals. Easy to read and to tweak by ear:
+      //         1 e & a 2 e & a 3 e & a 4 e & a
+      ...drumGrid(
+        {
+          dum:   { freq: 110,  gain: 0.70, pan: 0.08 },
+          tek:   { freq: 1500, gain: 0.52, pan: 0.08 },
+          sagat: { freq: 3400, gain: 0.28, pan: 0.30, reverb: true },
+        },
+        {
+          dum:   'X.....o.X...o...',
+          tek:   '..x..ox...x..xo.',
+          sagat: '..x...x...x...xx',
+        },
+        { swing: 0.58, reps: 8 },                                              // 16-step bar ×8 = 32 beats
+      ),
+    ],
+  },
 };
 
 // Realm ID → theme name.
@@ -573,6 +709,7 @@ const REALM_THEME = {
   chamber: 'chamber',
   council:  'council',
   atlantis: 'atlantis',
+  nile:     'nile',
 };
 
 // ── SoundManager singleton ────────────────────────────────
@@ -787,14 +924,76 @@ class SoundManagerClass {
       return track.seq.reduce((s, [, d]) => s + d, 0);
     }
 
-    for (const [freq, dur] of track.seq) {
-      const durSec = dur * beatLen;
+    // ── Percussion track handler ─────────────────────────────
+    // wave: 'drum' — each seq entry [centerFreq|null, beats] fires a short
+    // tuned filtered-noise burst. centerFreq sets the drum's voice: low
+    // (~110 Hz) reads as a doumbek "dum", high (~1900 Hz) as a "tek". Decay
+    // is short so duty cycle (and loudness) stays low even at a busy tempo.
+    // Only the nile theme uses this; all other themes are untouched.
+    if (track.wave === 'drum') {
+      const rate = ctx.sampleRate;
+      for (const [freq, dur, vel] of track.seq) {
+        const durSec = dur * beatLen;
+        if (freq !== null) {
+          // Three voices by centerFreq: dum (body), tek (crack), and sagat —
+          // finger cymbals: a high, high-Q, longer-ringing metallic tier.
+          const decay  = freq < 400 ? 0.20 : freq < 3000 ? 0.085 : 0.16;
+          const peak   = track.gain * (vel ?? 1);    // accents vs. ghost notes
+          const bufLen = Math.floor(rate * decay);
+          const buf    = ctx.createBuffer(1, bufLen, rate);
+          const data   = buf.getChannelData(0);
+          for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+
+          const bp = ctx.createBiquadFilter();
+          bp.type            = 'bandpass';
+          bp.frequency.value = freq;
+          bp.Q.value         = freq < 400 ? 1.6 : freq < 3000 ? 3.0 : 9.0; // body / crack / ring
+
+          const env = ctx.createGain();
+          env.gain.setValueAtTime(0, t);
+          env.gain.linearRampToValueAtTime(peak, t + 0.004);
+          env.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.connect(bp);
+          bp.connect(env);
+          env.connect(panner);
+          if (track.reverb) env.connect(this._reverb);
+          src.start(t);
+          src.stop(t + decay + 0.01);
+          this._oscillators.push(src);
+        }
+        t     += durSec;
+        beats += dur;
+      }
+      return beats;
+    }
+
+    // prevFreq lets a note glide (portamento) from the pitch before it —
+    // the snake-charmer slide. Reset across rests so phrases start clean.
+    let prevFreq = null;
+
+    for (const [freq, dur, vel] of track.seq) {
+      // Swing (optional): reshape this note's onset + length through the same
+      // curve drumGrid uses, so a melodic part can lock to a swung groove.
+      const ns     = track.swing ? startT + _swung(beats, track.swing) * beatLen : t;
+      const durSec = (track.swing ? startT + _swung(beats + dur, track.swing) * beatLen
+                                  : t + dur * beatLen) - ns;
       if (freq !== null) {
-        const osc = ctx.createOscillator();
-        const env = ctx.createGain();
-        osc.type            = track.wave;
-        osc.frequency.value = freq;
+        const osc  = ctx.createOscillator();
+        const env  = ctx.createGain();
+        const peak = track.gain * (vel ?? 1); // per-note velocity (dynamics)
+        osc.type = track.wave;
         if (track.detune) osc.detune.value = track.detune;
+
+        // Portamento — slide from the previous pitch into this one.
+        if (track.glide && prevFreq !== null) {
+          osc.frequency.setValueAtTime(prevFreq, ns);
+          osc.frequency.linearRampToValueAtTime(freq, ns + Math.min(track.glide, durSec * 0.6));
+        } else {
+          osc.frequency.setValueAtTime(freq, ns);
+        }
 
         // Vibrato LFO — adds expressiveness to melodic leads
         if (track.vibrato && dur >= 0.4) {
@@ -803,33 +1002,36 @@ class SoundManagerClass {
           lfo.frequency.value  = track.vibrato.rate;
           lfoGain.gain.value   = track.vibrato.depth;
           // Delay vibrato onset slightly (natural performer gesture)
-          const vibratoOnset = t + Math.min(0.12, durSec * 0.3);
-          lfoGain.gain.setValueAtTime(0,                   t);
+          const vibratoOnset = ns + Math.min(0.12, durSec * 0.3);
+          lfoGain.gain.setValueAtTime(0,                   ns);
           lfoGain.gain.linearRampToValueAtTime(0,          vibratoOnset);
           lfoGain.gain.linearRampToValueAtTime(track.vibrato.depth,
                                                vibratoOnset + 0.06);
           lfo.connect(lfoGain);
           lfoGain.connect(osc.frequency);
-          lfo.start(t);
-          lfo.stop(t + durSec + 0.01);
+          lfo.start(ns);
+          lfo.stop(ns + durSec + 0.01);
           this._oscillators.push(lfo);
         }
 
         // ADSR: fast attack, full sustain, clean release — no clicks
         const attack  = Math.min(0.018, durSec * 0.05);
         const release = Math.min(0.055, durSec * 0.15);
-        env.gain.setValueAtTime(0,           t);
-        env.gain.linearRampToValueAtTime(track.gain, t + attack);
-        env.gain.setValueAtTime(track.gain,  t + durSec - release);
-        env.gain.linearRampToValueAtTime(0,  t + durSec);
+        env.gain.setValueAtTime(0,    ns);
+        env.gain.linearRampToValueAtTime(peak, ns + attack);
+        env.gain.setValueAtTime(peak, ns + durSec - release);
+        env.gain.linearRampToValueAtTime(0,    ns + durSec);
 
         osc.connect(env);
         env.connect(filter);
-        osc.start(t);
-        osc.stop(t + durSec + 0.005);
+        osc.start(ns);
+        osc.stop(ns + durSec + 0.005);
         this._oscillators.push(osc);
+        prevFreq = freq;
+      } else {
+        prevFreq = null; // a rest breaks the glide chain
       }
-      t     += durSec;
+      t     += dur * beatLen;
       beats += dur;
     }
     return beats;

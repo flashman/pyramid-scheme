@@ -45,30 +45,34 @@ export class TriggerZone {
    * @param {function} opts.onExit    – called once when player exits
    * @param {function} opts.onStay    – called every frame while inside
    * @param {string}   opts.hint      – prompt text drawn while inside, e.g. '[↑] ENTER'
+   * @param {function} opts.hintCondition – gate for SHOWING the hint only (the zone
+   *                   still enters/fires onEnter when out of hint; default: always)
    * @param {number}   opts.hintY     – canvas Y for hint text (default: CH/2 - 20)
    * @param {string}   opts.hintColor – hint color (default: '#f0c020')
    */
   constructor(id, {
-    x1         = 0,
-    x2         = 0,
-    condition  = () => true,
-    onEnter    = null,
-    onExit     = null,
-    onStay     = null,
-    hint       = null,
-    hintY      = null,
-    hintColor  = '#f0c020',
+    x1            = 0,
+    x2            = 0,
+    condition     = () => true,
+    onEnter       = null,
+    onExit        = null,
+    onStay        = null,
+    hint          = null,
+    hintCondition = () => true,
+    hintY         = null,
+    hintColor     = '#f0c020',
   } = {}) {
-    this.id        = id;
-    this.x1        = x1;
-    this.x2        = x2;
-    this.condition = condition;
-    this.onEnter   = onEnter;
-    this.onExit    = onExit;
-    this.onStay    = onStay;
-    this.hint      = hint;
-    this.hintY     = hintY;
-    this.hintColor = hintColor;
+    this.id            = id;
+    this.x1            = x1;
+    this.x2            = x2;
+    this.condition     = condition;
+    this.onEnter       = onEnter;
+    this.onExit        = onExit;
+    this.onStay        = onStay;
+    this.hint          = hint;
+    this.hintCondition = hintCondition;
+    this.hintY         = hintY;
+    this.hintColor     = hintColor;
     this._inside   = false;
     this.active    = true;
   }
@@ -146,6 +150,7 @@ export class TriggerRegistry {
   renderHints(camX = 0) {
     for (const z of this._zones) {
       if (!z.active || !z._inside || !z.hint) continue;
+      if (z.hintCondition && !z.hintCondition()) continue;   // hint hidden, zone still active
       const zoneCenter = (z.x1 + z.x2) / 2;
       const sx  = Math.round(zoneCenter - camX);
       const sy  = z.hintY ?? (CH / 2 - 20);

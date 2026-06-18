@@ -106,6 +106,9 @@ export class GameSession {
       restoreRecruits(recruitsData.recruits);
       if (recruitsData.recruits.length > 0) {
         log(`Restored ${recruitsData.recruits.length} recruit(s) from the server.`, '');
+        // Backfill: any recruit implies a scroll was once sent. Unlocks the
+        // east/west lands for accounts that predate the `first_scroll_sent` flag.
+        if (!Flags.get('first_scroll_sent')) Flags.set('first_scroll_sent', true);
       }
     }
   }

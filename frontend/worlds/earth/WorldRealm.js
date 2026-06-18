@@ -11,6 +11,7 @@ import { COL }                            from '../../engine/colors.js';
 import { GND, WORLD_W, Z_LAYERS }         from './constants.js';
 import { SPEED, SPDHALF, LH, inputDx }   from '../constants.js';
 import { OASIS_ENTRY_X }                  from '../oasis/constants.js';
+import { NILE_GATE_X }                    from '../nile/constants.js';
 import { oasisTransRender, launchTransRender } from '../transitions.js';
 import { PortalRegistry }                      from '../../engine/portal.js';
 import { spawnParts }                     from '../../draw/utils.js';
@@ -52,9 +53,19 @@ export class WorldRealm extends PhysicsRealm {
     this.triggers.add(new TriggerZone('oasis-gate', {
       x1:        OASIS_ENTRY_X - OASIS_GATE_RANGE,
       x2:        OASIS_ENTRY_X + OASIS_GATE_RANGE,
-      condition: () => G.pZ === 0,
-      hint:      '[↑] ENTER THE OASIS',
-      onEnter:   () => log('The east wind pulls you forward.', ''),
+      condition:     () => G.pZ === 0,
+      hint:          '[↑] ENTER THE OASIS',
+      hintCondition: () => Flags.get('first_scroll_sent'),   // prompt hidden until first scroll sent
+      onEnter:       () => log('The east wind pulls you forward.', ''),
+    }));
+
+    this.triggers.add(new TriggerZone('nile-gate', {
+      x1:            0,
+      x2:            NILE_GATE_X,
+      condition:     () => G.pZ === 0,
+      hint:          '[↑] FOLLOW THE RIVER WEST',
+      hintCondition: () => Flags.get('first_scroll_sent'),   // prompt hidden until first scroll sent
+      onEnter:       () => log('A damp wind comes off the water to the west.', ''),
     }));
 
     // Crypt door and capstone-ascend zones are registered lazily in
@@ -70,7 +81,10 @@ export class WorldRealm extends PhysicsRealm {
     PortalRegistry.register({
       from: 'world', to: 'oasis',
       key: 'ArrowUp', trigger: 'oasis-gate',
-      condition:  () => G.bought,
+      // Locked until the first scroll is sent. `first_scroll_sent` is set once,
+      // at the send site in recruits.js — monotonic and immune to invite-count
+      // accumulation (each buy-in adds +4), unlike an `invitesLeft < 4` test.
+      condition:  () => Flags.get('first_scroll_sent'),
       onUse:      () => { G.shake = 6; },
       transition: oasisTransRender, duration: 1200,
     });
@@ -139,6 +153,20 @@ export class WorldRealm extends PhysicsRealm {
   onEnter(fromId) {
     G.shake = 4;
     if (fromId === 'chamber') log('You emerge from the pyramid.', '');
+    if (fromId === 'nile') {
+      // The Nile lies WEST — return to the gate on the desert's west edge,
+      // just east of the trigger zone so it doesn't immediately re-fire.
+      G.px = NILE_GATE_X + 40; G.py = GND; G.pZ = 0; G.pvy = 0;
+      G.camX = 0;
+      log('You climb the bank back into the desert.', '');
+    }
+    if (fromId === 'oasis') {
+      // The Oasis (and the Sphinx) lie EAST — return to its gate on the
+      // desert's east side, just west of the zone so it doesn't re-fire.
+      G.px = OASIS_ENTRY_X - OASIS_GATE_RANGE - 40; G.py = GND; G.pZ = 0; G.pvy = 0;
+      G.camX = Math.max(0, Math.min(WORLD_W - CW, G.px - CW / 2));
+      log('You come back out of the east, into the desert.', '');
+    }
     if (fromId === 'council') {
       const pp = G.pyramids.find(p => p.isPlayer);
       if (pp) { G.px = pp.wx; G.py = GND - pp.layers * LH; }
