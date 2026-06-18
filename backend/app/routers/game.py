@@ -70,7 +70,8 @@ async def save_state(
 @router.get("/config")
 async def get_config():
     from app.payout import PAYOUT_CONFIG
-    return {"payout": PAYOUT_CONFIG}
+    from app.shop import public_catalogue
+    return {"payout": PAYOUT_CONFIG, "shop": public_catalogue()}
 
 
 # ── POST /api/event ───────────────────────────────────────
