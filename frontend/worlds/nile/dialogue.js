@@ -9,6 +9,7 @@
 import { Dialogue } from '../../engine/dialogue.js';
 import { Flags }    from '../../engine/flags.js';
 import { Ledger }   from '../../engine/ledger.js';
+import { Events }   from '../../engine/events.js';
 import { log }      from '../../ui/panels.js';
 
 export function buildMerchantDialogue() {
@@ -48,11 +49,12 @@ export function buildMerchantDialogue() {
       speaker: 'THE MERCHANT  ✦  BAZAAR OF BELIEVERS',
       text: 'THREE PRODUCTS. ALL PROVEN.\nTHE SCARAB AMULET: PASSIVE LUCK.\nTHE PROTECTION SCROLL: DOWNLINE SHIELD.\nTHE PREMIUM BUNDLE: BOTH, PLUS A SECOND SCROLL.\n(THE SECOND SCROLL IS BLANK. SYMBOLICALLY VALUABLE.)',
       choices: [
-        { label: 'Tell me about the Scarab Amulet',    next: 'scarab'  },
-        { label: 'Tell me about the Protection Scroll', next: 'scroll'  },
-        { label: 'Tell me about the Bundle',            next: 'bundle'  },
-        { label: 'None of these sound real',            next: 'real'    },
-        { label: 'Leave',                               next: null      },
+        { label: '✦ Step up to the table', action: () => Events.emit('shop:open'), next: null },
+        { label: 'Tell me about the Scarab Amulet',     next: 'scarab'  },
+        { label: 'Tell me about the Protection Scroll',  next: 'scroll'  },
+        { label: 'Tell me about the Bundle',             next: 'bundle'  },
+        { label: 'None of these sound real',             next: 'real'    },
+        { label: 'Leave',                                next: null      },
       ],
     },
 
