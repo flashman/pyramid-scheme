@@ -149,3 +149,17 @@ class ChangeUsernameRequest(BaseModel):
 
 class ChangeEmailRequest(BaseModel):
     new_email: str | None = Field(default=None, max_length=128)
+
+
+# ── Shop ──────────────────────────────────────────────────
+
+class ShopBuyRequest(BaseModel):
+    item_id: str = Field(..., min_length=1, max_length=64)
+
+
+class ShopBuyResponse(BaseModel):
+    ok:           bool
+    item_id:      str
+    earned:       float
+    invites_left: int
+    owned:        list[str]
