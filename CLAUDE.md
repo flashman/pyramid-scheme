@@ -13,6 +13,7 @@ The stack is a FastAPI backend (Python, async SQLAlchemy, PostgreSQL, WebSockets
 | Realm id | Name | Class |
 |---|---|---|
 | `world` | The Desert | `WorldRealm` (scrolling, physics) |
+| `nile` | The Nile | `NileRealm` (scrolling, physics; west off the Desert; one-way river current) |
 | `oasis` | The Oasis | `OasisRealm` (scrolling, physics, pool wading) |
 | `vault` | Beneath the Sphinx | `VaultRealm` (flat, indoor) |
 | `atlantis` | Atlantis | `AtlantisRealm` (free 2D swim, 5 zones) |
@@ -75,6 +76,9 @@ All shared runtime state (player position, economics, particles, held keys) live
 
 ### Event bus: `Events` (`engine/events.js`)
 Lightweight pub/sub. Cross-system wiring (realm enter → music change, pyramid layer added → particles) is done in `main.js` via `Events.on(...)`. Keep draw-layer imports out of game-logic files by emitting events instead of calling draw functions directly.
+
+### Flags & the Ledger (`engine/flags.js`, `engine/ledger.js`)
+`Flags` are named, persistent game-state values (client-settable; synced to the server and restored on load — see `game/session.js`). Quests gate on them. The **Ledger** (`engine/ledger.js`) is a Flags-backed append-only accumulator of one-way story *forks* (e.g. the Nile basket: `Ledger.record('nile_baby', 'adopted'|'drowned')`). It records "at face amount" — it does not judge — for a future endgame reckoning to read back via `Ledger.count(...)`.
 
 ### Realm system (`engine/realm.js`)
 - `Realm` — minimal base: `onEnter`, `onExit`, `update(ts)`, `render()`, `onKeyDown(key)`, `getPlayerPose()`.
