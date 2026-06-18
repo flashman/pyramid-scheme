@@ -165,6 +165,10 @@ export function buildFerrymanDialogue() {
       speaker: 'THE FERRYMAN  ✦  LICENSED CROSSING',
       text: 'THE TOLL:\nONE COIN. EGYPTIAN STANDARD WEIGHT.\nOR EQUIVALENT IN BELIEF.\nBELIEF IS VALUED AT FACE AMOUNT.\nFACE AMOUNT IS WHAT YOU CAME WITH.\nYOU WILL NOT HAVE IT WHEN YOU ARRIVE.',
       choices: [
+        { label: '(Offer the Bronze Coin)', condition: () => Flags.get('shop_owned_bronze_coin'),
+          action: () => { Flags.set('nile_ferry_paid', true);
+                          log('✦ The coin is exact. The Ferryman does not look surprised.', 'hi'); },
+          next: 'receipt' },
         { label: 'I will pay the toll',     next: 'toll_pay'     },
         { label: 'I will not pay the toll', next: 'toll_refuse'  },
       ],
@@ -228,11 +232,21 @@ export function buildSobekDialogue() {
       speaker: 'SOBEK  ✦  DIVINE COLLECTIONS',
       text: 'I SEE YOU.\n\nI ALWAYS SEE YOU.\nMY EYES ARE ABOVE THE WATERLINE\nEVEN WHEN THE REST OF ME IS NOT.\n\nDO YOU OWE UPLINE?',
       choices: [
+        { label: 'I wear the river\'s own skin', condition: () => Flags.get('shop_owned_croc_sandals'),
+          next: 'sandals' },
         { label: 'I pay what I owe',             next: 'compliant'   },
         { label: 'What happens if I don\'t pay?', next: 'procedure'   },
         { label: 'Who sent you?',                next: 'mandate'     },
         { label: 'I object to being eaten',      next: 'object'      },
       ],
+    },
+
+    // ── Sandals — the crocodile-god regards his own hide ──
+    sandals: {
+      speaker: 'SOBEK  ✦  DIVINE COLLECTIONS',
+      text: 'YOU WEAR ONE OF MINE.\nI DO NOT EAT MY OWN HIDE.\nIT WOULD BE UNPROFESSIONAL.\n\nWE UNDERSTAND EACH OTHER.\nFOR NOW.',
+      onComplete: () => log('✦ Sobek regards your sandals. Something passes between you.', 'hi'),
+      next: null,
     },
 
     // ── Compliant ────────────────────────────────────────
@@ -305,10 +319,20 @@ export function buildJosephDialogue() {
       speaker: 'JOSEPH  ✦  GOVERNOR OF GRAIN',
       text: 'YOU ARE NOT THE FIRST\nTO WALK THIS RIVER WESTWARD.\n\nBUT YOU ARE THE FIRST IN SOME TIME\nWHO LOOKS LIKE THEY UNDERSTAND\nWHAT THEY ARE WALKING TOWARD.\n\nSIT.',
       choices: [
+        { label: 'I read the well too', condition: () => Flags.get('shop_owned_secret_flood'),
+          next: 'fellow_insider' },
         { label: 'Who are you?',           next: 'recognition'  },
         { label: 'What did you build here?', next: 'granary'    },
         { label: 'I know who you are',     next: 'heir'         },
       ],
+    },
+
+    // ── Fellow insider — the player carries the Secret of the Flood ──
+    fellow_insider: {
+      speaker: 'JOSEPH  ✦  GOVERNOR OF GRAIN',
+      text: 'THEN YOU KNOW.\nYOU KNEW BEFORE THE OTHERS KNEW.\nYOU WERE AT THE WELL.\n\nWE ARE NOT MANY.\nWE NEVER WERE.\nTHAT IS RATHER THE POINT.',
+      onComplete: () => log('✦ Joseph nods, slowly. You are not strangers. You never were.', 'hi'),
+      next: 'heir',
     },
 
     // ── Recognition ──────────────────────────────────────
