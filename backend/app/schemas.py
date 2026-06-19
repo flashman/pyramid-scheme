@@ -23,6 +23,14 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+# ── Inventory ─────────────────────────────────────────────
+
+class InventoryItemOut(BaseModel):
+    item_id:  str
+    quantity: int
+    equipped: bool
+
+
 # ── Game state ────────────────────────────────────────────
 
 class MeResponse(BaseModel):
@@ -34,6 +42,7 @@ class MeResponse(BaseModel):
     invites_left: int
     flags:        dict
     balance:      float
+    inventory:    list[InventoryItemOut] = []
 
     class Config:
         from_attributes = True
@@ -162,4 +171,4 @@ class ShopBuyResponse(BaseModel):
     item_id:      str
     earned:       float
     invites_left: int
-    owned:        list[str]
+    inventory:    list[InventoryItemOut]
