@@ -104,6 +104,7 @@ Browser
 
 **Key backend files**
 - `app/chain.py` — upline chain-walk logic (shared by buy-in and dev sim)
+- `app/shop.py` / `app/inventory.py` — bazaar catalogue (single source of truth) + the `inventory` table; `POST /api/shop/buy` spends `earned` and writes a `Transaction` ledger row
 - `app/ws.py` — WebSocket connection manager (multi-tab per user)
 - `app/email.py` — SMTP sender (Mailhog in dev, real SMTP in prod)
 - `app/routers/dev.py` — simulation endpoints (gated behind `DEBUG=true`)
@@ -113,6 +114,7 @@ Browser
   stereo panning
 - `game/ws.js` — WS client with auto-reconnect + keep-alive
 - `game/recruits.js` — `addRecruit()` handles both real WS arrivals and local guest sim
+- `game/inventory.js` + `worlds/nile/shop/` — the "JUST POTS" bazaar stall overlay + client inventory store
 - `ui/auth.js` — login/register overlay; ToS gate on registration (PSE-TOS-2025-R1)
 - `ui/dev-panel.js` — dev panel including the sim section
 - `worlds/oasis/riddles.js` — Sphinx riddle system; renders via shared `#dlg` HTML panel
@@ -131,6 +133,10 @@ docker compose exec backend alembic history
 
 Migration files:
 - `0001_initial_schema` — full schema from scratch (squashed from earlier incremental migrations)
+- `0002_inventory` — bazaar shop `inventory` table
+
+Migrations auto-apply on deploy: the backend Dockerfile runs `alembic upgrade head` before uvicorn,
+and Render uses that Dockerfile — so there's no manual migration step in production.
 
 ---
 

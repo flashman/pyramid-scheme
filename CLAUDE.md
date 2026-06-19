@@ -64,8 +64,9 @@ Backend hot-reloads via uvicorn `--reload` (source bind-mounted at `/app`). Fron
 Key files:
 - `app/chain.py` — `run_buyin_chain()` walks the upline and credits ancestors. Shared by real buy-ins (`routers/payments.py`) and the dev sim (`routers/dev.py`). Does NOT commit — caller commits then pushes WS events.
 - `app/payout.py` — `PAYOUT_CONFIG` is the **single source of truth** for all payout math. The frontend fetches it via `GET /api/config`; never duplicate these values in JS.
+- `app/shop.py` — `SHOP_CATALOGUE` is the **single source of truth** for bazaar ware ids/prices (mirrors `payout.py`); served via `GET /api/config`. Never hardcode ware prices in JS. `app/inventory.py` has the inventory helpers; ownership lives in the `inventory` table (**keepsakes only**, qty 1 — consumables are effect-only, never inventoried), and every buy writes a `shop_buy` row to `Transaction` (the DB ledger). **Namespace lock:** `PUT /api/state` strips reserved flag prefixes (`shop_owned_*`) so clients can't forge ownership — keep server-owned state out of the client-settable `flags`.
 - `app/ws.py` — `manager` singleton (`ConnectionManager`). Supports multiple tabs per user. Import `manager` wherever you need to push real-time events.
-- `app/models.py` — `User`, `GameState`, `Invite`, `Recruit`, `Transaction`, `GameEvent`. `Recruit.meta` (JSON) is patched by the frontend after slot assignment via `PATCH /api/recruits/{id}/meta`.
+- `app/models.py` — `User`, `GameState`, `Invite`, `Recruit`, `Transaction`, `GameEvent`, `Inventory`. `Recruit.meta` (JSON) is patched by the frontend after slot assignment via `PATCH /api/recruits/{id}/meta`.
 
 ## Frontend architecture
 
@@ -79,6 +80,9 @@ Lightweight pub/sub. Cross-system wiring (realm enter → music change, pyramid 
 
 ### Flags & the Ledger (`engine/flags.js`, `engine/ledger.js`)
 `Flags` are named, persistent game-state values (client-settable; synced to the server and restored on load — see `game/session.js`). Quests gate on them. The **Ledger** (`engine/ledger.js`) is a Flags-backed append-only accumulator of one-way story *forks* (e.g. the Nile basket: `Ledger.record('nile_baby', 'adopted'|'drowned')`). It records "at face amount" — it does not judge — for a future endgame reckoning to read back via `Ledger.count(...)`.
+
+### Inventory & the bazaar shop (`game/inventory.js`, `worlds/nile/shop/`)
+The `Inventory` store mirrors the server inventory — hydrated from `/api/me` and the WS `inventory_update` event, which **always carry the full list** (`hydrate()` replaces, never merges). The "JUST POTS" stall (`worlds/nile/shop/StallOverlay.js`) is a canvas overlay opened from the Nile merchant; wares come from the server catalogue (`game/config.js getShop()`), the spoken descriptions/retorts drive the real `#dlg` window, and buying goes through `POST /api/shop/buy`. Read ownership via `Inventory.owned(id)` — **not** `shop_owned_*` flags. The design + the (cut) Phase 2/3 scope live in `docs/superpowers/specs/2026-06-18-shop-*`.
 
 ### Realm system (`engine/realm.js`)
 - `Realm` — minimal base: `onEnter`, `onExit`, `update(ts)`, `render()`, `onKeyDown(key)`, `getPlayerPose()`.
