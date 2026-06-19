@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Integer, String, Numeric, Boolean, DateTime, ForeignKey, JSON
+from sqlalchemy import Integer, String, Numeric, Boolean, DateTime, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -35,6 +35,7 @@ class User(Base):
     recruits_made: Mapped[list[Recruit]]         = relationship("Recruit",     back_populates="recruiter",
                                                                 foreign_keys="[Recruit.recruiter_id]")
     events:        Mapped[list[GameEvent]]       = relationship("GameEvent",   back_populates="user")
+    inventory:     Mapped[list[Inventory]]       = relationship("Inventory", back_populates="user")
     invites_sent:  Mapped[list[Invite]]          = relationship("Invite",      back_populates="inviter",
                                                                 foreign_keys="[Invite.inviter_id]")
 
@@ -58,6 +59,24 @@ class GameState(Base):
     updated_at:   Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     user: Mapped[User] = relationship("User", back_populates="game_state")
+
+
+# ── Inventory ─────────────────────────────────────────────
+
+class Inventory(Base):
+    __tablename__ = "inventory"
+
+    id:          Mapped[int]      = mapped_column(Integer, primary_key=True)
+    user_id:     Mapped[int]      = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    item_id:     Mapped[str]      = mapped_column(String(64), nullable=False)
+    quantity:    Mapped[int]      = mapped_column(Integer, default=1, nullable=False)
+    equipped:    Mapped[bool]     = mapped_column(Boolean, default=False, nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at:  Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (UniqueConstraint("user_id", "item_id", name="uq_inventory_user_item"),)
+
+    user: Mapped[User] = relationship("User", back_populates="inventory")
 
 
 # ── Invite ────────────────────────────────────────────────

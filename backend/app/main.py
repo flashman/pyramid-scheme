@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, game, payments
+from app.routers import auth, game, payments, shop
 from app.routers import invites as invites_router
 from app.routers import ws as ws_router
 from app.routers import profile as profile_router
@@ -38,6 +38,7 @@ app.include_router(game.router,           prefix="/api",      tags=["game"])
 app.include_router(payments.router,       prefix="/api",      tags=["payments"])
 app.include_router(invites_router.router, prefix="/api",      tags=["invites"])
 app.include_router(profile_router.router, prefix="/api",      tags=["profile"])
+app.include_router(shop.router,           prefix="/api",      tags=["shop"])
 
 # ── WebSocket ─────────────────────────────────────────────
 app.include_router(ws_router.router, tags=["websocket"])

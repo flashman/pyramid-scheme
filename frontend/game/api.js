@@ -118,6 +118,9 @@ export const Api = {
   /** Trigger the buy-in flow. */
   buyIn(fee) { return Api.post('/api/buy-in', { fee }); },
 
+  /** Purchase a ware from the bazaar. Returns { ok, earned, invites_left, owned } or { error/detail }. */
+  buyItem(itemId) { return Api.post('/api/shop/buy', { item_id: itemId }); },
+
   /** Fetch the full recruit history for the current user. */
   loadRecruits() { return Api.get('/api/recruits'); },
 

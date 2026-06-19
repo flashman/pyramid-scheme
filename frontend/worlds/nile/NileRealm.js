@@ -19,6 +19,8 @@ import { InteractableRegistry }           from '../../engine/interactables.js';
 import { DialogueManager }                from '../../engine/dialogue.js';
 import { PortalRegistry }                 from '../../engine/portal.js';
 import { Flags }                          from '../../engine/flags.js';
+import { Events }                         from '../../engine/events.js';
+import { StallOverlay }                   from './shop/StallOverlay.js';
 import { G }                              from '../../game/state.js';
 import { inputDx, SPEED, SPDHALF }        from '../constants.js';
 import { CW }                             from '../../engine/canvas.js';
@@ -67,6 +69,11 @@ export class NileRealm extends PhysicsRealm {
 
     this.registry = new InteractableRegistry();
     this._deltaSeen = false;
+
+    // The bazaar stall — a first-person canvas sub-mode (not a realm). Opened
+    // from the merchant dialogue via the Events bus so dialogue.js stays decoupled.
+    this.stall = new StallOverlay();
+    Events.on('shop:open', () => { if (!this.stall.isOpen()) this.stall.open(); });
 
     this.health = new HealthSystem({
       respawnDelay: 2200, immunityAfterSpawn: 2500,
@@ -216,6 +223,7 @@ export class NileRealm extends PhysicsRealm {
 
   update(ts) {
     if (RealmManager.isTransitioning) return;
+    if (this.stall.isOpen()) return;   // frozen at the table
     if (this.health.update()) { G.camX = this._trackCameraX(G.camX, G.px); return; }
     if (DialogueManager.isActive()) return;
 
@@ -298,9 +306,11 @@ export class NileRealm extends PhysicsRealm {
     drawParts();                       // water splashes (screen-space; handles camX)
     if (!RealmManager.isTransitioning) this.triggers.renderHints(G.camX);
     DialogueManager.render();
+    this.stall.render();               // topmost canvas content while open
   }
 
   onKeyDown(key) {
+    if (this.stall.isOpen()) return this.stall.onKeyDown(key);
     if (RealmManager.isTransitioning) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
 

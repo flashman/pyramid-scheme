@@ -23,6 +23,14 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+# ── Inventory ─────────────────────────────────────────────
+
+class InventoryItemOut(BaseModel):
+    item_id:  str
+    quantity: int
+    equipped: bool
+
+
 # ── Game state ────────────────────────────────────────────
 
 class MeResponse(BaseModel):
@@ -34,6 +42,7 @@ class MeResponse(BaseModel):
     invites_left: int
     flags:        dict
     balance:      float
+    inventory:    list[InventoryItemOut] = []
 
     class Config:
         from_attributes = True
@@ -149,3 +158,17 @@ class ChangeUsernameRequest(BaseModel):
 
 class ChangeEmailRequest(BaseModel):
     new_email: str | None = Field(default=None, max_length=128)
+
+
+# ── Shop ──────────────────────────────────────────────────
+
+class ShopBuyRequest(BaseModel):
+    item_id: str = Field(..., min_length=1, max_length=64)
+
+
+class ShopBuyResponse(BaseModel):
+    ok:           bool
+    item_id:      str
+    earned:       float
+    invites_left: int
+    inventory:    list[InventoryItemOut]

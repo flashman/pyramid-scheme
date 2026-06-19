@@ -15,6 +15,8 @@ let _cfg = {
   minPayout:   0.01,
 };
 
+let _shop = {};   // id → { name, price, kind } — from GET /api/config
+
 /**
  * Fetch payout parameters from the server and store them locally.
  * Should be called once during init(), before renderPayoutTable().
@@ -32,10 +34,17 @@ export async function loadConfig(Api) {
       minPayout:   p.min_payout   ?? _cfg.minPayout,
     };
   }
+  if (data && data.shop && !data.error) _shop = data.shop;
 }
 
 /** Read-only snapshot of the current server config. */
 export function getCFG() { return { ..._cfg }; }
+
+/** Read-only snapshot of the shop catalogue prices (id → {name, price, kind}). */
+export function getShop() { return { ..._shop }; }
+
+/** True once shop prices have been loaded from the server. */
+export function shopLoaded() { return Object.keys(_shop).length > 0; }
 
 /**
  * Returns the payout amount for a recruit at the given chain depth.

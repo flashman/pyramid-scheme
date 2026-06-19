@@ -9,8 +9,11 @@ from app.schemas import (
     RecruitResponse, RecruitListResponse, PatchRecruitMetaRequest,
 )
 from app.auth import get_current_user
+from app.inventory import inventory_list
 
 router = APIRouter()
+
+RESERVED_FLAG_PREFIXES = ("shop_owned_",)   # server-owned; never client-settable
 
 
 # ── GET /api/me ───────────────────────────────────────────
@@ -28,6 +31,7 @@ async def me(
         await db.commit()
         await db.refresh(state)
 
+    inv = await inventory_list(db, current_user.id)
     return MeResponse(
         username=current_user.username,
         email=current_user.email,
@@ -37,6 +41,7 @@ async def me(
         invites_left=state.invites_left,
         flags=state.flags or {},
         balance=current_user.balance,
+        inventory=inv,
     )
 
 
@@ -54,10 +59,12 @@ async def save_state(
         state = GameState(user_id=current_user.id)
         db.add(state)
 
-    # Only flags are client-settable. bought / earned / invites_left are
-    # mutated server-side only (buy-in flow, chain walk).
+    # Only flags are client-settable — and reserved (server-owned) namespaces
+    # are stripped so ownership can't be forged through this channel.
     if body.flags is not None:
-        state.flags = {**(state.flags or {}), **body.flags}
+        incoming = {k: v for k, v in body.flags.items()
+                    if not k.startswith(RESERVED_FLAG_PREFIXES)}
+        state.flags = {**(state.flags or {}), **incoming}
 
     await db.commit()
     return {"ok": True}
@@ -70,7 +77,8 @@ async def save_state(
 @router.get("/config")
 async def get_config():
     from app.payout import PAYOUT_CONFIG
-    return {"payout": PAYOUT_CONFIG}
+    from app.shop import public_catalogue
+    return {"payout": PAYOUT_CONFIG, "shop": public_catalogue()}
 
 
 # ── POST /api/event ───────────────────────────────────────
