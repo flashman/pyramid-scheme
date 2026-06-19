@@ -714,12 +714,12 @@ export function drawMerchantTent(cx, baseY, t) {
   X.fillStyle = '#e8dcc0'; X.fillRect(cx - 42, eaveY + 1, 84, 11);
   X.fillStyle = '#caa040'; X.fillRect(cx - 42, eaveY + 1, 84, 1);
   X.fillStyle = '#9a3a2a'; X.font = '5px monospace'; X.textAlign = 'center';
-  X.fillText('BAZAAR OF BELIEVERS', cx, eaveY + 9);
+  X.fillText('JUST POTS', cx, eaveY + 9);
   X.textAlign = 'left'; X.restore();
 }
 
 // A standing balance — he values belief "at face amount". The beam tips slowly.
-function drawBalanceScale(px, baseY, t) {
+export function drawBalanceScale(px, baseY, t) {
   const postH = 40, baseTop = baseY - postH;
   X.fillStyle = '#5a3a16'; X.fillRect(px - 7, baseY - 3, 16, 3);     // foot
   X.fillStyle = '#7a5a2a'; X.fillRect(px - 1, baseTop, 3, postH);    // post

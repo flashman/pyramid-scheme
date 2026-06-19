@@ -12,7 +12,7 @@ import { loadConfig, getShop, shopLoaded } from '../../../game/config.js';
 import { WARES }            from './catalogue.js';
 import { purchase, isOwned } from './buy.js';
 import { drawWareArt }      from './ware-art.js';
-import { drawMerchant, drawMerchantTent } from '../draw/nile.js';
+import { drawMerchant, drawMerchantTent, drawBalanceScale } from '../draw/nile.js';
 
 const SCALE   = 2.7;     // merchant + tent magnification ("life size" in frame)
 const FEET_Y  = 345;     // merchant feet (just behind the table top → legs hidden)
@@ -83,7 +83,7 @@ export class StallOverlay {
     const full = pitchFor(w);
     if (full !== this._typeFull) { this._typeFull = full; this._typeStart = performance.now(); }
     const shown = full.slice(0, Math.floor((performance.now() - this._typeStart) / TYPE_MS));
-    set('dlg-speaker', w ? `THE MERCHANT  ✦  ${w.name.toUpperCase()}` : 'THE MERCHANT  ✦  BAZAAR OF BELIEVERS');
+    set('dlg-speaker', w ? `THE MERCHANT  ✦  ${w.name.toUpperCase()}` : 'THE MERCHANT  ✦  JUST POTS');
     set('dlg-text', shown);
     const ch = document.getElementById('dlg-choices'); if (ch) ch.innerHTML = '';
     set('dlg-hint', '← → ↑ ↓ MOVE    SPACE BUY    ESC LEAVE');
@@ -144,6 +144,21 @@ export class StallOverlay {
     X.fillStyle = vg; X.fillRect(0, 0, CW, CH);
   }
 
+  // ── A hookah on the table corner: glass base, gold stem, glowing bowl, hose, smoke ──
+  _drawHookah(x, baseY, t) {
+    X.fillStyle = '#3a6a8a'; X.beginPath(); X.ellipse(x, baseY - 11, 13, 15, 0, 0, Math.PI * 2); X.fill();   // glass base
+    X.fillStyle = '#5a9ac8'; X.beginPath(); X.ellipse(x - 4, baseY - 16, 4, 6, 0, 0, Math.PI * 2); X.fill(); // highlight
+    X.fillStyle = '#244a64'; X.fillRect(x - 13, baseY - 7, 26, 4);                                            // liquid line
+    X.fillStyle = '#caa040'; X.fillRect(x - 2, baseY - 50, 4, 39);                                            // stem
+    X.fillStyle = '#9a7c3a'; X.fillRect(x - 5, baseY - 32, 10, 4);                                            // joint
+    X.fillStyle = '#8a5a3a'; X.beginPath(); X.moveTo(x - 8, baseY - 50); X.lineTo(x + 8, baseY - 50); X.lineTo(x + 4, baseY - 58); X.lineTo(x - 4, baseY - 58); X.closePath(); X.fill();  // clay bowl
+    X.save(); X.globalAlpha = 0.5 + 0.35 * Math.sin(t / 300); X.fillStyle = '#e8602a'; X.fillRect(x - 3, baseY - 60, 6, 3); X.restore();  // coal glow
+    X.strokeStyle = '#7a3a30'; X.lineWidth = 3; X.beginPath(); X.moveTo(x + 3, baseY - 30); X.quadraticCurveTo(x + 30, baseY - 18, x + 24, baseY + 4); X.stroke();  // hose
+    X.fillStyle = '#caa040'; X.fillRect(x + 22, baseY + 2, 5, 7);                                             // mouthpiece
+    X.save(); X.globalAlpha = 0.15; X.strokeStyle = '#d8d0c0'; X.lineWidth = 2;                               // smoke
+    X.beginPath(); X.moveTo(x, baseY - 60); for (let yy = baseY - 60; yy > baseY - 128; yy -= 10) X.lineTo(x + Math.sin(yy / 16 + t / 600) * 7, yy); X.stroke(); X.restore();
+  }
+
   render() {
     if (!this._open) return;
     const shop = getShop();
@@ -198,6 +213,10 @@ export class StallOverlay {
       else if (priced) { X.fillStyle = afford ? '#e8c878' : '#a05a4a'; X.fillText(`$${priced.price}`, cx, cy + 30); }
     });
     X.textAlign = 'left';
+
+    // trade dressing on the table ends: the scale of belief (as outside) + a hookah
+    X.save(); X.translate(744, 476); X.scale(1.6, 1.6); drawBalanceScale(0, 0, now); X.restore();
+    this._drawHookah(40, 516, now);
 
     this._interiorFront(now);
     this._speak(WARES[this._sel]);
