@@ -15,6 +15,7 @@
 
 import { Events }              from '../engine/events.js';
 import { Flags }               from '../engine/flags.js';
+import { Inventory }            from './inventory.js';
 import { CW }                  from '../engine/canvas.js';
 import { G }                   from './state.js';
 import { Api }                 from './api.js';
@@ -80,6 +81,7 @@ export class GameSession {
         Flags._store[k] = v;  // bypass event bus to avoid sync-back loop
       }
     }
+    if (Array.isArray(me.inventory)) Inventory.hydrate(me.inventory);
     log(`Welcome back, ${me.username}!`, 'hi');
   }
 
@@ -170,6 +172,13 @@ export class GameSession {
       if (evt.invested     != null) G.invested    = evt.invested;
       updateStats();
       updateSlots();
+    });
+
+    // Server pushed a fresh inventory snapshot (e.g. after a shop buy).
+    Events.on('ws:inventory_update', (evt) => {
+      if (evt.type === 'inventory_update' && Array.isArray(evt.inventory)) {
+        Inventory.hydrate(evt.inventory);
+      }
     });
 
     // An invitee registered (but hasn't bought in yet).
