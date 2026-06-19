@@ -19,6 +19,7 @@ const FEET_Y  = 345;     // merchant feet (just behind the table top → legs hi
 const TABLE_Y = 318;     // table surface line
 const PER_ROW = 9;       // wares per row laid on the table (2 rows for 17)
 const TYPE_MS = 26;      // ms per character of the merchant's spoken pitch
+const WELCOME = 'STEP IN, FUTURE PHARAOH. MIND THE POTS.\nEVERYTHING ON THE TABLE IS FOR SALE.\nTHE LOOKING IS FREE. THE WANTING, ALSO.';
 
 const RED = '#5a281f', RED_LT = '#7a3a30', RED_DK = '#3a1d18', GOLD = '#caa040';
 
@@ -36,6 +37,7 @@ export class StallOverlay {
     this._loading = false;
     this._typeFull = '';     // current target pitch (resets the typewriter when it changes)
     this._typeStart = 0;
+    this._welcomed = false;  // show the welcome first; first interaction hands off to item pitches
   }
 
   isOpen() { return this._open; }
@@ -44,6 +46,7 @@ export class StallOverlay {
     this._open = true;
     this._sel  = 0;
     this._typeFull = '';
+    this._welcomed = false;
     G.shake = 0;                    // steady frame — the loop applies G.shake around render()
     if (!shopLoaded()) {            // guests skip GameSession → no prices yet
       this._loading = true;
@@ -61,6 +64,7 @@ export class StallOverlay {
   onKeyDown(key) {
     if (!this._open) return false;
     if (key === 'Escape' || key === 'q' || key === 'Q') { this.close(); return true; }
+    this._welcomed = true;     // first interaction hands off from the welcome to item pitches
     const n = WARES.length;
     if (key === 'ArrowRight' || key === 'd' || key === 'D') { this._sel = (this._sel + 1) % n; return true; }
     if (key === 'ArrowLeft'  || key === 'a' || key === 'A') { this._sel = (this._sel - 1 + n) % n; return true; }
@@ -74,20 +78,27 @@ export class StallOverlay {
     return true;   // swallow all keys while open
   }
 
-  /** Speak the selected ware through the real #dlg window — title in the gold
-      speaker line; the pitch types out (the merchant "speaks" on select). */
-  _speak(w) {
+  /** Speak a line through the real #dlg window — typed out (the merchant "speaks").
+      Used for both the entry welcome and per-ware pitches. */
+  _say(speaker, full) {
     const dlg = document.getElementById('dlg');
     if (!dlg) return;
     const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    const full = pitchFor(w);
     if (full !== this._typeFull) { this._typeFull = full; this._typeStart = performance.now(); }
     const shown = full.slice(0, Math.floor((performance.now() - this._typeStart) / TYPE_MS));
-    set('dlg-speaker', w ? `THE MERCHANT  ✦  ${w.name.toUpperCase()}` : 'THE MERCHANT  ✦  JUST POTS');
+    set('dlg-speaker', speaker);
     set('dlg-text', shown);
     const ch = document.getElementById('dlg-choices'); if (ch) ch.innerHTML = '';
     set('dlg-hint', '← → ↑ ↓ MOVE    SPACE BUY    ESC LEAVE');
     dlg.classList.add('active');     // re-asserted each frame (DialogueManager clears it when idle)
+  }
+
+  /** What the merchant is currently saying: the welcome until the player browses,
+      then the selected ware's pitch. */
+  _speakCurrent() {
+    if (!this._welcomed) return this._say('THE MERCHANT  ✦  JUST POTS', WELCOME);
+    const w = WARES[this._sel];
+    this._say(w ? `THE MERCHANT  ✦  ${w.name.toUpperCase()}` : 'THE MERCHANT  ✦  JUST POTS', pitchFor(w));
   }
 
   // ── Tent interior, behind the merchant ──────────────────
@@ -233,7 +244,7 @@ export class StallOverlay {
     if (this._loading) {
       X.textAlign = 'center'; X.fillStyle = '#cbb288'; X.font = '14px monospace';
       X.fillText('the merchant unrolls his catalogue…', CW / 2, CH / 2);
-      X.textAlign = 'left'; this._speak(null); return;
+      X.textAlign = 'left'; this._say('THE MERCHANT  ✦  JUST POTS', WELCOME); return;
     }
 
     // ── Weird stock hung on the tent wall, flanking the merchant ──
@@ -276,6 +287,6 @@ export class StallOverlay {
     X.textAlign = 'left';
 
     this._interiorFront(now);
-    this._speak(WARES[this._sel]);
+    this._speakCurrent();
   }
 }
