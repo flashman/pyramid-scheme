@@ -9,7 +9,7 @@ import { X, CW, CH }        from '../../../engine/canvas.js';
 import { G }                from '../../../game/state.js';
 import { Api }              from '../../../game/api.js';
 import { loadConfig, getShop, shopLoaded } from '../../../game/config.js';
-import { WARES }            from './catalogue.js';
+import { WARES, GENERIC_RETORTS, WARE_RETORTS } from './catalogue.js';
 import { purchase, isOwned } from './buy.js';
 import { drawWareArt }      from './ware-art.js';
 import { drawMerchant, drawMerchantTent, drawBalanceScale } from '../draw/nile.js';
@@ -38,6 +38,8 @@ export class StallOverlay {
     this._typeFull = '';     // current target pitch (resets the typewriter when it changes)
     this._typeStart = 0;
     this._welcomed = false;  // show the welcome first; first interaction hands off to item pitches
+    this._retort = '';       // a snarky line shown briefly after a successful buy
+    this._retortUntil = 0;
   }
 
   isOpen() { return this._open; }
@@ -47,6 +49,7 @@ export class StallOverlay {
     this._sel  = 0;
     this._typeFull = '';
     this._welcomed = false;
+    this._retortUntil = 0;
     G.shake = 0;                    // steady frame — the loop applies G.shake around render()
     if (!shopLoaded()) {            // guests skip GameSession → no prices yet
       this._loading = true;
@@ -72,7 +75,7 @@ export class StallOverlay {
     if (key === 'ArrowUp'    || key === 'w' || key === 'W') { this._sel = Math.max(0, this._sel - PER_ROW); return true; }
     if (key === ' ' || key === 'Enter' || key === 'z' || key === 'Z') {
       const ware = WARES[this._sel];
-      if (ware) purchase(ware.id);   // fire-and-forget; render re-reads state
+      if (ware) purchase(ware.id).then(r => { if (r && r.ok) this._fireRetort(ware.id); });
       return true;
     }
     return true;   // swallow all keys while open
@@ -93,9 +96,17 @@ export class StallOverlay {
     dlg.classList.add('active');     // re-asserted each frame (DialogueManager clears it when idle)
   }
 
-  /** What the merchant is currently saying: the welcome until the player browses,
-      then the selected ware's pitch. */
+  /** Begin a snarky retort (item-specific if defined, else a random generic). */
+  _fireRetort(id) {
+    const pool = GENERIC_RETORTS;
+    this._retort = WARE_RETORTS[id] || pool[Math.floor(Math.random() * pool.length)];
+    this._retortUntil = performance.now() + 3600;
+  }
+
+  /** What the merchant is currently saying: a buy retort if one is active, else
+      the welcome until the player browses, then the selected ware's pitch. */
   _speakCurrent() {
+    if (performance.now() < this._retortUntil) return this._say('THE MERCHANT  ✦  JUST POTS', this._retort);
     if (!this._welcomed) return this._say('THE MERCHANT  ✦  JUST POTS', WELCOME);
     const w = WARES[this._sel];
     this._say(w ? `THE MERCHANT  ✦  ${w.name.toUpperCase()}` : 'THE MERCHANT  ✦  JUST POTS', pitchFor(w));
