@@ -140,7 +140,7 @@ export class StallOverlay {
       X.stroke(); X.restore();
     }
     const vg = X.createRadialGradient(CW / 2, CH / 2, CH * 0.35, CW / 2, CH / 2, CH * 0.75);
-    vg.addColorStop(0, 'transparent'); vg.addColorStop(1, 'rgba(8,5,2,0.7)');
+    vg.addColorStop(0, 'transparent'); vg.addColorStop(1, 'rgba(8,5,2,0.5)');
     X.fillStyle = vg; X.fillRect(0, 0, CW, CH);
   }
 
@@ -214,11 +214,13 @@ export class StallOverlay {
     });
     X.textAlign = 'left';
 
-    // trade dressing on the table ends: the scale of belief (as outside) + a hookah
-    X.save(); X.translate(744, 476); X.scale(1.6, 1.6); drawBalanceScale(0, 0, now); X.restore();
-    this._drawHookah(40, 516, now);
-
     this._interiorFront(now);
+
+    // trade dressing — drawn AFTER the vignette so the corners don't bury it:
+    // the scale of belief (as outside) on the right, a hookah on the left.
+    X.save(); X.translate(704, 506); X.scale(1.8, 1.8); drawBalanceScale(0, 0, now); X.restore();
+    this._drawHookah(90, 534, now);
+
     this._speak(WARES[this._sel]);
   }
 }
