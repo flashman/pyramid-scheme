@@ -22,7 +22,7 @@ def upgrade() -> None:
         sa.Column("quantity",    sa.Integer,      nullable=False, server_default="1"),
         sa.Column("equipped",    sa.Boolean,      nullable=False, server_default=sa.false()),
         sa.Column("acquired_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at",  sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("updated_at",  sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now()),
         sa.UniqueConstraint("user_id", "item_id", name="uq_inventory_user_item"),
     )
     op.create_index("ix_inventory_user_id", "inventory", ["user_id"])

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -43,14 +44,20 @@ async def buy_item(
     # ── Atomic: deduct → grant inventory → ledger row, one commit ──
     state.earned = round(float(state.earned or 0) - price, 2)
     # Phase 1: consumables apply their effect on buy (use-on-demand is Phase 2).
-    if item["kind"] == "consumable" and item["effect"]["type"] == "invites":
-        state.invites_left = (state.invites_left or 0) + item["effect"]["amount"]
+    effect = item.get("effect") or {}
+    if item["kind"] == "consumable" and effect.get("type") == "invites":
+        state.invites_left = (state.invites_left or 0) + effect["amount"]
 
     await grant_item(db, current_user.id, body.item_id)
     db.add(Transaction(user_id=current_user.id, type="shop_buy",
                        amount=-price, ref_id=body.item_id, meta={"qty": 1}))
-    await db.commit()
-    await db.refresh(state)
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Concurrent keepsake buy raced past the SELECT check and hit the
+        # uq_inventory_user_item constraint — surface the correct 409, not a 500.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Already owned.")
 
     inv = await inventory_list(db, current_user.id)
 

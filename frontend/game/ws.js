@@ -9,6 +9,7 @@
 // Events emitted on the global Events bus:
 //   ws:recruit_joined   { name, depth, payout, db_recruit_id, parent_name }
 //   ws:state_update     { bought?, invites_left?, earned?, balance? }
+//   ws:inventory_update { inventory: [{ item_id, quantity, equipped }] }
 //   ws:invite_accepted  { email, recruit_username }
 //   ws:connected        {}
 //   ws:disconnected     {}
