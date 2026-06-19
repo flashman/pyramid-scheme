@@ -655,7 +655,7 @@ function drawBazaar(t) {
 // Back wall + poles + canopy are drawn behind the figure; the valance, side
 // drapes, lantern and sign hang at/above head height so the figure reads as
 // sheltered within it.
-function drawMerchantTent(cx, baseY, t) {
+export function drawMerchantTent(cx, baseY, t) {
   const HW = 54;                       // half-width at the base
   const ridgeY = baseY - 120;          // roof peak
   const eaveY  = baseY - 84;           // where the canopy meets the poles
@@ -838,7 +838,7 @@ function drawBeliever(x, baseY, variant, t, kneel) {
   X.fillRect(x + 9, y - 37 - lift, 3, 3);
 }
 
-function drawMerchant(x, baseY, t) {
+export function drawMerchant(x, baseY, t) {
   const y = baseY;
   const look = Math.max(-1, Math.min(1, (G.px - x) / 140));   // eyes track the mark
 

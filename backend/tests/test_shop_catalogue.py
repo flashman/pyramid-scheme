@@ -1,6 +1,14 @@
 from app.shop import SHOP_CATALOGUE, get_item, price_of, public_catalogue
 
 
+def test_catalogue_has_expected_ids():
+    assert "protection_scroll" not in SHOP_CATALOGUE  # dropped
+    assert "blank_scroll" not in SHOP_CATALOGUE        # dropped
+    for new_id in ("secret_recursion", "secret_fire", "attentive_reel", "self_equity"):
+        assert new_id in SHOP_CATALOGUE
+    assert len(SHOP_CATALOGUE) == 17
+
+
 def test_every_item_has_required_fields():
     for item_id, item in SHOP_CATALOGUE.items():
         assert item["name"], f"{item_id} missing name"
