@@ -51,11 +51,12 @@ export class StallOverlay {
     this._sel  = 0;
     this._typeFull = '';
     this._welcomed = false;
+    this._retort = '';
     this._retortUntil = 0;
     G.shake = 0;                    // steady frame — the loop applies G.shake around render()
     if (!shopLoaded()) {            // guests skip GameSession → no prices yet
       this._loading = true;
-      try { await loadConfig(Api); } catch { /* leave _loading; render shows a notice */ }
+      try { await loadConfig(Api); } catch { /* loadConfig failed; if prices stay missing the stall shows a notice */ }
       this._loading = false;
     }
   }

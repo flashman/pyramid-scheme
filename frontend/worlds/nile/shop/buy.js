@@ -44,6 +44,8 @@ export async function purchase(itemId) {
     // Local-only, like guest recruits. Keepsakes are held; consumables are
     // effect-only (mirrors the server: no inventory row for consumables).
     G.earned = Math.round((G.earned - plan.cost) * 100) / 100;
+    // +1 mirrors SHOP_CATALOGUE["invite_scroll"].effect.amount (the server source of
+    // truth, which /api/config does not expose). Keep in sync if that amount changes.
     if (plan.kind === 'consumable') { G.invitesLeft += 1; updateSlots(); }
     else                            { Inventory.addLocal(itemId); }
     updateStats();

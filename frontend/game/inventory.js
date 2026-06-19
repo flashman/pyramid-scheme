@@ -8,7 +8,9 @@ import { Events } from '../engine/events.js';
 export const Inventory = {
   _store: {},   // item_id → { quantity, equipped }
 
-  /** Replace the whole store from a server list [{item_id, quantity, equipped}]. */
+  /** Replace the whole store from a server list [{item_id, quantity, equipped}].
+      Invariant: the server always sends the COMPLETE inventory (both in /api/me
+      and in the WS inventory_update), so this replaces rather than merges. */
   hydrate(list) {
     this._store = {};
     for (const r of (list || [])) this._store[r.item_id] = { quantity: r.quantity, equipped: !!r.equipped };
