@@ -11,6 +11,7 @@ import { Flags }    from '../../engine/flags.js';
 import { Ledger }   from '../../engine/ledger.js';
 import { Events }   from '../../engine/events.js';
 import { log }      from '../../ui/panels.js';
+import { Inventory } from '../../game/inventory.js';
 
 export function buildMerchantDialogue() {
   return new Dialogue({
@@ -165,7 +166,7 @@ export function buildFerrymanDialogue() {
       speaker: 'THE FERRYMAN  ✦  LICENSED CROSSING',
       text: 'THE TOLL:\nONE COIN. EGYPTIAN STANDARD WEIGHT.\nOR EQUIVALENT IN BELIEF.\nBELIEF IS VALUED AT FACE AMOUNT.\nFACE AMOUNT IS WHAT YOU CAME WITH.\nYOU WILL NOT HAVE IT WHEN YOU ARRIVE.',
       choices: [
-        { label: '(Offer the Bronze Coin)', condition: () => Flags.get('shop_owned_bronze_coin'),
+        { label: '(Offer the Bronze Coin)', condition: () => Inventory.owned('bronze_coin'),
           action: () => { Flags.set('nile_ferry_paid', true);
                           log('✦ The coin is exact. The Ferryman does not look surprised.', 'hi'); },
           next: 'receipt' },
@@ -232,7 +233,7 @@ export function buildSobekDialogue() {
       speaker: 'SOBEK  ✦  DIVINE COLLECTIONS',
       text: 'I SEE YOU.\n\nI ALWAYS SEE YOU.\nMY EYES ARE ABOVE THE WATERLINE\nEVEN WHEN THE REST OF ME IS NOT.\n\nDO YOU OWE UPLINE?',
       choices: [
-        { label: 'I wear the river\'s own skin', condition: () => Flags.get('shop_owned_croc_sandals'),
+        { label: 'I wear the river\'s own skin', condition: () => Inventory.owned('croc_sandals'),
           next: 'sandals' },
         { label: 'I pay what I owe',             next: 'compliant'   },
         { label: 'What happens if I don\'t pay?', next: 'procedure'   },
@@ -319,7 +320,7 @@ export function buildJosephDialogue() {
       speaker: 'JOSEPH  ✦  GOVERNOR OF GRAIN',
       text: 'YOU ARE NOT THE FIRST\nTO WALK THIS RIVER WESTWARD.\n\nBUT YOU ARE THE FIRST IN SOME TIME\nWHO LOOKS LIKE THEY UNDERSTAND\nWHAT THEY ARE WALKING TOWARD.\n\nSIT.',
       choices: [
-        { label: 'I read the well too', condition: () => Flags.get('shop_owned_secret_flood'),
+        { label: 'I read the well too', condition: () => Inventory.owned('secret_flood'),
           next: 'fellow_insider' },
         { label: 'Who are you?',           next: 'recognition'  },
         { label: 'What did you build here?', next: 'granary'    },
