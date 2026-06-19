@@ -8,13 +8,10 @@ if (Inventory.qty('invite_scroll') !== 3) throw new Error('qty() wrong');
 if (Inventory.owned('bronze_coin')) throw new Error('unowned should be false');
 if (Inventory.isEquipped('scarab_amulet')) throw new Error('equipped should be false');
 
-// guest local add: keepsake caps at 1, consumable stacks
+// guest local add: keepsakes only, idempotent (qty caps at 1)
 Inventory.clear();
-Inventory.addLocal('scarab_amulet', 'keepsake');
-Inventory.addLocal('scarab_amulet', 'keepsake');
+Inventory.addLocal('scarab_amulet');
+Inventory.addLocal('scarab_amulet');
 if (Inventory.qty('scarab_amulet') !== 1) throw new Error('keepsake must cap at 1');
-Inventory.addLocal('invite_scroll', 'consumable');
-Inventory.addLocal('invite_scroll', 'consumable');
-if (Inventory.qty('invite_scroll') !== 2) throw new Error('consumable must stack');
 
 console.log('inventory smoke OK');

@@ -41,14 +41,17 @@ async def buy_item(
     if float(state.earned or 0) < price:
         raise HTTPException(status_code=400, detail="Insufficient earned credits.")
 
-    # ── Atomic: deduct → grant inventory → ledger row, one commit ──
+    # ── Atomic: deduct → (grant keepsake) → ledger row, one commit ──
     state.earned = round(float(state.earned or 0) - price, 2)
-    # Phase 1: consumables apply their effect on buy (use-on-demand is Phase 2).
-    effect = item.get("effect") or {}
-    if item["kind"] == "consumable" and effect.get("type") == "invites":
-        state.invites_left = (state.invites_left or 0) + effect["amount"]
+    # Keepsakes are held in inventory; consumables are effect-only (applied here,
+    # recorded in the ledger, never inventoried).
+    if item["kind"] == "keepsake":
+        await grant_item(db, current_user.id, body.item_id)
+    else:
+        effect = item.get("effect") or {}
+        if effect.get("type") == "invites":
+            state.invites_left = (state.invites_left or 0) + effect["amount"]
 
-    await grant_item(db, current_user.id, body.item_id)
     db.add(Transaction(user_id=current_user.id, type="shop_buy",
                        amount=-price, ref_id=body.item_id, meta={"qty": 1}))
     try:

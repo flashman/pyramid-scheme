@@ -5,21 +5,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Inventory
-from app.shop import get_item
 
 
 async def grant_item(db: AsyncSession, user_id: int, item_id: str) -> Inventory:
-    """Upsert one unit. Keepsake → ensure a qty-1 row (no stacking);
-    consumable → create at 1 or increment. Returns the row. Does NOT commit."""
-    item = get_item(item_id)
-    res  = await db.execute(select(Inventory).where(
+    """Grant a keepsake the player holds (qty 1). Idempotent if already owned.
+
+    Only keepsakes are inventoried — consumables are effect-only (applied at
+    purchase, recorded in the ledger) and never create a row. The `quantity`
+    column stays 1 in this flavor-true model. Does NOT commit."""
+    res = await db.execute(select(Inventory).where(
         Inventory.user_id == user_id, Inventory.item_id == item_id))
     row = res.scalar_one_or_none()
     if row is None:
         row = Inventory(user_id=user_id, item_id=item_id, quantity=1)
         db.add(row)
-    elif item and item["kind"] == "consumable":
-        row.quantity += 1
     return row
 
 

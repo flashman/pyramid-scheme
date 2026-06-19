@@ -29,15 +29,23 @@ async def test_buy_keepsake_twice_returns_409(client):
         assert float(st.earned) == 41.0   # only the first buy charged
 
 
-async def test_buy_consumable_stacks_qty_and_applies_effect(client):
+async def test_buy_consumable_applies_effect_and_is_not_inventoried(client):
+    # Flavor-true model: consumables are effect-only — invites rise, a ledger row
+    # is written, but no inventory row is created (you don't "hold" a used scroll).
     uid = await make_user(earned=20.0, invites=0)
     async with client as c:
         await c.post("/api/shop/buy", json={"item_id": "invite_scroll"}, headers=auth_headers(uid))
         r2 = await c.post("/api/shop/buy", json={"item_id": "invite_scroll"}, headers=auth_headers(uid))
     body = r2.json()
     assert body["earned"] == 10.0
-    assert body["invites_left"] == 2      # effect still applied on buy in Phase 1
-    assert {"item_id": "invite_scroll", "quantity": 2, "equipped": False} in body["inventory"]
+    assert body["invites_left"] == 2
+    assert body["inventory"] == []        # consumables never appear in inventory
+    async with TestingSessionLocal() as db:
+        inv = (await db.execute(select(Inventory).where(Inventory.user_id == uid))).scalars().all()
+        assert inv == []
+        txs = (await db.execute(select(Transaction).where(
+            Transaction.user_id == uid, Transaction.type == "shop_buy"))).scalars().all()
+        assert len(txs) == 2              # both purchases recorded in the ledger
 
 
 async def test_buy_insufficient_funds_returns_400_no_change(client):

@@ -25,11 +25,10 @@ export const Inventory = {
       ({ item_id, quantity: v.quantity, equipped: v.equipped }));
   },
 
-  /** Guest-only local grant: keepsake caps at 1, consumable stacks. */
-  addLocal(id, kind) {
-    const cur = this._store[id];
-    if (!cur) this._store[id] = { quantity: 1, equipped: false };
-    else if (kind === 'consumable') cur.quantity += 1;
+  /** Guest-only local grant of a keepsake (qty 1, idempotent). Consumables are
+      effect-only and never inventoried. */
+  addLocal(id) {
+    if (!this._store[id]) this._store[id] = { quantity: 1, equipped: false };
     Events.emit('inventory:change', {});
   },
 

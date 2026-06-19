@@ -1,8 +1,28 @@
 # Design: Shop Inventory + DB Ledger (first-class items)
 
 **Date:** 2026-06-18
-**Status:** Approved (brainstorm) — pending spec review
+**Status:** Phase 1 shipped; **Phases 2 & 3 cut** (see amendment below).
 **Builds on:** `feat/bazaar-marketplace` (the MVP shop). This design **replaces that shop's flag-based ownership** with a real DB-backed inventory and an append-only ledger.
+
+> ## Amendment (2026-06-18): scope downgraded to "flavor-true"
+>
+> After a staff-level review, the roadmap was deliberately cut back. **Phase 1 ships as the
+> permanent shape; Phases 2 (use/equip) and 3 (sell/discard/gift) are cut**, not deferred —
+> they were infrastructure ahead of demonstrated gameplay need, the items are mostly dormant
+> flavor, and the project has higher-priority open work (auth security, actual game mechanics).
+>
+> Two model changes follow from the cut, and are implemented:
+> - **Consumables are effect-only.** Buying a consumable (the invite scroll) applies its effect
+>   and writes a `shop_buy` ledger row, but creates **no inventory row** — you don't "hold" a
+>   used scroll. **Inventory therefore holds only keepsakes** (always qty 1). This removes the
+>   transient "consumable sits in inventory doing nothing" wart the phased plan would have had.
+> - The `inventory.quantity` and `inventory.equipped` columns stay in the schema but are
+>   **dormant** (always `1` / `false`) — kept to avoid a migration if the economy is ever revived.
+>
+> If item-driven mechanics later justify it, use/equip/sell/gift can be reintroduced as a fresh
+> design. The `earned`-as-wallet overload (which sell-back would have stressed) is moot while
+> nothing credits `earned` back. The sections below describe the original full design for
+> reference; treat anything beyond Phase 1 as **not built**.
 
 ## Summary
 

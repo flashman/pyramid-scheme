@@ -36,10 +36,11 @@ export async function purchase(itemId) {
   const meta = WARES_BY_ID[itemId];
 
   if (G.isGuest) {
-    // Local-only, like guest recruits.
+    // Local-only, like guest recruits. Keepsakes are held; consumables are
+    // effect-only (mirrors the server: no inventory row for consumables).
     G.earned = Math.round((G.earned - plan.cost) * 100) / 100;
-    Inventory.addLocal(itemId, plan.kind);
-    if (plan.kind === 'consumable') { G.invitesLeft += 1; updateSlots(); }  // Phase 1: effect on buy
+    if (plan.kind === 'consumable') { G.invitesLeft += 1; updateSlots(); }
+    else                            { Inventory.addLocal(itemId); }
     updateStats();
     log(`✦ The Merchant wraps the ${meta.name} in papyrus. It feels like belief.`, 'hi');
     return plan;
