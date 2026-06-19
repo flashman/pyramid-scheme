@@ -178,6 +178,38 @@ export class StallOverlay {
     this._drawPot(x, baseY - 15, 12, 18);
   }
 
+  // ── Weird stock hung on the tent wall, flanking the merchant ──
+  _drawWallHangings(now) {
+    const peg = (x, topY) => { X.fillStyle = '#caa040'; X.fillRect(x - 2, topY - 2, 4, 3);
+      X.strokeStyle = '#2a1810'; X.lineWidth = 1; X.beginPath(); X.moveTo(x, topY); X.lineTo(x, topY + 12); X.stroke(); };
+
+    // LEFT, upper — a jackal mask (it is watching too)
+    peg(286, 150); const mx = 286, my = 174;
+    X.fillStyle = '#1a1a20'; X.fillRect(mx - 12, my - 10, 5, 11); X.fillRect(mx + 7, my - 10, 5, 11);   // ears
+    X.fillStyle = '#2a2a30'; X.beginPath(); X.moveTo(mx - 11, my - 4); X.lineTo(mx + 11, my - 4); X.lineTo(mx + 7, my + 22); X.lineTo(mx - 7, my + 22); X.closePath(); X.fill();
+    X.fillStyle = '#caa040'; X.fillRect(mx - 6, my + 6, 3, 2); X.fillRect(mx + 3, my + 6, 3, 2);          // eyes
+
+    // LEFT, lower — a bundle of dried reeds
+    peg(304, 236);
+    X.strokeStyle = '#7a6a3a'; X.lineWidth = 2;
+    for (let i = -3; i <= 3; i++) { X.beginPath(); X.moveTo(304, 248); X.lineTo(304 + i * 3, 248 + 24); X.stroke(); }
+    X.fillStyle = '#9a7a3a'; X.fillRect(304 - 6, 248, 12, 4);
+
+    // RIGHT, upper — a string of eyes that follow you
+    peg(494, 150);
+    for (let i = 0; i < 4; i++) { const ey = 168 + i * 15;
+      X.fillStyle = '#e8e2d0'; X.beginPath(); X.ellipse(494, ey, 6, 4, 0, 0, Math.PI * 2); X.fill();
+      X.fillStyle = '#1a2a3a'; X.beginPath(); X.arc(494 + Math.sin(now / 1300 + i) * 2, ey, 2, 0, Math.PI * 2); X.fill(); }
+
+    // RIGHT, lower — an hourglass (time is, allegedly, money)
+    peg(512, 236); const hx = 512, hy = 252;
+    X.fillStyle = '#8a6a3a'; X.fillRect(hx - 9, hy, 18, 3); X.fillRect(hx - 9, hy + 25, 18, 3);
+    X.fillStyle = '#bfa86a';
+    X.beginPath(); X.moveTo(hx - 8, hy + 3); X.lineTo(hx + 8, hy + 3); X.lineTo(hx, hy + 15); X.closePath(); X.fill();
+    X.beginPath(); X.moveTo(hx - 8, hy + 25); X.lineTo(hx + 8, hy + 25); X.lineTo(hx, hy + 15); X.closePath(); X.fill();
+    X.fillStyle = '#e8d8a0'; X.fillRect(hx - 1, hy + 13, 2, 12);
+  }
+
   render() {
     if (!this._open) return;
     const shop = getShop();
@@ -204,11 +236,15 @@ export class StallOverlay {
       X.textAlign = 'left'; this._speak(null); return;
     }
 
-    // ── The merchant's trade dressing, flanking him on stacks of (actual) pots.
-    //    Drawn before the table so their bases tuck behind it, like his legs. ──
-    this._drawPotStack(232, 338); this._drawHookah(232, 308, now);       // hookah, his left
-    this._drawPotStack(548, 334);                                        // scale, his right
-    X.save(); X.translate(548, 304); X.scale(1.5, 1.5); drawBalanceScale(0, 0, now); X.restore();
+    // ── Weird stock hung on the tent wall, flanking the merchant ──
+    this._drawWallHangings(now);
+
+    // ── Trade dressing on stacks of (actual) pots, spread out past the tent
+    //    footprint into the side voids. Drawn before the table so their bases
+    //    tuck behind it, like his legs. ──
+    this._drawPotStack(150, 340); this._drawHookah(150, 310, now);       // hookah, far left
+    this._drawPotStack(630, 336);                                        // scale, far right
+    X.save(); X.translate(630, 306); X.scale(1.5, 1.5); drawBalanceScale(0, 0, now); X.restore();
 
     // ── The table across the foreground ──
     X.fillStyle = '#5a3a1c'; X.fillRect(0, TABLE_Y, CW, CH - TABLE_Y);

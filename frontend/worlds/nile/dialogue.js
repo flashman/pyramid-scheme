@@ -14,111 +14,42 @@ import { log }      from '../../ui/panels.js';
 import { Inventory } from '../../game/inventory.js';
 
 export function buildMerchantDialogue() {
+  // Shared so "Step inside" is offered at every beat — including the greeting,
+  // letting a returning player skip straight to the stall.
+  const stepInside = { label: '✦ Step inside', action: () => Events.emit('shop:open'), next: null };
+
   return new Dialogue({
 
-    // ── Entry ─────────────────────────────────────────────
+    // ── Greeting (entry into the stall is available immediately) ──
     start: {
       speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'WELCOME, FUTURE PHARAOH.\nYOUR DOWNLINE LOOKS THIN.\nI HAVE JUST THE CHARM.',
+      text: 'WELCOME, FUTURE PHARAOH.\nOFFICIALLY, WE SELL POTS.\nYOUR DOWNLINE LOOKS THIN — STEP IN. I HAVE OTHER STOCK.',
       choices: [
-        { label: 'Show me the wares',  next: 'wares'  },
-        { label: 'What does it do?',   next: 'pitch'  },
-        { label: 'Leave',              next: null     },
+        stepInside,
+        { label: 'What do you really sell?', next: 'shill' },
+        { label: 'Leave',                    next: null    },
       ],
     },
 
-    // ── The pitch: what does a charm actually do? ─────────
-    pitch: {
+    // ── The shill ──
+    shill: {
       speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'THE CHARM RADIATES DOWNLINE ENERGY.\nIT SAYS TO YOUR RECRUITS:\n"THIS PERSON HAS INVESTED IN THEMSELVES."\nTHEY WILL FEEL THIS. THEY ALWAYS FEEL THIS.',
+      text: 'POTS ARE THE SIGN. BELIEF IS THE BUSINESS.\nCHARMS. SECRETS. THE OCCASIONAL CERTAINTY.\nNONE OF IT IS CLAY.\n(THE POTS ARE CLAY.)',
       choices: [
-        { label: 'Do they actually feel it?',  next: 'honesty'  },
-        { label: 'Show me the wares',          next: 'wares'    },
-        { label: 'Leave',                      next: null       },
+        { label: 'Does any of it work?', next: 'honesty' },
+        stepInside,
+        { label: 'Leave',                next: null      },
       ],
     },
 
-    // ── Brief moment of honesty ───────────────────────────
+    // ── The honesty payoff (the wanting is real; he sells that part) ──
     honesty: {
       speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'NOT ONCE.\nBUT YOU WILL.\nAND THAT CONFIDENCE FLOWS DOWNWARD.\nPSYCHOLOGICALLY. IT IS SCIENCE.',
-      next: 'wares',
-    },
-
-    // ── The catalogue ─────────────────────────────────────
-    wares: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'THREE PRODUCTS. ALL PROVEN.\nTHE SCARAB AMULET: PASSIVE LUCK.\nTHE PROTECTION SCROLL: DOWNLINE SHIELD.\nTHE PREMIUM BUNDLE: BOTH, PLUS A SECOND SCROLL.\n(THE SECOND SCROLL IS BLANK. SYMBOLICALLY VALUABLE.)',
+      text: 'FOUR THOUSAND YEARS ON THIS BANK,\nAND NO ONE HAS EVER ASKED IF IT WORKS.\n\nIT IS CLAY, PHARAOH. IT IS ALWAYS CLAY.\nBUT THE WANTING IS REAL.\nI SELL THAT PART. STEP IN.',
       choices: [
-        { label: '✦ Step up to the table', action: () => Events.emit('shop:open'), next: null },
-        { label: 'Tell me about the Scarab Amulet',     next: 'scarab'  },
-        { label: 'Tell me about the Protection Scroll',  next: 'scroll'  },
-        { label: 'Tell me about the Bundle',             next: 'bundle'  },
-        { label: 'None of these sound real',             next: 'real'    },
-        { label: 'Leave',                                next: null      },
+        stepInside,
+        { label: 'Leave', next: null },
       ],
-    },
-
-    // ── Scarab Amulet detail ──────────────────────────────
-    scarab: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'THE SCARAB AMULET.\nHAND-PRESSED FROM NILE CLAY.\nINCREASES YOUR PASSIVE RECRUIT ENERGY BY UP TO 3%.\nPAYABLE IN TEN INSTALLMENTS.\nTHE FIRST TWO INSTALLMENTS ARE COMPLIMENTARY.\nINSTALLMENTS THREE THROUGH TEN ARE NOT.',
-      choices: [
-        { label: 'What does 3% passive energy mean?',  next: 'scarab_detail'  },
-        { label: 'I will take it',                     next: 'purchase'       },
-        { label: 'Back',                               next: 'wares'          },
-      ],
-    },
-
-    scarab_detail: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'IT MEANS YOUR DOWNLINE WILL SENSE\nTHAT YOU ARE THE SORT OF PERSON\nWHO CARRIES A SCARAB AMULET.\nIMPACT IS ATMOSPHERIC.\nNOT QUANTIFIABLE.\nTHIS IS INTENTIONAL.',
-      next: 'scarab',
-    },
-
-    // ── Protection Scroll detail ──────────────────────────
-    scroll: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'THE DOWNLINE PROTECTION SCROLL.\nIF YOUR RECRUITS FAIL TO RECRUIT,\nTHIS SCROLL ABSORBS THE SPIRITUAL SHORTFALL.\nDEFLECTS UPLINE DISAPPOINTMENT.\nPRICED AT A MODEST TWELVE INSTALLMENTS.\nELEVEN IF YOU ACT BEFORE THE RIVER TURNS.',
-      choices: [
-        { label: 'Has anyone\'s upline been satisfied?',  next: 'upline_truth'  },
-        { label: 'I will take it',                        next: 'purchase'      },
-        { label: 'Back',                                  next: 'wares'         },
-      ],
-    },
-
-    upline_truth: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'NOT IN MY EXPERIENCE.\nBUT NONE OF THEM OWNED THE SCROLL.\nTHAT IS THE CONTROL GROUP.\nTHE DATA IS SUGGESTIVE.',
-      next: 'scroll',
-    },
-
-    // ── Bundle detail ─────────────────────────────────────
-    bundle: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'THE PREMIUM BUNDLE.\nEVERYTHING FROM THE CATALOGUE\nPLUS THE BLANK SCROLL.\nFUTURE PHARAOHS WRITE THEIR OWN PROMISES ON IT.\nTHEY RARELY FILL IT IN.\nTHE BLANK SPACE IS CALLED POTENTIAL.\nPOTENTIAL IS THE PREMIUM PRODUCT.',
-      choices: [
-        { label: 'I will take the Bundle',  next: 'purchase'  },
-        { label: 'Back',                    next: 'wares'     },
-      ],
-    },
-
-    // ── Sceptical player pushes back ──────────────────────
-    real: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: '"SOUND REAL."\nFOUR THOUSAND YEARS ON THIS BANK\nAND NO ONE HAS EVER ASKED\nIF THE CHARM SOUNDS REAL.\n\nIT IS CLAY, PHARAOH.\nIT IS ALWAYS CLAY.\nBUT THE WANTING IS REAL.\nI SELL THAT PART.',
-      choices: [
-        { label: 'I respect that',  next: 'wares'  },
-        { label: 'Leave',           next: null     },
-      ],
-    },
-
-    // ── The "purchase" ────────────────────────────────────
-    purchase: {
-      speaker: 'THE MERCHANT  ✦  JUST POTS',
-      text: 'EXCELLENT CHOICE.\nI WILL WRAP IT IN PAPYRUS.\nTHE PAPYRUS IS COMPLIMENTARY.\nTHE FIRST INSTALLMENT IS ALSO COMPLIMENTARY.\nGOOD LUCK WITH YOUR DOWNLINE, PHARAOH.\nI BELIEVE IN YOU.\n(THAT IS INCLUDED.)',
-      onComplete: () => log('✦ The Merchant wraps something in papyrus. It feels like belief.', 'hi'),
-      next: null,
     },
   });
 }
