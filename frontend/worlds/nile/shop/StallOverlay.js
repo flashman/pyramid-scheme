@@ -9,7 +9,7 @@ import { X, CW, CH }        from '../../../engine/canvas.js';
 import { G }                from '../../../game/state.js';
 import { Api }              from '../../../game/api.js';
 import { loadConfig, getShop, shopLoaded } from '../../../game/config.js';
-import { WARES, GENERIC_RETORTS, WARE_RETORTS } from './catalogue.js';
+import { WARES, GENERIC_RETORTS, WARE_RETORTS, POOR_RETORTS, OWNED_RETORTS } from './catalogue.js';
 import { purchase, isOwned } from './buy.js';
 import { drawWareArt }      from './ware-art.js';
 import { drawMerchant, drawMerchantTent, drawBalanceScale } from '../draw/nile.js';
@@ -20,6 +20,8 @@ const TABLE_Y = 318;     // table surface line
 const PER_ROW = 9;       // wares per row laid on the table (2 rows for 17)
 const TYPE_MS = 26;      // ms per character of the merchant's spoken pitch
 const WELCOME = 'STEP IN, FUTURE PHARAOH. MIND THE POTS.\nEVERYTHING ON THE TABLE IS FOR SALE.\nTHE LOOKING IS FREE. THE WANTING, ALSO.';
+
+const _pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const RED = '#5a281f', RED_LT = '#7a3a30', RED_DK = '#3a1d18', GOLD = '#caa040';
 
@@ -75,7 +77,12 @@ export class StallOverlay {
     if (key === 'ArrowUp'    || key === 'w' || key === 'W') { this._sel = Math.max(0, this._sel - PER_ROW); return true; }
     if (key === ' ' || key === 'Enter' || key === 'z' || key === 'Z') {
       const ware = WARES[this._sel];
-      if (ware) purchase(ware.id).then(r => { if (r && r.ok) this._fireRetort(ware.id); });
+      if (ware) purchase(ware.id).then(r => {
+        if (!r) return;
+        if (r.ok)                   this._fireLine(WARE_RETORTS[ware.id] || _pick(GENERIC_RETORTS));
+        else if (r.reason === 'poor')  this._fireLine(_pick(POOR_RETORTS));
+        else if (r.reason === 'owned') this._fireLine(_pick(OWNED_RETORTS));
+      });
       return true;
     }
     return true;   // swallow all keys while open
@@ -96,10 +103,9 @@ export class StallOverlay {
     dlg.classList.add('active');     // re-asserted each frame (DialogueManager clears it when idle)
   }
 
-  /** Begin a snarky retort (item-specific if defined, else a random generic). */
-  _fireRetort(id) {
-    const pool = GENERIC_RETORTS;
-    this._retort = WARE_RETORTS[id] || pool[Math.floor(Math.random() * pool.length)];
+  /** Show a snarky line in the dialogue window for a few seconds (buy reactions). */
+  _fireLine(text) {
+    this._retort = text;
     this._retortUntil = performance.now() + 3600;
   }
 

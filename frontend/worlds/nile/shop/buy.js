@@ -31,7 +31,12 @@ export async function purchase(itemId) {
   const plan = planPurchase(itemId, {
     prices: getShop(), earned: G.earned, owned: _ownedMap(), isGuest: G.isGuest,
   });
-  if (!plan.ok) { log(_BARK[plan.reason] || _BARK.fail, ''); return plan; }
+  // poor/owned are voiced by the merchant in the stall (#dlg retort); only log
+  // genuine errors here so the side panel isn't double-narrating.
+  if (!plan.ok) {
+    if (plan.reason !== 'poor' && plan.reason !== 'owned') log(_BARK[plan.reason] || _BARK.fail, '');
+    return plan;
+  }
 
   const meta = WARES_BY_ID[itemId];
 
