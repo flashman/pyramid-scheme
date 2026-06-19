@@ -159,6 +159,25 @@ export class StallOverlay {
     X.beginPath(); X.moveTo(x, baseY - 60); for (let yy = baseY - 60; yy > baseY - 128; yy -= 10) X.lineTo(x + Math.sin(yy / 16 + t / 600) * 7, yy); X.stroke(); X.restore();
   }
 
+  // ── A plain clay pot — the only honest merchandise; used here as furniture ──
+  _drawPot(x, baseY, w, h) {
+    X.fillStyle = '#8a5836'; X.beginPath();
+    X.moveTo(x - w * 0.45, baseY - h);
+    X.bezierCurveTo(x - w, baseY - h * 0.55, x - w, baseY - h * 0.1, x, baseY);
+    X.bezierCurveTo(x + w, baseY - h * 0.1, x + w, baseY - h * 0.55, x + w * 0.45, baseY - h);
+    X.closePath(); X.fill();
+    X.fillStyle = '#a06a3e'; X.fillRect(x - w * 0.5, baseY - h - 2, w, 3);           // rim
+    X.fillStyle = '#a8744c'; X.fillRect(x - w * 0.4, baseY - h * 0.7, 3, h * 0.5);   // lit side
+    X.fillStyle = '#5a3620'; X.fillRect(x + w * 0.3, baseY - h * 0.7, 3, h * 0.5);   // shade
+  }
+
+  /** A short stack of plain pots, used as a pedestal for the merchant's dressing. */
+  _drawPotStack(x, baseY) {
+    this._drawPot(x - 9, baseY, 11, 17);
+    this._drawPot(x + 8, baseY + 1, 10, 15);
+    this._drawPot(x, baseY - 15, 12, 18);
+  }
+
   render() {
     if (!this._open) return;
     const shop = getShop();
@@ -184,6 +203,12 @@ export class StallOverlay {
       X.fillText('the merchant unrolls his catalogue…', CW / 2, CH / 2);
       X.textAlign = 'left'; this._speak(null); return;
     }
+
+    // ── The merchant's trade dressing, flanking him on stacks of (actual) pots.
+    //    Drawn before the table so their bases tuck behind it, like his legs. ──
+    this._drawPotStack(232, 338); this._drawHookah(232, 308, now);       // hookah, his left
+    this._drawPotStack(548, 334);                                        // scale, his right
+    X.save(); X.translate(548, 304); X.scale(1.5, 1.5); drawBalanceScale(0, 0, now); X.restore();
 
     // ── The table across the foreground ──
     X.fillStyle = '#5a3a1c'; X.fillRect(0, TABLE_Y, CW, CH - TABLE_Y);
@@ -215,12 +240,6 @@ export class StallOverlay {
     X.textAlign = 'left';
 
     this._interiorFront(now);
-
-    // trade dressing — drawn AFTER the vignette so the corners don't bury it:
-    // the scale of belief (as outside) on the right, a hookah on the left.
-    X.save(); X.translate(704, 506); X.scale(1.8, 1.8); drawBalanceScale(0, 0, now); X.restore();
-    this._drawHookah(90, 534, now);
-
     this._speak(WARES[this._sel]);
   }
 }
