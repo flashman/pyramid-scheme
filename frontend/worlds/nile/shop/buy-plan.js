@@ -4,8 +4,6 @@
 
 import { WARES_BY_ID } from './catalogue.js';
 
-export const ownedKey = id => `shop_owned_${id}`;
-
 /**
  * Pure decision: can this buy proceed, and what does it cost/do?
  * @param {string} itemId
