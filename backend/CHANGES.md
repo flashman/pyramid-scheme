@@ -1,5 +1,14 @@
 # Backend Changelog
 
+## 0.5.1 — Real buy-in gate: 503 block + manual-approval blueprint
+
+### Changed
+- `POST /api/buy-in` now returns **503** while `stripe_enabled = False`, blocking self-grant.
+- Chain-walk logic extracted into `_apply_confirmed_buyin(fee, user, state, db)` — call from the Stripe webhook after signature verification.
+- `POST /api/stripe/webhook` stub preserved with a TODO comment for signature verification.
+
+---
+
 ## 0.5.0 — Session persistence & user profile
 
 ### Added

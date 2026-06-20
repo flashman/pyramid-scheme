@@ -21,7 +21,7 @@ The stack is a FastAPI backend (Python, async SQLAlchemy, PostgreSQL, WebSockets
 | `chamber` | The Crypt | `ChamberRealm` (flat, indoor) |
 | `council` | Galactic Council | `CouncilRealm` (flat, indoor) |
 
-### Current status (v1.45 frontend / v0.5.0 backend)
+### Current status (v1.46 frontend / v0.5.1 backend)
 
 **Working end-to-end:** registration, JWT auth, upline chain walk, payout credits, WebSocket real-time pyramid updates, invite email flow (Mailhog in dev), dev sim panel, session persistence, profile management.
 

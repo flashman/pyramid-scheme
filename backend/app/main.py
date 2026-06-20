@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Pyramid Scheme API",
-    version="0.4.0",
+    version="0.5.1",
     lifespan=lifespan,
 )
 

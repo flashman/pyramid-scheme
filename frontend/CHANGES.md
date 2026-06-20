@@ -2,6 +2,31 @@
 
 ---
 
+## v1.46 — Real buy-in gate: manual payment flow + offering code
+
+### Changed
+- **Auth buy-in dialog** — logged-in users see a real payment dialog: QR code, $10 instruction, and a deterministic 5-emoji **offering code** derived from their username. They include the code in the payment note; admin matches it and flips `GameState.bought = True`. No auto-confirm path exists for authenticated users (CONFIRM button hidden; Enter key guarded by `_buyInIsGuest`).
+- **`POST /api/buy-in` → 503** while Stripe is disabled, blocking self-grant. The chain-walk blueprint lives in `_apply_confirmed_buyin()` ready for the Stripe webhook.
+- Emoji pool cleaned: `🕯️` `👁️` `⚰️` (variation-selector glyphs, rendered solid black on some platforms) replaced with `🐝` `🦉` `🐊`.
+
+---
+
+## v1.45 — Bazaar marketplace: JUST POTS stall + inventory/ledger
+
+### New systems
+- **`game/inventory.js`** — client-side inventory store, hydrated from `/api/me` and `inventory_update` WS events (full-list replace, never merge). Read ownership with `Inventory.owned(id)`.
+- **`worlds/nile/shop/StallOverlay.js`** — "JUST POTS" bazaar stall canvas overlay opened from the Nile merchant. Wares come from the server catalogue (`game/config.js getShop()`); buying goes through `POST /api/shop/buy`. Spoken descriptions and retorts drive the shared `#dlg` panel.
+- **`engine/ledger.js`** — Flags-backed append-only accumulator of one-way story forks (first consumer: Nile basket).
+
+### Backend
+- `app/shop.py` — `SHOP_CATALOGUE` single source of truth for ware ids/prices; served via `GET /api/config`.
+- `app/inventory.py` — inventory helpers; ownership in the `inventory` table (keepsakes only, qty 1).
+- `POST /api/shop/buy` — spends `earned`, writes a `shop_buy` row to `Transaction`, pushes `inventory_update` WS event.
+- `PUT /api/state` strips `shop_owned_*` flag prefix so clients can't forge ownership.
+- Migration `0002_inventory` — adds the `inventory` table.
+
+---
+
 ## v1.44 — THE NILE: new realm (the living downline), west of the Desert
 
 > *Every other realm climbs up (Council, cosmos) or down into the buried past (Atlantis, the Deep). The Nile is the missing fourth axis — west, downstream, toward the setting sun and the people the scheme shed on its way up. It is a live mirror of your real `G.recruits`: empty and eerie for a new player, teeming and damning for a veteran.*
