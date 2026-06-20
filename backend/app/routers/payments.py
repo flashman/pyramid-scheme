@@ -45,21 +45,40 @@ async def buy_in(
             new_invites_left=state.invites_left,
         )
 
-    # ── Stub path ─────────────────────────────────────────
+    # Stripe not yet wired — block self-grant until payment is confirmed externally.
+    raise HTTPException(
+        status_code=503,
+        detail="Payment processing is not yet enabled. The gods are still being consulted.",
+    )
+
+
+async def _create_stripe_payment_intent(amount: float, user: User) -> str:
+    raise NotImplementedError("Stripe not yet enabled.")
+
+
+async def _apply_confirmed_buyin(
+    fee: float,
+    current_user: User,
+    state: GameState,
+    db: AsyncSession,
+) -> BuyInResponse:
+    """Apply a verified payment to a user's account and walk the upline chain.
+
+    Call this from the Stripe webhook handler after signature verification,
+    or from any future manual-grant admin endpoint.
+    """
     total_pool   = sum(payout_at_depth(d) for d in range(1, max_pay_depth() + 1))
-    platform_cut = round(body.fee - total_pool, 2)
+    platform_cut = round(fee - total_pool, 2)
 
     db.add(Transaction(
-        user_id=current_user.id, type="buyin", amount=-body.fee, ref_id="stub",
+        user_id=current_user.id, type="buyin", amount=-fee, ref_id="stripe",
         meta={"platform_cut": platform_cut, "upline_pool": round(total_pool, 2)},
     ))
 
-    rebuy = state.bought
     state.bought       = True
-    state.invested     = round((state.invested or 0) + body.fee, 2)
+    state.invested     = round((state.invested or 0) + fee, 2)
     state.invites_left = (state.invites_left or 0) + INVITES_PER_BUYIN
 
-    # Walk the upline chain
     ws_events: list = []
     if current_user.recruiter_id:
         ws_events = await run_buyin_chain(
@@ -71,7 +90,6 @@ async def buy_in(
 
     await db.commit()
 
-    # Push events after commit
     for uid, event in ws_events:
         await manager.send_to_user(uid, event)
 
@@ -83,18 +101,14 @@ async def buy_in(
     })
 
     return BuyInResponse(
-        success=True, stub=True,
+        success=True, stub=False,
         message=(
-            f"[STUB] Buy-in accepted. ${platform_cut} platform fee. "
+            f"Buy-in confirmed. ${platform_cut} platform fee. "
             f"${total_pool} distributed to {len(ws_events)} upline member(s)."
         ),
         new_balance=current_user.balance,
         new_invites_left=state.invites_left,
     )
-
-
-async def _create_stripe_payment_intent(amount: float, user: User) -> str:
-    raise NotImplementedError("Stripe not yet enabled.")
 
 
 @router.post("/stripe/webhook")
