@@ -524,7 +524,7 @@ export function devPanelSetAuthMode(hasDebugEndpoint) {
   const simSection = document.getElementById('dev-sim-section');
   if (!simSection) return;
 
-  if (hasDebugEndpoint) {
+  if (hasDebugEndpoint && Api.hasToken()) {
     simSection.style.display = 'block';
     _simLog('Backend debug mode active — sim recruits enabled.', '#40d080');
   } else {
