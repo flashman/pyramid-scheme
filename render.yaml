@@ -16,12 +16,12 @@ services:
       # Generate: python -c "import secrets; print(secrets.token_hex(32))"
       - key: SECRET_KEY
         sync: false
-      # Set to ["https://pyramid-scheme.onrender.com"] after frontend deploys
+      # Set to ["https://pyramid-scheme.live"] after frontend deploys
       - key: CORS_ORIGINS
         sync: false
       - key: DEBUG
         value: "false"
-      # Set to https://pyramid-scheme.onrender.com after frontend deploys
+      # Set to https://pyramid-scheme.live after frontend deploys
       - key: FRONTEND_URL
         sync: false
       # Resend SMTP — swap for mailhog values if testing locally via .env
