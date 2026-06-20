@@ -142,13 +142,27 @@ export function showPrompt(title, body, placeholder = '') {
 
 // ── Buy-in confirmation dialog ────────────────────────────
 //
-// Guest path:  cheeky venmo QR + satirical copy, confirms before simulation
-// Auth path:   stripe placeholder, confirms before Api.buyIn()
+// Guest path:  cheeky QR + satirical copy, confirms before simulation
+// Auth path:   real payment instructions + QR; resolves false (no auto-confirm)
 
 import { PAYMENT_QR_DATA }        from '../game/payment.js';
 import { drawQR, decodeQRString, randomQRMatrix } from './qr.js';
 
 let _buyInResolve = null;
+let _buyInIsGuest = false;
+
+const OFFERING_EMOJIS = ['🐍','🌙','🔥','💀','🦅','🌊','⭐','🗿','🌵','🦂','🧿','🔮','🏺','🌿','🐝','🐫','🐊','🦉','🌀','🪙','💎','🦁','🌛','🦋'];
+
+function _offeringCode(username) {
+  let h = 0;
+  for (let i = 0; i < username.length; i++) h = (h * 31 + username.charCodeAt(i)) >>> 0;
+  const n = OFFERING_EMOJIS.length;
+  return OFFERING_EMOJIS[h % n]
+    + OFFERING_EMOJIS[(h >> 5) % n]
+    + OFFERING_EMOJIS[(h >> 10) % n]
+    + OFFERING_EMOJIS[(h >> 15) % n]
+    + OFFERING_EMOJIS[(h >> 20) % n];
+}
 
 const BUYIN_CSS = `
 #bi-overlay {
@@ -175,6 +189,10 @@ const BUYIN_CSS = `
   display:block;margin:8px auto;
   border:1px solid #3a2800;
 }
+#bi-code {
+  font-size:20px;letter-spacing:6px;
+  padding:8px 4px;margin:8px 0;
+}
 #bi-sub {
   color:#806040;font-size:5px;letter-spacing:1px;
   line-height:1.8;white-space:pre-line;margin-bottom:10px;
@@ -196,6 +214,7 @@ function _ensureBuyInDOM() {
       <div id="bi-title"></div>
       <div id="bi-body"></div>
       <canvas id="bi-qr"></canvas>
+      <div id="bi-code"></div>
       <div id="bi-sub"></div>
       <div class="bi-btns">
         <button class="btn" id="bi-cancel">CANCEL</button>
@@ -216,36 +235,47 @@ function _dismissBuyIn(confirmed) {
 document.addEventListener('keydown', e => {
   const ov = document.getElementById('bi-overlay');
   if (!ov || ov.style.display === 'none') return;
-  if (e.key === 'Enter')  { e.preventDefault(); _dismissBuyIn(true); }
+  if (e.key === 'Enter')  { e.preventDefault(); _dismissBuyIn(_buyInIsGuest); }
   if (e.key === 'Escape') { e.preventDefault(); _dismissBuyIn(false); }
 });
 
 /**
- * Shows a buy-in confirmation overlay.
- * Guests see a cheeky Venmo QR; auth users see a Stripe placeholder.
- * Returns Promise<boolean> — true if confirmed, false if cancelled.
+ * Shows a buy-in overlay.
+ * Guests: satirical QR + confirm button → resolves true (simulated buy-in).
+ * Auth users: real payment QR + offering code + GOT IT only → resolves false (no auto-confirm).
  */
-export function showBuyInDialog(isGuest) {
+export function showBuyInDialog(isGuest, username = '') {
   _ensureBuyInDOM();
-  const qr = document.getElementById('bi-qr');
+  _buyInIsGuest = isGuest;
+  const qr   = document.getElementById('bi-qr');
+  const code = document.getElementById('bi-code');
   if (isGuest) {
-    document.getElementById('bi-ok').textContent    = 'CONFIRM ►';
-    document.getElementById('bi-title').textContent = '💸 THE OFFERING';
-    document.getElementById('bi-body').textContent  =
+    document.getElementById('bi-ok').style.display   = '';
+    document.getElementById('bi-ok').textContent     = 'CONFIRM ►';
+    document.getElementById('bi-cancel').textContent = 'CANCEL';
+    document.getElementById('bi-title').textContent  = '💸 THE OFFERING';
+    document.getElementById('bi-body').textContent   =
       'THE PYRAMID HUNGERS.\n\nScan the Sacred Glyph™\nand sacrifice to the gods:';
-    document.getElementById('bi-sub').textContent   =
+    document.getElementById('bi-sub').textContent    =
       '— or just press confirm —\nThe Pharaoh is patient.\nAll debts settle\nin the next life.\n\n★ TOTALLY LEGAL ™ ★';
+    code.style.display = 'none';
     const matrix = decodeQRString(PAYMENT_QR_DATA) ?? randomQRMatrix();
     qr.style.display = 'block';
     setTimeout(() => drawQR(qr, matrix), 10);
   } else {
-    document.getElementById('bi-ok').textContent    = 'CONFIRM ►';
-    document.getElementById('bi-title').textContent = '💰 CONFIRM BUY-IN';
-    document.getElementById('bi-body').textContent  =
-      '$10 flows up the ancient chain.\nScrolls shall be granted.\nYour pyramid shall rise.';
-    document.getElementById('bi-sub').textContent   =
-      'Payment via Stripe — coming soon.\nFor now, your faith is sufficient.\n\n★ THE LEDGER NOTES YOUR NAME ★';
-    qr.style.display = 'none';
+    // Auth user: payment is real and manual — show instructions only, no auto-confirm.
+    document.getElementById('bi-ok').style.display   = 'none';
+    document.getElementById('bi-cancel').textContent = 'SO IT IS WRITTEN';
+    document.getElementById('bi-title').textContent  = '⚡ THE TITHE AWAITS ⚡';
+    document.getElementById('bi-body').textContent   =
+      'You have been measured, Pharaoh.\n\nScan the glyph. $10.\nSpeak nothing. Write only your mark.\nThe ledger needs no other context.';
+    code.textContent   = _offeringCode(username);
+    code.style.display = 'block';
+    document.getElementById('bi-sub').textContent    =
+      'The gate opens when the coin crosses.\nNot before. Not after.\n\nDo not lose your mark.\n\n★ THE LEDGER IS ETERNAL ★';
+    const matrix = decodeQRString(PAYMENT_QR_DATA) ?? randomQRMatrix();
+    qr.style.display = 'block';
+    setTimeout(() => drawQR(qr, matrix), 10);
   }
   document.getElementById('bi-overlay').style.display = 'flex';
   return new Promise(resolve => { _buyInResolve = resolve; });
