@@ -155,13 +155,6 @@ frontend reconnects with exponential back-off.
 
 ---
 
-## Changelogs
-
-- `frontend/CHANGES.md` — frontend version history
-- `backend/CHANGES.md` — backend version history
-
----
-
 ## Production Roadmap
 
 `PYRAMID_SCHEME_TODO.md` in the project root contains the full prioritised production checklist,
