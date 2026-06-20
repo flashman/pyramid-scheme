@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     smtp_tls:      bool = False
     smtp_user:     str  = ""
     smtp_password: str  = ""
-    smtp_from:     str  = "noreply@pyramidscheme.gg"
+    smtp_from:     str  = "noreply@pyramid-scheme.live"
 
     # URL embedded in invite email links
     frontend_url: str = "http://localhost:5173"
