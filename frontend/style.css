@@ -81,7 +81,6 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 .ss.us{border-color:var(--border-slot-used);background:var(--bg-panel);opacity:.3;font-size:9px}
 .pw{background:var(--bg-input);border:2px solid var(--amber-dark);height:8px;margin:3px 0;overflow:hidden}
 .pf{height:100%;background:linear-gradient(90deg,var(--gold-dim),var(--gold-bright));transition:width .5s}
-.ilb{background:var(--bg-input);border:2px solid var(--amber-dark);padding:4px;margin:3px 0;word-break:break-all;color:var(--gray);font-size:5px;line-height:1.8}
 #pt-table{width:100%;border-collapse:collapse;margin-top:4px}
 #pt-table tr td{font-size:5px;padding:2px 1px;line-height:1.8}
 #pt-table tr td:first-child{color:var(--tan)}

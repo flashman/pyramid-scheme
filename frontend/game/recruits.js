@@ -245,9 +245,6 @@ export async function buyIn() {
     G.pyramids.unshift(pyr);
     addLayer('player', 1, 'YOU');
     G.px = 2450; G.py = GND; G.camX = 2450 - CW/2; G.facing = 1;
-    const code = 'PH' + Math.random().toString(36).substr(2,6).toUpperCase();
-    document.getElementById('rc').textContent = code;
-    document.getElementById('il').style.display = 'block';
   }
   document.getElementById('bi').disabled = true;
   document.getElementById('rb').disabled = false;

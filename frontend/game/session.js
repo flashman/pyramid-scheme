@@ -99,8 +99,6 @@ export class GameSession {
       G.px = 2450; G.py = GND; G.camX = 2450 - CW / 2; G.facing = 1;
       document.getElementById('bi').disabled = true;
       document.getElementById('rb').disabled = false;
-      const il = document.getElementById('il');
-      if (il) il.style.display = 'block';
     }
 
     const recruitsData = await Api.loadRecruits();
