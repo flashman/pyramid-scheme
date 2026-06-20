@@ -43,6 +43,7 @@ class MeResponse(BaseModel):
     flags:        dict
     balance:      float
     is_admin:     bool = False
+    offering_code: str = ""
     inventory:    list[InventoryItemOut] = []
 
     class Config:

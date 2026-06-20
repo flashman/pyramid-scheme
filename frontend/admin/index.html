@@ -41,6 +41,9 @@
          cursor:pointer;letter-spacing:1px}
   button:hover{background:var(--btn-hover)}
   button:disabled{opacity:.5;cursor:default}
+  #resolve{margin-top:8px;font-size:6px;line-height:2.2;min-height:10px;color:var(--tan-muted)}
+  #resolve.ok{color:var(--gold)}
+  #resolve.err{color:var(--err)}
   #result{margin-top:16px;font-size:6px;line-height:2.4;min-height:14px;word-break:break-word}
   #result.ok{color:var(--ok)}
   #result.err{color:var(--err)}
@@ -57,8 +60,9 @@
 
   <div id="panel">
     <div class="who">Signed in as <b id="who-name">—</b></div>
-    <label for="username">PLAYER USERNAME</label>
-    <input type="text" id="username" autocomplete="off" spellcheck="false" placeholder="username">
+    <label for="username">USERNAME OR OFFERING CODE</label>
+    <input type="text" id="username" autocomplete="off" spellcheck="false" placeholder="username or 🐍🌙🔥💀🦅">
+    <div id="resolve"></div>
     <label class="rebuy" for="rebuy">
       <input type="checkbox" id="rebuy">
       ALLOW REBUY (pays the chain again)
@@ -95,16 +99,71 @@ function bounce() { window.location.replace('/'); }
 })();
 
 // ── Confirm a buy-in ──────────────────────────────────────
-const $user   = document.getElementById('username');
-const $rebuy  = document.getElementById('rebuy');
-const $btn    = document.getElementById('confirm');
-const $result = document.getElementById('result');
+const $user    = document.getElementById('username');
+const $resolve = document.getElementById('resolve');
+const $rebuy   = document.getElementById('rebuy');
+const $btn     = document.getElementById('confirm');
+const $result  = document.getElementById('result');
 
 function show(msg, kind) { $result.textContent = msg; $result.className = kind || ''; }
+function showResolve(msg, kind) { $resolve.textContent = msg; $resolve.className = kind || ''; }
+
+// An offering code is emoji; a username is not. Distinguish without re-hashing.
+const isOfferingCode = (s) => /\p{Extended_Pictographic}/u.test(s);
+
+// Username the next confirm should target when the field holds an emoji code.
+// null = not yet resolved to a single match (block confirm).
+let resolvedUsername = null;
+
+async function lookupCode(code) {
+  let res, data;
+  try {
+    res = await fetch('/api/admin/lookup', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ code }),
+    });
+    if (res.status === 401) return bounce();
+    data = await res.json().catch(() => ({}));
+  } catch { return showResolve('Lookup failed — network error.', 'err'); }
+
+  const matches = data.matches || [];
+  if (matches.length === 0) {
+    resolvedUsername = null;
+    showResolve('✗ no player matches that code', 'err');
+  } else if (matches.length === 1) {
+    resolvedUsername = matches[0].username;
+    showResolve(`→ ${matches[0].username}` +
+      (matches[0].bought ? ' (already bought in)' : ''), 'ok');
+  } else {
+    resolvedUsername = null;
+    showResolve('→ multiple matches: ' + matches.map(m => m.username).join(', ') +
+      ' — type the exact username', 'err');
+  }
+}
+
+// Live-resolve as the admin types/pastes an emoji code.
+let _debounce = null;
+$user.addEventListener('input', () => {
+  resolvedUsername = null;
+  const v = $user.value.trim();
+  clearTimeout(_debounce);
+  if (!v || !isOfferingCode(v)) { showResolve('', ''); return; }
+  showResolve('resolving…', '');
+  _debounce = setTimeout(() => lookupCode(v), 300);
+});
 
 async function confirmBuyin() {
-  const username = $user.value.trim();
-  if (!username) return show('Enter a username first.', 'err');
+  const raw = $user.value.trim();
+  if (!raw) return show('Enter a username or offering code first.', 'err');
+
+  // Resolve an emoji code to its username before paying.
+  let username = raw;
+  if (isOfferingCode(raw)) {
+    if (!resolvedUsername) { clearTimeout(_debounce); await lookupCode(raw); }
+    if (!resolvedUsername) {
+      return show('Resolve the offering code to a single player first.', 'err');
+    }
+    username = resolvedUsername;
+  }
 
   $btn.disabled = true;
   show('Consulting the gods…', '');
@@ -127,6 +186,8 @@ async function confirmBuyin() {
     show('✓ ' + (data.message || 'Buy-in confirmed.'), 'ok');
     $user.value = '';
     $rebuy.checked = false;
+    resolvedUsername = null;
+    showResolve('', '');
     return;
   }
   if (res.status === 409) {

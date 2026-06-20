@@ -235,7 +235,7 @@ export function recruitFriend() {
 export async function buyIn() {
   if (G.bought && G.invitesLeft > 0) { showModal('ALREADY IN!', 'Keep recruiting, Pharaoh!'); return; }
 
-  const confirmed = await showBuyInDialog(!Api.hasToken(), G.username);
+  const confirmed = await showBuyInDialog(!Api.hasToken(), G.offeringCode);
   if (!confirmed) return;
 
   const rebuy = G.bought;

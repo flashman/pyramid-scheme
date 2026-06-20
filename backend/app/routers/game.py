@@ -10,6 +10,7 @@ from app.schemas import (
 )
 from app.auth import get_current_user
 from app.inventory import inventory_list
+from app.offering import offering_code
 
 router = APIRouter()
 
@@ -42,6 +43,7 @@ async def me(
         flags=state.flags or {},
         balance=current_user.balance,
         is_admin=current_user.is_admin,
+        offering_code=offering_code(current_user.username),
         inventory=inv,
     )
 

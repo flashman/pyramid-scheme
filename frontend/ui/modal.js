@@ -151,19 +151,6 @@ import { drawQR, decodeQRString, randomQRMatrix } from './qr.js';
 let _buyInResolve = null;
 let _buyInIsGuest = false;
 
-const OFFERING_EMOJIS = ['🐍','🌙','🔥','💀','🦅','🌊','⭐','🗿','🌵','🦂','🧿','🔮','🏺','🌿','🐝','🐫','🐊','🦉','🌀','🪙','💎','🦁','🌛','🦋'];
-
-function _offeringCode(username) {
-  let h = 0;
-  for (let i = 0; i < username.length; i++) h = (h * 31 + username.charCodeAt(i)) >>> 0;
-  const n = OFFERING_EMOJIS.length;
-  return OFFERING_EMOJIS[h % n]
-    + OFFERING_EMOJIS[(h >> 5) % n]
-    + OFFERING_EMOJIS[(h >> 10) % n]
-    + OFFERING_EMOJIS[(h >> 15) % n]
-    + OFFERING_EMOJIS[(h >> 20) % n];
-}
-
 const BUYIN_CSS = `
 #bi-overlay {
   position:fixed;inset:0;z-index:20000;
@@ -243,8 +230,10 @@ document.addEventListener('keydown', e => {
  * Shows a buy-in overlay.
  * Guests: satirical QR + confirm button → resolves true (simulated buy-in).
  * Auth users: real payment QR + offering code + GOT IT only → resolves false (no auto-confirm).
+ * `offeringCode` is the server-canonical code from /api/me (G.offeringCode) —
+ * never computed client-side (see app/offering.py).
  */
-export function showBuyInDialog(isGuest, username = '') {
+export function showBuyInDialog(isGuest, offeringCode = '') {
   _ensureBuyInDOM();
   _buyInIsGuest = isGuest;
   const qr   = document.getElementById('bi-qr');
@@ -269,7 +258,7 @@ export function showBuyInDialog(isGuest, username = '') {
     document.getElementById('bi-title').textContent  = '⚡ THE TITHE AWAITS ⚡';
     document.getElementById('bi-body').textContent   =
       'You have been measured, Pharaoh.\n\nScan the glyph. $10.\nSpeak nothing. Write only your mark.\nThe ledger needs no other context.';
-    code.textContent   = _offeringCode(username);
+    code.textContent   = offeringCode;
     code.style.display = 'block';
     document.getElementById('bi-sub').textContent    =
       'The gate opens when the coin crosses.\nNot before. Not after.\n\nDo not lose your mark.\n\n★ THE LEDGER IS ETERNAL ★';

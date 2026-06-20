@@ -11,11 +11,48 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_admin_user
 from app.database import get_db
 from app.models import User, GameState
+from app.offering import offering_code
 from app.payout import PAYOUT_CONFIG
 from app.routers.payments import _apply_confirmed_buyin
 from app.schemas import BuyInResponse
 
 router = APIRouter()
+
+
+class LookupRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=64)
+
+
+class LookupMatch(BaseModel):
+    username: str
+    bought:   bool
+
+
+class LookupResponse(BaseModel):
+    matches: list[LookupMatch]
+
+
+@router.post("/admin/lookup", response_model=LookupResponse)
+async def lookup_offering_code(
+    body: LookupRequest,
+    _admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve a pasted 5-emoji offering code back to the username(s) that
+    produce it. The code is a lossy hash, so collisions are possible — return
+    every match (with bought status) so the admin can disambiguate.
+    """
+    code = body.code.strip()
+    rows = await db.execute(
+        select(User.username, GameState.bought)
+        .outerjoin(GameState, GameState.user_id == User.id)
+    )
+    matches = [
+        LookupMatch(username=username, bought=bool(bought))
+        for username, bought in rows.all()
+        if offering_code(username) == code
+    ]
+    return LookupResponse(matches=matches)
 
 
 class ConfirmBuyInRequest(BaseModel):

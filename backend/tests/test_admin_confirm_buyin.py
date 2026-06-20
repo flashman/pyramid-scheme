@@ -110,6 +110,52 @@ async def test_me_exposes_is_admin(client):
     assert pleb_me.status_code == 200 and pleb_me.json()["is_admin"] is False
 
 
+async def test_me_exposes_offering_code(client):
+    from app.offering import offering_code
+    uid = await _mk("admin")
+    async with client as c:
+        me = await c.get("/api/me", headers=auth_headers(uid, "admin"))
+    assert me.json()["offering_code"] == offering_code("admin")
+
+
+async def test_lookup_resolves_code_to_username(client):
+    from app.offering import offering_code
+    admin = await _mk("pharaoh", is_admin=True)
+    buyer = await _mk("alice", bought=True)
+    async with client as c:
+        res = await c.post(
+            "/api/admin/lookup",
+            json={"code": offering_code("alice")},
+            headers=auth_headers(admin, "pharaoh"),
+        )
+    assert res.status_code == 200
+    matches = res.json()["matches"]
+    assert {"username": "alice", "bought": True} in matches
+
+
+async def test_lookup_no_match_returns_empty(client):
+    admin = await _mk("pharaoh", is_admin=True)
+    async with client as c:
+        res = await c.post(
+            "/api/admin/lookup",
+            json={"code": "🐍🐍🐍🐍🐍"},
+            headers=auth_headers(admin, "pharaoh"),
+        )
+    assert res.status_code == 200 and res.json()["matches"] == []
+
+
+async def test_lookup_rejects_non_admin(client):
+    from app.offering import offering_code
+    caller = await _mk("plebeian", is_admin=False)
+    async with client as c:
+        res = await c.post(
+            "/api/admin/lookup",
+            json={"code": offering_code("plebeian")},
+            headers=auth_headers(caller, "plebeian"),
+        )
+    assert res.status_code == 403
+
+
 async def test_confirm_buyin_unknown_user_404(client):
     admin = await _mk("pharaoh", is_admin=True)
     async with client as c:
