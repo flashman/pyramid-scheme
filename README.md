@@ -56,7 +56,7 @@ docker compose exec backend alembic upgrade head
 
 ### Invite flow (real path)
 1. Register → click BUY IN → scan the QR code and pay $10 externally, including your 5-emoji offering code in the payment note
-2. Admin matches the code to your username and sets `GameState.bought = True` in the DB — the game unlocks on next refresh
+2. Admin (user 1) opens **`/admin`**, pastes the offering code (or types the username), and clicks **Confirm Buy-In** — this credits the upline chain and unlocks the game on next refresh. (Do **not** hand-edit `GameState.bought` — that skips the payout.)
 3. Click **SEND SCROLL** → enter an email address
 4. Check **Mailhog** at `:8025` — the invite email lands there instantly
 5. Copy the invite link from the email, open it in an incognito tab

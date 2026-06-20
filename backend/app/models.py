@@ -22,6 +22,7 @@ class User(Base):
     password_hash: Mapped[str]      = mapped_column(String(128), nullable=False)
     balance:       Mapped[float]    = mapped_column(Numeric(10, 2), default=0.0)
     is_active:     Mapped[bool]     = mapped_column(Boolean, default=True)
+    is_admin:      Mapped[bool]     = mapped_column(Boolean, default=False, nullable=False)
     created_at:    Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     # Self-referential FK: who directly recruited this user. Null = organic / root.

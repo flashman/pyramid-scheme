@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<title>PYRAMID SCHEME™ — Admin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  :root{
+    --gold:#f0c020; --gold-dim:#c8a020; --gold-bright:#f0e040;
+    --tan:#a07030; --amber-dark:#804000; --tan-muted:#604010;
+    --bg-page:#0a0612; --bg-panel:#100800; --bg-input:#200800;
+    --btn-bg:#7a3800; --btn-hover:#a05000;
+    --ok:#60c040; --err:#e05030;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg-page);color:var(--tan);
+       font-family:'Press Start 2P',monospace;display:flex;flex-direction:column;
+       align-items:center;padding:24px 12px;line-height:2.2}
+  h1{color:var(--gold);font-size:13px;text-shadow:2px 2px 0 var(--amber-dark);
+     letter-spacing:1px;text-align:center;margin:0 0 4px}
+  .sub{color:var(--tan-muted);font-size:6px;letter-spacing:1px;margin-bottom:20px}
+  #gate{color:var(--tan-muted);font-size:7px;margin-top:40px}
+  #panel{display:none;width:100%;max-width:440px;background:var(--bg-panel);
+         border:4px solid var(--gold-dim);border-top:2px solid var(--amber-dark);
+         padding:18px 20px 22px}
+  .who{color:var(--tan-muted);font-size:6px;margin-bottom:16px;text-align:center}
+  .who b{color:var(--gold)}
+  label{display:block;color:var(--gold);font-size:7px;margin:0 0 6px;letter-spacing:1px}
+  input[type=text]{width:100%;background:var(--bg-input);border:2px solid var(--amber-dark);
+       color:var(--gold-bright);font-family:'Press Start 2P',monospace;font-size:9px;
+       padding:9px;outline:none}
+  input[type=text]:focus{border-color:var(--gold-dim)}
+  .rebuy{display:flex;align-items:center;gap:8px;margin:14px 0 4px;
+         color:var(--tan);font-size:6px;cursor:pointer}
+  .rebuy input{width:14px;height:14px;accent-color:var(--gold-dim);cursor:pointer}
+  button{display:block;width:100%;margin-top:16px;background:var(--btn-bg);
+         border:3px solid var(--gold-dim);color:var(--gold-bright);
+         font-family:'Press Start 2P',monospace;font-size:8px;padding:11px 4px;
+         cursor:pointer;letter-spacing:1px}
+  button:hover{background:var(--btn-hover)}
+  button:disabled{opacity:.5;cursor:default}
+  #resolve{margin-top:8px;font-size:6px;line-height:2.2;min-height:10px;color:var(--tan-muted)}
+  #resolve.ok{color:var(--gold)}
+  #resolve.err{color:var(--err)}
+  #result{margin-top:16px;font-size:6px;line-height:2.4;min-height:14px;word-break:break-word}
+  #result.ok{color:var(--ok)}
+  #result.err{color:var(--err)}
+  a.back{display:inline-block;margin-top:22px;color:var(--tan-muted);font-size:6px;
+         text-decoration:none;letter-spacing:1px}
+  a.back:hover{color:var(--gold)}
+</style>
+</head>
+<body>
+  <h1>⚡ ADMIN ⚡</h1>
+  <div class="sub">★ CONFIRM BUY-INS ★</div>
+
+  <div id="gate">CHECKING CREDENTIALS…</div>
+
+  <div id="panel">
+    <div class="who">Signed in as <b id="who-name">—</b></div>
+    <label for="username">USERNAME OR OFFERING CODE</label>
+    <input type="text" id="username" autocomplete="off" spellcheck="false" placeholder="username or 🐍🌙🔥💀🦅">
+    <div id="resolve"></div>
+    <label class="rebuy" for="rebuy">
+      <input type="checkbox" id="rebuy">
+      ALLOW REBUY (pays the chain again)
+    </label>
+    <button id="confirm">✓ CONFIRM BUY-IN</button>
+    <div id="result"></div>
+    <a class="back" href="/">← back to game</a>
+  </div>
+
+<script>
+const TOKEN_KEY = 'ps_auth_token';
+const token = localStorage.getItem(TOKEN_KEY);
+
+function authHeaders(extra = {}) {
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...extra };
+}
+function bounce() { window.location.replace('/'); }
+
+// ── Gate: must be a logged-in admin, else back to the main game/login ──
+(async function gate() {
+  if (!token) return bounce();
+  let me;
+  try {
+    const res = await fetch('/api/me', { headers: authHeaders() });
+    if (!res.ok) return bounce();          // 401 expired / invalid
+    me = await res.json();
+  } catch { return bounce(); }
+  if (me.is_admin !== true) return bounce();
+
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('panel').style.display = 'block';
+  document.getElementById('who-name').textContent = me.username;
+  document.getElementById('username').focus();
+})();
+
+// ── Confirm a buy-in ──────────────────────────────────────
+const $user    = document.getElementById('username');
+const $resolve = document.getElementById('resolve');
+const $rebuy   = document.getElementById('rebuy');
+const $btn     = document.getElementById('confirm');
+const $result  = document.getElementById('result');
+
+function show(msg, kind) { $result.textContent = msg; $result.className = kind || ''; }
+function showResolve(msg, kind) { $resolve.textContent = msg; $resolve.className = kind || ''; }
+
+// An offering code is emoji; a username is not. Distinguish without re-hashing.
+const isOfferingCode = (s) => /\p{Extended_Pictographic}/u.test(s);
+
+// Username the next confirm should target when the field holds an emoji code.
+// null = not yet resolved to a single match (block confirm).
+let resolvedUsername = null;
+
+async function lookupCode(code) {
+  let res, data;
+  try {
+    res = await fetch('/api/admin/lookup', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ code }),
+    });
+    if (res.status === 401) return bounce();
+    data = await res.json().catch(() => ({}));
+  } catch { return showResolve('Lookup failed — network error.', 'err'); }
+
+  const matches = data.matches || [];
+  if (matches.length === 0) {
+    resolvedUsername = null;
+    showResolve('✗ no player matches that code', 'err');
+  } else if (matches.length === 1) {
+    resolvedUsername = matches[0].username;
+    showResolve(`→ ${matches[0].username}` +
+      (matches[0].bought ? ' (already bought in)' : ''), 'ok');
+  } else {
+    resolvedUsername = null;
+    showResolve('→ multiple matches: ' + matches.map(m => m.username).join(', ') +
+      ' — type the exact username', 'err');
+  }
+}
+
+// Live-resolve as the admin types/pastes an emoji code.
+let _debounce = null;
+$user.addEventListener('input', () => {
+  resolvedUsername = null;
+  const v = $user.value.trim();
+  clearTimeout(_debounce);
+  if (!v || !isOfferingCode(v)) { showResolve('', ''); return; }
+  showResolve('resolving…', '');
+  _debounce = setTimeout(() => lookupCode(v), 300);
+});
+
+async function confirmBuyin() {
+  const raw = $user.value.trim();
+  if (!raw) return show('Enter a username or offering code first.', 'err');
+
+  // Resolve an emoji code to its username before paying.
+  let username = raw;
+  if (isOfferingCode(raw)) {
+    if (!resolvedUsername) { clearTimeout(_debounce); await lookupCode(raw); }
+    if (!resolvedUsername) {
+      return show('Resolve the offering code to a single player first.', 'err');
+    }
+    username = resolvedUsername;
+  }
+
+  $btn.disabled = true;
+  show('Consulting the gods…', '');
+  let res, data;
+  try {
+    res = await fetch('/api/admin/confirm-buyin', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ username, allow_rebuy: $rebuy.checked }),
+    });
+    data = await res.json().catch(() => ({}));
+  } catch {
+    $btn.disabled = false;
+    return show('Network error — try again.', 'err');
+  }
+  $btn.disabled = false;
+
+  if (res.status === 401) return bounce();
+  if (res.ok) {
+    show('✓ ' + (data.message || 'Buy-in confirmed.'), 'ok');
+    $user.value = '';
+    $rebuy.checked = false;
+    resolvedUsername = null;
+    showResolve('', '');
+    return;
+  }
+  if (res.status === 409) {
+    // Already bought in — surface the rebuy path so a genuine second payment
+    // can be confirmed deliberately.
+    $rebuy.checked = true;
+    return show((data.detail || 'Already bought in.') +
+                ' — tick is now set; press confirm again only if this is a real second payment.', 'err');
+  }
+  show(data.detail || `Error (${res.status}).`, 'err');
+}
+
+$btn.addEventListener('click', confirmBuyin);
+$user.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmBuyin(); });
+</script>
+</body>
+</html>

@@ -10,6 +10,7 @@ COPY engine/     /usr/share/nginx/html/engine/
 COPY game/       /usr/share/nginx/html/game/
 COPY ui/         /usr/share/nginx/html/ui/
 COPY worlds/     /usr/share/nginx/html/worlds/
+COPY admin/      /usr/share/nginx/html/admin/
 COPY index.html  /usr/share/nginx/html/
 COPY main.js     /usr/share/nginx/html/
 COPY style.css   /usr/share/nginx/html/

@@ -42,6 +42,8 @@ class MeResponse(BaseModel):
     invites_left: int
     flags:        dict
     balance:      float
+    is_admin:     bool = False
+    offering_code: str = ""
     inventory:    list[InventoryItemOut] = []
 
     class Config:

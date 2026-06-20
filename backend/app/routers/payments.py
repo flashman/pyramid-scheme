@@ -61,17 +61,21 @@ async def _apply_confirmed_buyin(
     current_user: User,
     state: GameState,
     db: AsyncSession,
+    source: str = "stripe",
 ) -> BuyInResponse:
     """Apply a verified payment to a user's account and walk the upline chain.
 
+    `current_user` / `state` are the BUYER's records (not whoever triggered this).
+    `source` is recorded as the buyin Transaction ref_id ("stripe", "venmo", ...).
+
     Call this from the Stripe webhook handler after signature verification,
-    or from any future manual-grant admin endpoint.
+    or from the admin manual-confirm endpoint.
     """
     total_pool   = sum(payout_at_depth(d) for d in range(1, max_pay_depth() + 1))
     platform_cut = round(fee - total_pool, 2)
 
     db.add(Transaction(
-        user_id=current_user.id, type="buyin", amount=-fee, ref_id="stripe",
+        user_id=current_user.id, type="buyin", amount=-fee, ref_id=source,
         meta={"platform_cut": platform_cut, "upline_pool": round(total_pool, 2)},
     ))
 

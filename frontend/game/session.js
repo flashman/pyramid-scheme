@@ -76,6 +76,7 @@ export class GameSession {
     if (me.bought       != null) G.bought      = me.bought;
     if (me.invites_left != null) G.invitesLeft = me.invites_left;
     if (me.username)             G.username    = me.username;
+    if (me.offering_code)        G.offeringCode = me.offering_code;
     if (me.flags && typeof me.flags === 'object') {
       for (const [k, v] of Object.entries(me.flags)) {
         Flags._store[k] = v;  // bypass event bus to avoid sync-back loop
@@ -99,8 +100,6 @@ export class GameSession {
       G.px = 2450; G.py = GND; G.camX = 2450 - CW / 2; G.facing = 1;
       document.getElementById('bi').disabled = true;
       document.getElementById('rb').disabled = false;
-      const il = document.getElementById('il');
-      if (il) il.style.display = 'block';
     }
 
     const recruitsData = await Api.loadRecruits();
