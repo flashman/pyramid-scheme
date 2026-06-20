@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     smtp_password: str  = ""
     smtp_from:     str  = "no-reply@pyramid-scheme.live"
 
+    # Resend HTTPS API key (re_...). Render blocks outbound SMTP, so in
+    # production we deliver over https://api.resend.com instead of SMTP.
+    # Falls back to smtp_password (Resend's SMTP password *is* the API key).
+    resend_api_key: str = ""
+
     # URL embedded in invite email links
     frontend_url: str = "http://localhost:5173"
 

@@ -225,6 +225,10 @@ export function recruitFriend() {
       Api.getInvites().then(data => {
         if (data.invites) updateInvitePanel(data.invites);
       }).catch(() => {});
+    })
+    .catch(() => {
+      // Network-level failure (request never completed) — don't fail silently.
+      log('✗ Scroll failed to send. Check your connection and try again.', 'r');
     });
 }
 
