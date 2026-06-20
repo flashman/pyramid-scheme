@@ -41,6 +41,7 @@ async def me(
         invites_left=state.invites_left,
         flags=state.flags or {},
         balance=current_user.balance,
+        is_admin=current_user.is_admin,
         inventory=inv,
     )
 

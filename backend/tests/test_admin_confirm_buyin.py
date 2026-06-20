@@ -100,6 +100,16 @@ async def test_confirm_buyin_already_bought_requires_allow_rebuy(client):
         assert allowed.status_code == 200
 
 
+async def test_me_exposes_is_admin(client):
+    admin = await _mk("pharaoh", is_admin=True)
+    pleb  = await _mk("plebeian", is_admin=False)
+    async with client as c:
+        admin_me = await c.get("/api/me", headers=auth_headers(admin, "pharaoh"))
+        pleb_me  = await c.get("/api/me", headers=auth_headers(pleb, "plebeian"))
+    assert admin_me.status_code == 200 and admin_me.json()["is_admin"] is True
+    assert pleb_me.status_code == 200 and pleb_me.json()["is_admin"] is False
+
+
 async def test_confirm_buyin_unknown_user_404(client):
     admin = await _mk("pharaoh", is_admin=True)
     async with client as c:
