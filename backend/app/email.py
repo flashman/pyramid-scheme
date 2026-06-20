@@ -15,6 +15,7 @@ invite endpoint always succeeds for the caller.
 """
 from __future__ import annotations
 import asyncio
+import html
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -94,12 +95,13 @@ async def send_invite_email(
         f"{invite_url}\n\n"
         f"⚡ PYRAMID SCHEME™ — TOTALLY LEGAL™"
     )
+    safe_username = html.escape(inviter_username)
     html_body = f"""<!DOCTYPE html>
 <html>
 <body style="background:#0a0500;color:#d0a060;font-family:monospace;padding:24px;margin:0">
   <h1 style="color:#f0c020;letter-spacing:3px;font-size:18px">⚡ PYRAMID SCHEME™ ⚡</h1>
   <p style="margin:16px 0">
-    <strong style="color:#f0c020">{inviter_username}</strong>
+    <strong style="color:#f0c020">{safe_username}</strong>
     has sent you an invite scroll.
   </p>
   <p style="margin:0 0 20px">Click below to register and build your empire:</p>
