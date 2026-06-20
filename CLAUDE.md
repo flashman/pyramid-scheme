@@ -21,12 +21,14 @@ The stack is a FastAPI backend (Python, async SQLAlchemy, PostgreSQL, WebSockets
 | `chamber` | The Crypt | `ChamberRealm` (flat, indoor) |
 | `council` | Galactic Council | `CouncilRealm` (flat, indoor) |
 
-### Current status (v1.44 frontend / v0.5.0 backend)
+### Current status (v1.45 frontend / v0.5.0 backend)
 
-**Working end-to-end:** registration, JWT auth, buy-in, upline chain walk, payout credits, WebSocket real-time pyramid updates, invite email flow (Mailhog in dev), dev sim panel, session persistence, profile management.
+**Working end-to-end:** registration, JWT auth, upline chain walk, payout credits, WebSocket real-time pyramid updates, invite email flow (Mailhog in dev), dev sim panel, session persistence, profile management.
+
+**Buy-in flow (manual):** `POST /api/buy-in` returns 503 while Stripe is disabled. The authenticated buy-in dialog shows a QR code + a deterministic 5-emoji offering code derived from the username. The player pays externally, includes the code in the payment note, and the admin sets `GameState.bought = True` in the DB. `_apply_confirmed_buyin()` in `routers/payments.py` is the blueprint for the Stripe webhook to call once wired.
 
 **Stubbed / incomplete:**
-- Stripe payment integration is `raise NotImplementedError` — no real money can move yet.
+- Stripe payment integration is a 503 gate — `_apply_confirmed_buyin()` holds the chain-walk blueprint; call it from the webhook after signature verification.
 - Balance withdrawal/cashout has no implementation.
 - `POST /api/stripe/webhook` accepts any POST; signature verification is a TODO comment.
 

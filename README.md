@@ -55,12 +55,13 @@ docker compose exec backend alembic upgrade head
 ## Dev workflow
 
 ### Invite flow (real path)
-1. Register, buy in → you get 4 invite scrolls
-2. Click **SEND SCROLL** → enter an email address
-3. Check **Mailhog** at `:8025` — the invite email lands there instantly
-4. Copy the invite link from the email, open it in an incognito tab
-5. Register as a new user → the inviter's browser gets a WS `invite_accepted` notification
-6. Buy in as the new user → the chain walk fires, the inviter sees a new pyramid appear in real time
+1. Register → click BUY IN → scan the QR code and pay $10 externally, including your 5-emoji offering code in the payment note
+2. Admin matches the code to your username and sets `GameState.bought = True` in the DB — the game unlocks on next refresh
+3. Click **SEND SCROLL** → enter an email address
+4. Check **Mailhog** at `:8025` — the invite email lands there instantly
+5. Copy the invite link from the email, open it in an incognito tab
+6. Register as a new user → the inviter's browser gets a WS `invite_accepted` notification
+7. Buy in as the new user (same manual flow) → the chain walk fires, the inviter sees a new pyramid appear in real time
 
 ### Simulate without a second browser (dev panel)
 1. Log in, buy in

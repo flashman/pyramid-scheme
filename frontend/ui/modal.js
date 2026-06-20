@@ -151,7 +151,7 @@ import { drawQR, decodeQRString, randomQRMatrix } from './qr.js';
 let _buyInResolve = null;
 let _buyInIsGuest = false;
 
-const OFFERING_EMOJIS = ['🐍','🌙','🔥','💀','🦅','🌊','⭐','🗿','🌵','🦂','🧿','🔮','🏺','🌿','🕯️','🐫','⚰️','👁️','🌀','🪙','💎','🦁','🌛','🦋'];
+const OFFERING_EMOJIS = ['🐍','🌙','🔥','💀','🦅','🌊','⭐','🗿','🌵','🦂','🧿','🔮','🏺','🌿','🐝','🐫','🐊','🦉','🌀','🪙','💎','🦁','🌛','🦋'];
 
 function _offeringCode(username) {
   let h = 0;
