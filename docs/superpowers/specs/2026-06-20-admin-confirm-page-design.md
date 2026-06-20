@@ -1,8 +1,16 @@
 # Admin Confirm-Buyin Page — Design
 
 **Date:** 2026-06-20
-**Status:** Approved, pending implementation
+**Status:** Implemented (PR #16)
 **Builds on:** PR #16 (`is_admin` flag, `POST /api/admin/confirm-buyin`, `_apply_confirmed_buyin`)
+
+> **Implementation note (post-approval):** during build, the page also gained
+> offering-code resolution — the admin can paste the 5-emoji code from a payment
+> note and the page resolves it to a username via `POST /api/admin/lookup`. This
+> uncovered and fixed a pre-existing bug in the offering-code hash (signed `>>`
+> shift produced "undefined" emojis for ~half of usernames); the code generator
+> is now server-canonical in `app/offering.py`. See the Components / Testing
+> sections below, which reflect what shipped.
 
 ## Problem
 
@@ -39,21 +47,33 @@ changes server-side.
 ## Components
 
 1. **`frontend/admin/index.html`** (+ inline JS) — served by nginx at the clean
-   URL `/admin` via the existing `try_files $uri $uri/ =404` rule (a request for
-   `/admin` resolves to the `admin/` directory's `index.html`). **No nginx change
-   required.** Contains:
+   URL `/admin` via the `try_files $uri $uri/ =404` rule (a request for `/admin`
+   resolves to the `admin/` directory's `index.html`). One nginx change was
+   needed: `absolute_redirect off` so the `/admin` → `/admin/` directory redirect
+   preserves `host:port` (otherwise nginx drops the dev `:5173` port). Contains:
    - Gate logic (token check + `/api/me` → redirect if not admin).
-   - A confirm form: username text field + "allow rebuy" checkbox + submit.
+   - A confirm form: a **username-or-offering-code** text field + "allow rebuy"
+     checkbox + submit. An emoji code is detected client-side
+     (`\p{Extended_Pictographic}`) and resolved live (debounced) via
+     `POST /api/admin/lookup`; a "→ username (bought?)" indicator shows the
+     resolved player. Confirm targets the resolved username; an unresolved /
+     ambiguous code blocks confirm.
    - A result/status area for success and error messages.
    - A "back to game" link to `/`. It only navigates — it does **not** clear
      `ps_auth_token`, since that token is shared with the game session and
      clearing it would log the admin out of the game too.
    - No canvas, no imports from the game bundle. Plain inline `<script>`.
 
-2. **Backend — expose `is_admin` in `/api/me`:**
-   - Add `is_admin: bool` to `MeResponse` (`schemas.py`).
-   - Populate it from the `User` row in the `/api/me` handler (`routers/game.py`).
-   - This is the field the gate reads. It is the only backend change.
+2. **Backend:**
+   - Add `is_admin: bool` to `MeResponse` (`schemas.py`), populated in the
+     `/api/me` handler (`routers/game.py`). This is the field the gate reads.
+   - Add `offering_code: str` to `MeResponse`, computed by the new canonical
+     `app/offering.py` (the frontend stops computing it — `modal.js` reads
+     `G.offeringCode`, hydrated from `/api/me`).
+   - Add `POST /api/admin/lookup {code}` (`routers/admin.py`, admin-gated):
+     iterates users, computes each `offering_code`, returns all matches with
+     `bought` status. Returns all matches so the lossy-hash collisions can be
+     disambiguated by the admin.
 
 ## Flow
 
@@ -62,8 +82,10 @@ changes server-side.
 3. Gate runs: read `ps_auth_token`; call `/api/me`.
    - No token / `401` / `is_admin` false → redirect to `/`.
    - `is_admin` true → render confirm view.
-4. Confirm view: enter a username → `POST /api/admin/confirm-buyin` with the
-   Bearer token (and `allow_rebuy` if the checkbox is set).
+4. Confirm view: enter a username **or paste the offering code**. A pasted code
+   is resolved to a username via `POST /api/admin/lookup` first; then
+   `POST /api/admin/confirm-buyin` with the Bearer token (and `allow_rebuy` if
+   the checkbox is set).
 5. On `200`: show the response message (platform cut + amount distributed to N
    upline members).
 6. On error, show inline:
@@ -80,18 +102,23 @@ page never invents authorization decisions — it reflects what the API returns.
 
 ## Testing
 
-- **Backend:** a test asserting `/api/me` includes `is_admin`, true for an admin
-  user and false for a normal user. Extends the existing `/api/me` coverage.
-- **Frontend:** the page is static HTML with inline JS and no JS test runner in
-  this project. Verified manually after a frontend rebuild:
-  - Visiting `/admin` while logged out → redirected to `/`.
-  - Visiting `/admin` as a non-admin user → redirected to `/`.
-  - Visiting `/admin` as user 1 → confirm UI renders; confirming a real buyer
-    pays the upline (already covered by the PR #16 backend tests).
+- **Backend (full suite: 37 passed):**
+  - `/api/me` includes `is_admin` (true for admin, false for normal user) and
+    `offering_code`.
+  - `test_offering_code.py` pins `offering_code` to the frontend reference
+    values, including non-ASCII usernames, and asserts every code is 5 valid
+    emojis (regression guard for the old "undefined" bug).
+  - `POST /api/admin/lookup` resolves a code → username, returns empty for no
+    match, and 403s a non-admin caller.
+  - `confirm-buyin` (from PR #16): non-admin 403, ancestor `balance`/`earned`
+    actually move, `allow_rebuy` 409 guard, 404 unknown user.
+- **Frontend:** static HTML + inline JS, no JS test runner. Data paths verified
+  live via curl; the in-browser gate redirect + paste→resolve→confirm round-trip
+  verified manually after rebuild.
 
 ## Out of scope (YAGNI)
 
 - nginx-level IP allowlist / basic-auth on `/admin` (defense-in-depth; the API
   gate is authoritative).
-- Recent-activity list, user lookup, balance edits, cashout — a future fuller
-  console if ever needed.
+- Recent-activity list, balance edits, cashout — a future fuller console if ever
+  needed. (Code → username lookup, originally listed here, was implemented.)
