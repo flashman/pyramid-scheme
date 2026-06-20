@@ -1,23 +1,44 @@
 """
 Email sending service.
 
-Always sends via SMTP — in development this hits Mailhog (the local
-catch-all server at mailhog:1025) so you see rendered emails without
-any real delivery.  In production point SMTP_HOST at a real provider.
+Two delivery paths, chosen at runtime:
 
-View caught emails at http://localhost:8025 when running via Docker.
+  • Resend HTTPS API (production) — Render blocks outbound SMTP, so we POST
+    to https://api.resend.com/emails over 443 instead. Used whenever an
+    API key is available and SMTP_HOST points at Resend.
+  • SMTP (local dev) — hits Mailhog (mailhog:1025), the local catch-all
+    server, so you see rendered emails without real delivery. View them at
+    http://localhost:8025 when running via Docker.
+
+Email delivery is best-effort: failures are logged, never raised, so the
+invite endpoint always succeeds for the caller.
 """
 from __future__ import annotations
 import asyncio
+import html
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import partial
 
+import httpx
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+RESEND_ENDPOINT = "https://api.resend.com/emails"
+
+
+def _resend_key() -> str:
+    """Resend API key — explicit setting, else the SMTP password (same value)."""
+    return settings.resend_api_key or settings.smtp_password
+
+
+def _use_resend_api() -> bool:
+    """Use the HTTPS API when we have a key and SMTP_HOST targets Resend."""
+    return bool(_resend_key()) and "resend" in settings.smtp_host.lower()
 
 
 def _send_smtp_sync(to_email: str, subject: str, html_body: str, text_body: str) -> None:
@@ -29,14 +50,37 @@ def _send_smtp_sync(to_email: str, subject: str, html_body: str, text_body: str)
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+    # timeout guards against a hung connection (e.g. a blocked SMTP port).
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as server:
         if settings.smtp_tls:
             server.ehlo()
             server.starttls()
         if settings.smtp_user:
             server.login(settings.smtp_user, settings.smtp_password)
         server.sendmail(settings.smtp_from, to_email, msg.as_string())
-        logger.info(f"Email sent → {to_email}  subject='{subject}'")
+        logger.info(f"Email sent via SMTP → {to_email}  subject='{subject}'")
+
+
+async def _send_resend_api(to_email: str, subject: str, html_body: str, text_body: str) -> None:
+    """Deliver via the Resend HTTPS API (works where outbound SMTP is blocked)."""
+    payload = {
+        "from":    f"PYRAMID SCHEME <{settings.smtp_from}>",
+        "to":      [to_email],
+        "subject": subject,
+        "html":    html_body,
+        "text":    text_body,
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            RESEND_ENDPOINT,
+            headers={"Authorization": f"Bearer {_resend_key()}"},
+            json=payload,
+        )
+    if resp.status_code >= 400:
+        # Surface Resend's reason (bad key, unverified domain, etc.) in the logs.
+        logger.error(f"Resend API {resp.status_code} for {to_email}: {resp.text}")
+        return
+    logger.info(f"Email sent via Resend → {to_email}  id={resp.json().get('id')}")
 
 
 async def send_invite_email(
@@ -51,12 +95,13 @@ async def send_invite_email(
         f"{invite_url}\n\n"
         f"⚡ PYRAMID SCHEME™ — TOTALLY LEGAL™"
     )
+    safe_username = html.escape(inviter_username)
     html_body = f"""<!DOCTYPE html>
 <html>
 <body style="background:#0a0500;color:#d0a060;font-family:monospace;padding:24px;margin:0">
   <h1 style="color:#f0c020;letter-spacing:3px;font-size:18px">⚡ PYRAMID SCHEME™ ⚡</h1>
   <p style="margin:16px 0">
-    <strong style="color:#f0c020">{inviter_username}</strong>
+    <strong style="color:#f0c020">{safe_username}</strong>
     has sent you an invite scroll.
   </p>
   <p style="margin:0 0 20px">Click below to register and build your empire:</p>
@@ -73,18 +118,21 @@ async def send_invite_email(
 </body>
 </html>"""
 
-    if not settings.smtp_host:
+    if not _use_resend_api() and not settings.smtp_host:
         logger.warning(
-            f"SMTP_HOST not configured — invite link for {to_email}: {invite_url}"
+            f"No email transport configured — invite link for {to_email}: {invite_url}"
         )
         return
 
-    loop = asyncio.get_event_loop()
     try:
-        await loop.run_in_executor(
-            None,
-            partial(_send_smtp_sync, to_email, subject, html_body, text_body),
-        )
+        if _use_resend_api():
+            await _send_resend_api(to_email, subject, html_body, text_body)
+        else:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                partial(_send_smtp_sync, to_email, subject, html_body, text_body),
+            )
     except Exception as exc:
-        # Log but don't crash the invite endpoint — email failure is non-fatal
+        # Log but don't crash the invite flow — email failure is non-fatal.
         logger.error(f"Failed to send invite email to {to_email}: {exc}")

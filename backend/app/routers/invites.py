@@ -1,6 +1,6 @@
 import uuid
 import re
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ _EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 @router.post("/invites", response_model=InviteResponse, status_code=201)
 async def send_invite(
     body: SendInviteRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -57,9 +58,10 @@ async def send_invite(
     await db.commit()
     await db.refresh(invite)
 
-    # Send email (dev mode logs; prod sends SMTP)
+    # Send email after the response is returned, so a slow/failed mail
+    # provider never blocks the client (prod: Resend API; dev: Mailhog).
     invite_url = f"{settings.frontend_url}?invite={token}"
-    await send_invite_email(email, current_user.username, invite_url)
+    background_tasks.add_task(send_invite_email, email, current_user.username, invite_url)
 
     return InviteResponse(
         id=invite.id,
