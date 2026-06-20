@@ -151,13 +151,17 @@ import { drawQR, decodeQRString, randomQRMatrix } from './qr.js';
 let _buyInResolve = null;
 let _buyInIsGuest = false;
 
-const OFFERING_EMOJIS = ['🐍','🌙','⚡','🔥','💀','🦅','🌊','⭐','🗿','🌵','🦂','🌑','🔮','🏺','🌿','🕯️','🐫','⚰️','👁️','🌀','🪙','💎','🦁','🌛'];
+const OFFERING_EMOJIS = ['🐍','🌙','🔥','💀','🦅','🌊','⭐','🗿','🌵','🦂','🧿','🔮','🏺','🌿','🕯️','🐫','⚰️','👁️','🌀','🪙','💎','🦁','🌛','🦋'];
 
 function _offeringCode(username) {
   let h = 0;
   for (let i = 0; i < username.length; i++) h = (h * 31 + username.charCodeAt(i)) >>> 0;
   const n = OFFERING_EMOJIS.length;
-  return OFFERING_EMOJIS[h % n] + OFFERING_EMOJIS[(h >> 5) % n] + OFFERING_EMOJIS[(h >> 10) % n];
+  return OFFERING_EMOJIS[h % n]
+    + OFFERING_EMOJIS[(h >> 5) % n]
+    + OFFERING_EMOJIS[(h >> 10) % n]
+    + OFFERING_EMOJIS[(h >> 15) % n]
+    + OFFERING_EMOJIS[(h >> 20) % n];
 }
 
 const BUYIN_CSS = `
@@ -187,7 +191,6 @@ const BUYIN_CSS = `
 }
 #bi-code {
   font-size:20px;letter-spacing:6px;
-  background:#0a0600;border:1px solid var(--gold-dim,#8a6a20);
   padding:8px 4px;margin:8px 0;
 }
 #bi-sub {
@@ -262,14 +265,14 @@ export function showBuyInDialog(isGuest, username = '') {
   } else {
     // Auth user: payment is real and manual — show instructions only, no auto-confirm.
     document.getElementById('bi-ok').style.display   = 'none';
-    document.getElementById('bi-cancel').textContent = 'THE GODS HAVE HEARD ME';
+    document.getElementById('bi-cancel').textContent = 'SO IT IS WRITTEN';
     document.getElementById('bi-title').textContent  = '⚡ THE TITHE AWAITS ⚡';
     document.getElementById('bi-body').textContent   =
-      'This is not a simulation, Pharaoh.\n\nScan the sacred glyph. Send $10.\nNo note. No context.\nJust the coin — and your offering code:';
+      'You have been measured, Pharaoh.\n\nScan the glyph. $10.\nSpeak nothing. Write only your mark.\nThe ledger needs no other context.';
     code.textContent   = _offeringCode(username);
     code.style.display = 'block';
     document.getElementById('bi-sub').textContent    =
-      'Include your code in the payment note\nso the gods may know your name.\n\nWhen the coin moves, the gate finds you.\nRefresh the page. The desert opens.\n\n★ THE LEDGER IS ETERNAL ★';
+      'The gate opens when the coin crosses.\nNot before. Not after.\n\nDo not lose your mark.\n\n★ THE LEDGER IS ETERNAL ★';
     const matrix = decodeQRString(PAYMENT_QR_DATA) ?? randomQRMatrix();
     qr.style.display = 'block';
     setTimeout(() => drawQR(qr, matrix), 10);
