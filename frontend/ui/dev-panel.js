@@ -1,10 +1,11 @@
 // ── FILE: ui/dev-panel.js ─────────────────────────────────
 // Developer panel for testing — realm teleports, flag toggles,
-// state cheats, and (when authenticated) backend recruit simulation.
+// state cheats, and recruit simulation (local for guests, backend for auth users).
 // Toggle with the [⚠ DEV] button or backtick key.
 
 import { G }               from '../game/state.js';
-import { earthLayout }     from '../game/recruits.js';
+import { earthLayout, addRecruit } from '../game/recruits.js';
+import { pickName }         from '../game/tiers.js';
 import { Flags }           from '../engine/flags.js';
 import { Ledger }          from '../engine/ledger.js';
 import { RealmManager }    from '../engine/realm.js';
@@ -438,10 +439,6 @@ function _simLog(msg, colour = '#506050') {
 
 async function _runSimRecruit() {
   if (_simBusy) return;
-  if (!Api.hasToken()) {
-    _simLog('Not authenticated — log in first.', '#e04040');
-    return;
-  }
   if (!G.bought) {
     _simLog('Buy in first before simulating recruits.', '#e04040');
     return;
@@ -451,9 +448,22 @@ async function _runSimRecruit() {
   const delay = parseFloat(document.getElementById('dev-sim-delay').value);
   const btn   = document.getElementById('dev-sim-btn');
 
-  _simBusy      = true;
-  btn.disabled  = true;
+  _simBusy        = true;
+  btn.disabled    = true;
   btn.textContent = '⏳ SENDING…';
+
+  if (!Api.hasToken()) {
+    // Guest: local-only fake recruit after the delay
+    _simLog(`Guest sim — fake D${depth} recruit in ${delay}s…`, '#506050');
+    setTimeout(() => {
+      addRecruit(pickName(), depth, null);
+      _simLog(`Fake D${depth} recruit added locally.`, '#a0c080');
+      _simBusy        = false;
+      btn.disabled    = false;
+      btn.textContent = '► SIM RECRUIT';
+    }, delay * 1000);
+    return;
+  }
 
   try {
     const result = await Api.post('/api/dev/sim-recruit', {
@@ -470,7 +480,6 @@ async function _runSimRecruit() {
   } catch (e) {
     _simLog(`Request failed: ${e.message}`, '#e04040');
   } finally {
-    // Re-enable after the expected delay + a small buffer
     setTimeout(() => {
       _simBusy        = false;
       btn.disabled    = false;
@@ -524,7 +533,7 @@ export function devPanelSetAuthMode(hasDebugEndpoint) {
   const simSection = document.getElementById('dev-sim-section');
   if (!simSection) return;
 
-  if (hasDebugEndpoint && Api.hasToken()) {
+  if (hasDebugEndpoint) {
     simSection.style.display = 'block';
     _simLog('Backend debug mode active — sim recruits enabled.', '#40d080');
   } else {
