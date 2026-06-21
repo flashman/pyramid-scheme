@@ -8,7 +8,7 @@ from app.models import User, GameState, Transaction
 from app.schemas import BuyInRequest, BuyInResponse
 from app.auth import get_current_user
 from app.chain import run_buyin_chain
-from app.payout import payout_at_depth, max_pay_depth, PAYOUT_CONFIG
+from app.payout import PAYOUT_CONFIG
 from app.ws import manager
 
 router = APIRouter()
@@ -71,18 +71,14 @@ async def _apply_confirmed_buyin(
     Call this from the Stripe webhook handler after signature verification,
     or from the admin manual-confirm endpoint.
     """
-    total_pool   = sum(payout_at_depth(d) for d in range(1, max_pay_depth() + 1))
-    platform_cut = round(fee - total_pool, 2)
-
-    db.add(Transaction(
-        user_id=current_user.id, type="buyin", amount=-fee, ref_id=source,
-        meta={"platform_cut": platform_cut, "upline_pool": round(total_pool, 2)},
-    ))
-
     state.bought       = True
     state.invested     = round((state.invested or 0) + fee, 2)
     state.invites_left = (state.invites_left or 0) + INVITES_PER_BUYIN
 
+    # Walk the upline FIRST, so the ledger + message reflect what was ACTUALLY
+    # distributed — only the ancestors that exist, capped at max_pay_depth. A
+    # buyer may sit shallower than the full payout curve (or have no upline at
+    # all), so the real split varies by chain depth.
     ws_events: list = []
     if current_user.recruiter_id:
         ws_events = await run_buyin_chain(
@@ -91,6 +87,14 @@ async def _apply_confirmed_buyin(
             buyer_user_id=current_user.id,
             db=db,
         )
+
+    distributed  = round(sum(ev["payout"] for _, ev in ws_events), 2)
+    platform_cut = round(fee - distributed, 2)
+
+    db.add(Transaction(
+        user_id=current_user.id, type="buyin", amount=-fee, ref_id=source,
+        meta={"platform_cut": platform_cut, "upline_pool": distributed},
+    ))
 
     await db.commit()
 
@@ -107,8 +111,8 @@ async def _apply_confirmed_buyin(
     return BuyInResponse(
         success=True, stub=False,
         message=(
-            f"Buy-in confirmed. ${platform_cut} platform fee. "
-            f"${total_pool} distributed to {len(ws_events)} upline member(s)."
+            f"Buy-in confirmed. ${platform_cut:.2f} platform fee. "
+            f"${distributed:.2f} distributed to {len(ws_events)} upline member(s)."
         ),
         new_balance=current_user.balance,
         new_invites_left=state.invites_left,

@@ -23,6 +23,56 @@ async def _mk(username, *, is_admin=False, recruiter_id=None, bought=False, bala
         return u.id
 
 
+async def _make_chain(depth):
+    """Create an upline chain `depth` ancestors tall, then a fresh buyer at the
+    bottom. Returns the buyer id. depth=0 → buyer with no recruiter."""
+    recruiter = None
+    for i in range(depth):
+        recruiter = await _mk(f"anc{i}", recruiter_id=recruiter)
+    return await _mk("buyer", recruiter_id=recruiter)
+
+
+async def _confirm_message(client, buyer_username="buyer"):
+    admin = await _mk("pharaoh", is_admin=True)
+    async with client as c:
+        res = await c.post(
+            "/api/admin/confirm-buyin",
+            json={"username": buyer_username},
+            headers=auth_headers(admin, "pharaoh"),
+        )
+    assert res.status_code == 200, res.text
+    return res.json()["message"]
+
+
+async def test_message_no_upline(client):
+    # No ancestors: nothing distributed, the whole fee is platform revenue.
+    await _make_chain(0)
+    msg = await _confirm_message(client)
+    assert msg == "Buy-in confirmed. $10.00 platform fee. $0.00 distributed to 0 upline member(s)."
+
+
+async def test_message_partial_chain(client):
+    # 3 ancestors → D1+D2+D3 = 4+2+1 = $7.00 distributed.
+    await _make_chain(3)
+    msg = await _confirm_message(client)
+    assert msg == "Buy-in confirmed. $3.00 platform fee. $7.00 distributed to 3 upline member(s)."
+
+
+async def test_message_full_chain(client):
+    # Exactly max_pay_depth (9) ancestors → full $7.98 / $2.02.
+    await _make_chain(9)
+    msg = await _confirm_message(client)
+    assert msg == "Buy-in confirmed. $2.02 platform fee. $7.98 distributed to 9 upline member(s)."
+
+
+async def test_message_deeper_than_cap(client):
+    # 12 ancestors but payout caps at 9 — count and amount must not exceed the cap,
+    # and the dollars stay clean (no float artifacts like $2.0199999999999996).
+    await _make_chain(12)
+    msg = await _confirm_message(client)
+    assert msg == "Buy-in confirmed. $2.02 platform fee. $7.98 distributed to 9 upline member(s)."
+
+
 async def test_confirm_buyin_rejects_non_admin(client):
     caller = await _mk("plebeian", is_admin=False)
     buyer  = await _mk("buyer")
