@@ -76,6 +76,14 @@
 const TOKEN_KEY = 'ps_auth_token';
 const token = localStorage.getItem(TOKEN_KEY);
 
+// This page is served from the static host, which (unlike the dev nginx) does
+// NOT proxy /api to the backend. The main app injects window.API_BASE into
+// index.html at build time; this standalone page resolves it itself: relative
+// for local nginx-proxied dev, the backend origin in production.
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? '' : 'https://pyramid-scheme-backend.onrender.com';
+const api = (path) => API_BASE + path;
+
 function authHeaders(extra = {}) {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...extra };
 }
@@ -86,7 +94,7 @@ function bounce() { window.location.replace('/'); }
   if (!token) return bounce();
   let me;
   try {
-    const res = await fetch('/api/me', { headers: authHeaders() });
+    const res = await fetch(api('/api/me'), { headers: authHeaders() });
     if (!res.ok) return bounce();          // 401 expired / invalid
     me = await res.json();
   } catch { return bounce(); }
@@ -118,7 +126,7 @@ let resolvedUsername = null;
 async function lookupCode(code) {
   let res, data;
   try {
-    res = await fetch('/api/admin/lookup', {
+    res = await fetch(api('/api/admin/lookup'), {
       method: 'POST', headers: authHeaders(), body: JSON.stringify({ code }),
     });
     if (res.status === 401) return bounce();
@@ -169,7 +177,7 @@ async function confirmBuyin() {
   show('Consulting the gods…', '');
   let res, data;
   try {
-    res = await fetch('/api/admin/confirm-buyin', {
+    res = await fetch(api('/api/admin/confirm-buyin'), {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ username, allow_rebuy: $rebuy.checked }),
