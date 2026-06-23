@@ -39,6 +39,8 @@ export const WARES = [
     blurb: 'PROOF OF A PAYMENT YOU HAVE NOT YET MADE.\nVERY USEFUL. VERY BINDING.\nIT DOES NOT SURVIVE THE CROSSING. NEITHER, STATISTICALLY, DO YOU.' },
   { id: 'self_equity',        name: 'Stock Certificate in Yourself', tier: 'CURIOS',      art: 'self_equity',
     blurb: 'ONE SHARE. THE ISSUER IS YOU.\nYOU ARE NOW LONG ON YOURSELF —\nTHE MOST VOLATILE POSITION ON THE RIVER. CONGRATULATIONS.' },
+  { id: 'astral_lens',        name: 'A Lens Ground from Crushed Scarab', tier: 'RELICS', art: 'astral_lens',
+    blurb: 'GRIND YOUR EYE TO A FINE POWDER AND SEE THROUGH WALLS.\nYOUR CONSCIOUSNESS WILL DEPART YOUR BODY.\nDO NOT LEAVE IT UNATTENDED — PEOPLE WILL TALK.' },
 ];
 
 export const WARES_BY_ID = Object.fromEntries(WARES.map(w => [w.id, w]));
@@ -66,6 +68,7 @@ export const WARE_RETORTS = {
   future_receipt:   'PAID. OR YOU WILL HAVE. THE TENSES GET LOOSE BACK HERE.',
   self_equity:      'CONGRATULATIONS — YOU ARE NOW A SHAREHOLDER AND THE PRODUCT.',
   attentive_reel:   "ENJOY THE FOOTAGE. THEY HAVE THE DIRECTOR'S CUT.",
+  astral_lens:      'SOLD. YOUR BODY STAYS HERE. HOLD THAT THOUGHT.',
 };
 
 // Fired when you try to buy something you can't afford.

@@ -9,13 +9,13 @@ async def test_buy_keepsake_creates_inventory_row_and_ledger(client):
         res = await c.post("/api/shop/buy", json={"item_id": "scarab_amulet"}, headers=auth_headers(uid))
     assert res.status_code == 200
     body = res.json()
-    assert body["earned"] == 11.0
+    assert body["earned"] == 16.0
     assert {"item_id": "scarab_amulet", "quantity": 1, "equipped": False} in body["inventory"]
     async with TestingSessionLocal() as db:
         inv = (await db.execute(select(Inventory).where(Inventory.user_id == uid))).scalar_one()
         assert inv.item_id == "scarab_amulet" and inv.quantity == 1
         tx = (await db.execute(select(Transaction).where(Transaction.user_id == uid))).scalar_one()
-        assert tx.type == "shop_buy" and float(tx.amount) == -9.0 and tx.ref_id == "scarab_amulet"
+        assert tx.type == "shop_buy" and float(tx.amount) == -4.0 and tx.ref_id == "scarab_amulet"
 
 
 async def test_buy_keepsake_twice_returns_409(client):
@@ -26,7 +26,7 @@ async def test_buy_keepsake_twice_returns_409(client):
     assert res.status_code == 409
     async with TestingSessionLocal() as db:
         st = (await db.execute(select(GameState).where(GameState.user_id == uid))).scalar_one()
-        assert float(st.earned) == 41.0   # only the first buy charged
+        assert float(st.earned) == 46.0   # only the first buy charged
 
 
 async def test_buy_consumable_applies_effect_and_is_not_inventoried(client):
@@ -37,7 +37,7 @@ async def test_buy_consumable_applies_effect_and_is_not_inventoried(client):
         await c.post("/api/shop/buy", json={"item_id": "invite_scroll"}, headers=auth_headers(uid))
         r2 = await c.post("/api/shop/buy", json={"item_id": "invite_scroll"}, headers=auth_headers(uid))
     body = r2.json()
-    assert body["earned"] == 10.0
+    assert body["earned"] == 16.0
     assert body["invites_left"] == 2
     assert body["inventory"] == []        # consumables never appear in inventory
     async with TestingSessionLocal() as db:
