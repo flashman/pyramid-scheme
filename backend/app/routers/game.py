@@ -34,6 +34,7 @@ async def me(
 
     inv = await inventory_list(db, current_user.id)
     return MeResponse(
+        id=current_user.id,
         username=current_user.username,
         email=current_user.email,
         bought=state.bought,

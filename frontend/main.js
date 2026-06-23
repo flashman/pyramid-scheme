@@ -25,6 +25,8 @@ import { loadConfig }             from './game/config.js';
 import { renderPayoutTable }      from './ui/config-editor.js';
 import { openProfile }            from './ui/profile.js';
 import { SoundManager }           from './audio/sound.js';
+import { AstralSession }          from './game/astral.js';
+import { gameSocket }             from './game/ws.js';
 
 // ── Realms ────────────────────────────────────────────────
 // Realm instances are created in worlds/manifest.js.
@@ -88,12 +90,19 @@ document.addEventListener('keydown', e => {
   SoundManager.resume();
   // Don't forward key events during a realm transition animation.
   if (!RealmManager.isTransitioning) {
-    RealmManager.current.onKeyDown(e.key);
+    if (!AstralSession.onKeyDown(e.key)) {
+      RealmManager.current.onKeyDown(e.key);
+    }
   }
 });
 
-// ── Music: change theme when the active realm changes ─────
-Events.on('realm:enter', ({ id }) => SoundManager.playRealm(id));
+// ── Music + WS channel: fire when active realm changes ────
+Events.on('realm:enter', ({ id }) => {
+  SoundManager.playRealm(id);
+  if (G.userId != null) {
+    gameSocket.send({ type: 'realm_enter', realm: id, owner_id: G.userId });
+  }
+});
 document.addEventListener('keyup', e => { G.keys[e.key] = false; });
 
 // ── Expose UI callbacks referenced by inline HTML handlers ──
@@ -126,6 +135,7 @@ function gameLoop(ts) {
   }
   X.clearRect(0, 0, CW, CH);
   RealmManager.current.render();
+  AstralSession.renderOverlay();
 
   // Draw the transition overlay (if any) on top of the current render.
   RealmManager.renderTransition();
@@ -144,6 +154,7 @@ async function init() {
 
   if (token) {
     await new GameSession(token).start();
+    AstralSession.init();
   } else {
     G.isGuest = true;
     log('Playing as guest — progress will not be saved.', '');

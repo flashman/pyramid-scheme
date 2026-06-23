@@ -16,6 +16,7 @@
 import { Events }              from '../engine/events.js';
 import { Flags }               from '../engine/flags.js';
 import { Inventory }            from './inventory.js';
+import { PresenceStore }       from './presence.js';
 import { CW }                  from '../engine/canvas.js';
 import { G }                   from './state.js';
 import { Api }                 from './api.js';
@@ -75,6 +76,7 @@ export class GameSession {
     if (me.earned       != null) G.earned      = me.earned;
     if (me.bought       != null) G.bought      = me.bought;
     if (me.invites_left != null) G.invitesLeft = me.invites_left;
+    if (me.id       != null)     G.userId      = me.id;
     if (me.username)             G.username    = me.username;
     if (me.offering_code)        G.offeringCode = me.offering_code;
     if (me.flags && typeof me.flags === 'object') {
@@ -186,6 +188,17 @@ export class GameSession {
       Api.getInvites()
         .then(data => { if (data.invites) updateInvitePanel(data.invites); })
         .catch(() => {});
+    });
+
+    // Peer presence — ghost pharaoh tracking.
+    Events.on('ws:peer_entered', ({ username, px, py, pZ, facing, frame }) => {
+      PresenceStore.upsert(username, { px, py, pZ, facing, frame });
+    });
+    Events.on('ws:peer_left', ({ username }) => {
+      PresenceStore.remove(username);
+    });
+    Events.on('ws:peer_pose', ({ username, px, py, pZ, facing, frame }) => {
+      PresenceStore.upsert(username, { px, py, pZ, facing, frame });
     });
   }
 }

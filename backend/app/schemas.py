@@ -41,6 +41,7 @@ class InventoryItemOut(BaseModel):
 # ── Game state ────────────────────────────────────────────
 
 class MeResponse(BaseModel):
+    id:           int
     username:     str
     email:        str | None
     bought:       bool
