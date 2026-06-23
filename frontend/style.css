@@ -100,12 +100,10 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 .help-body{color:var(--tan);font-size:6px;line-height:2.3}
 
 /* ── Inventory panel ── */
-#inventory-panel{display:none}
-#inventory-panel.has-items{display:block}
 #inventory-list{padding:2px 0}
-.inv-item{color:var(--tan);font-size:5px;line-height:2;padding:1px 0;display:flex;justify-content:space-between;align-items:center}
+.inv-item{color:var(--tan);font-size:5px;line-height:2;padding:1px 0}
 .inv-item-name{color:var(--gold-dim)}
-.inv-item-kind{color:var(--tan-muted);font-size:4px;text-transform:uppercase;letter-spacing:1px}
+.inv-empty{color:var(--tan-muted);font-size:5px;line-height:2;font-style:italic}
 
 #mo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.88);z-index:100;align-items:center;justify-content:center}
 #mo.show{display:flex}
