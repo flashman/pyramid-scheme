@@ -97,6 +97,14 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 #md h2{color:var(--gold);font-size:10px;margin-bottom:12px;text-shadow:2px 2px 0 var(--amber-dark)}
 #md p{color:var(--gold-dim);font-size:6px;line-height:2;margin-bottom:12px}
 
+/* ── Astral chat overlay (top-right of canvas) ── */
+#astral-chat{display:none;position:absolute;top:6px;right:6px;width:220px;background:rgba(0,0,0,0.75);border:1px solid #664400;font-family:monospace;box-sizing:border-box;padding:6px;z-index:10}
+#astral-chat.active{display:block}
+#astral-chat-log{color:#e8c878;font-size:6px;line-height:1.8;max-height:120px;overflow-y:auto}
+#astral-chat-log div{white-space:pre-wrap;word-break:break-word}
+#astral-chat-input{display:none;width:100%;background:#000;border:1px solid #664400;color:#e8c878;font-family:monospace;font-size:6px;box-sizing:border-box;margin-top:4px;padding:2px 4px;outline:none}
+#astral-chat-input.active{display:block}
+
 /* ── Dialogue panel (below canvas) ── */
 #dlg{display:none;width:780px;background:#060200;border:4px solid var(--gold-dim);border-top:2px solid var(--amber-dark);box-sizing:border-box;padding:10px 14px 12px;font-family:monospace;position:relative}
 #dlg::before{content:'';position:absolute;top:4px;left:4px;right:4px;bottom:4px;border:1px solid var(--amber-dark);pointer-events:none}
