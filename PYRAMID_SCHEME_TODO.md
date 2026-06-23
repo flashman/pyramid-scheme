@@ -126,6 +126,7 @@
 ## PHASE 6 — Scaling (When You Have Traction)
 *Don't do this speculatively. Do it when metrics say you need it.*
 
+- [ ] **Async email via Supabase Edge Functions** — current `BackgroundTasks` approach is fine at small scale but ties email I/O to the Render backend process. When volume or reliability matters: add a Supabase DB webhook on `users INSERT` → Supabase Edge Function → Resend API. Fully decoupled, free across all three tiers. The DB already lives in Supabase (accessed from Render), so the webhook wiring is the only work.
 - [ ] **Redis pub/sub for WS** — the in-memory `ConnectionManager` breaks with multiple backend replicas. When you need horizontal scaling, swap to a Redis channel per `user_id`. The WS router stays the same; only the manager backend changes.
 - [ ] **Connection pooling** — add `asyncpg` pool configuration (`pool_size`, `max_overflow`) in `database.py`. Default SQLAlchemy settings are too conservative for concurrent WS connections.
 - [ ] **Queue buy-in chain walks** — `run_buyin_chain()` is a synchronous-ish DB walk inside a request. Under load, long chains will hold connections. Move to a background task queue (Celery + Redis, or just FastAPI `BackgroundTasks` for a start) and push WS events asynchronously.
