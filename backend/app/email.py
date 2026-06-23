@@ -102,7 +102,7 @@ async def _dispatch(
             await _send_resend_api(to_email, subject, html_body, text_body,
                                    from_email=from_email, from_name=from_name)
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(
                 None,
                 partial(_send_smtp_sync, to_email, subject, html_body, text_body,
@@ -176,7 +176,7 @@ async def send_recruit_joined_inviter(
 </body>
 </html>"""
     await _dispatch(to_email, subject, html_body, text_body,
-                    from_email="chainmail@pyramid-scheme.live", from_name="Chain Mail")
+                    from_email="pigeon@pyramid-scheme.live", from_name="Carrier Pigeon")
 
 
 async def send_recruit_joined_admin(
