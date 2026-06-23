@@ -86,6 +86,21 @@
 ## PHASE 5 — Game Completeness
 *Target: Ongoing. Ship phases 1–3 first, then work here in parallel with Phase 4.*
 
+### Realm Engagement — Fractal Deduction
+*Full design in `docs/superpowers/specs/2026-06-21-realms-fractal-deduction-design.md`*
+
+**Core diagnosis:** The realms are read-once dioramas. Every interaction is `walk → SPACE → read text → set flag`. No satisfying verb, no replay value, and the exploration system never talks to the pyramid. The Nile is the proof: highest content volume in the game, still not fun. Content volume does not convert.
+
+**Design direction:** A single deduction verb (figure out the hidden scheme-shape) whose mastery is complicity — getting good at it means running the scheme, not just seeing it. Each realm recontextualises the same verb against a different myth (Mandelbrot, not Sierpinski). Solving triggers a zoom-out: the thing you just decoded was a tile in an identical scheme at the next scale. The pyramid is the Katamari — it visibly accretes and jumps scale. Tone trajectory: naive satire → cosmic horror as the walls come down.
+
+**Hard constraint:** Realm activities never mint money or touch the upline chain. Their payoff is a separate non-monetary physical-pyramid resource. Money stays tied to real recruits only.
+
+**Plan-for-a-plan (de-risking sequence):**
+- [x] Write the spec (done — `2026-06-21-realms-fractal-deduction-design.md`)
+- [ ] **Grey-box the deduction verb** — pick the mechanic (current lean: Golden Idol-shaped — solving = writing the lie/pitch/cover story) and prove the complicity bridge. Five-minute test with pyramid payoff OFF. Nothing else gets built until this passes.
+- [ ] **Prove one scale-transition** — one decoded scheme → zoom-out → revealed as a node in the next identical-but-novel scheme. If this Katamari beat lands, the whole game is just this beat, fractally.
+- [ ] Realm-by-realm rollout (its own spec, deferred until step 2–3 pass)
+
 ### Story Gaps
 - [ ] **Vault payoff** — the Dream Stele sets `stele_read` but nothing listens to it. Wire `stele_read` into either a new quest step or a narrative unlock. The most natural payoff: reading the stele reveals a prophecy about "a deeper desert" that becomes the hook for the next realm.
 - [ ] **Post-Tier-Omega loop** — after all 4 quests, the game ends. Add one of: infinite cosmetic recruits (planets, stars, galaxies), a prestige/wipe cycle with a cosmetic badge, or a teaser for the next chapter. Players who hit this wall currently just... stop.
