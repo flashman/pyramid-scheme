@@ -1,5 +1,5 @@
 from datetime import timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,12 +8,13 @@ from app.models import User, GameState, Invite, utcnow
 from app.schemas import RegisterRequest, LoginRequest, TokenResponse
 from app.auth import hash_password, verify_password, create_access_token
 from app.ws import manager
+from app.email import send_recruit_joined_inviter, send_recruit_joined_admin
 
 router = APIRouter()
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     # Validate username availability
     result = await db.execute(select(User).where(User.username == body.username))
     if result.scalar_one_or_none():
@@ -63,6 +64,24 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             "email": invite.invitee_email,
             "recruit_username": user.username,
         })
+
+        # Load inviter for email — already committed so a fresh select is safe
+        inviter_res = await db.execute(select(User).where(User.id == invite.inviter_id))
+        inviter = inviter_res.scalar_one_or_none()
+        if inviter and inviter.email:
+            background_tasks.add_task(
+                send_recruit_joined_inviter, inviter.email, inviter.username, user.username
+            )
+
+    # Notify all admin users
+    admin_res = await db.execute(
+        select(User).where(User.is_admin == True, User.email.is_not(None))
+    )
+    for admin in admin_res.scalars().all():
+        background_tasks.add_task(
+            send_recruit_joined_admin, admin.email, user.username,
+            inviter.username if invite and inviter else "unknown",
+        )
 
     token = create_access_token(user.id, user.username)
     return TokenResponse(access_token=token)
