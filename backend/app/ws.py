@@ -16,6 +16,7 @@ class ConnectionManager:
     def __init__(self):
         # user_id → set[WebSocket]
         self._conns: dict[int, set[WebSocket]] = {}
+        self._meta: dict[WebSocket, dict] = {}
 
     async def connect(self, user_id: int, ws: WebSocket):
         await ws.accept()
@@ -29,6 +30,7 @@ class ConnectionManager:
             bucket.discard(ws)
             if not bucket:
                 del self._conns[user_id]
+        self.remove_meta(ws)
 
     async def send_to_user(self, user_id: int, data: dict) -> bool:
         """Push a JSON event to all active connections for user_id.
@@ -47,6 +49,15 @@ class ConnectionManager:
 
     def is_connected(self, user_id: int) -> bool:
         return bool(self._conns.get(user_id))
+
+    def set_meta(self, ws: WebSocket, **kwargs) -> None:
+        self._meta.setdefault(ws, {}).update(kwargs)
+
+    def get_meta(self, ws: WebSocket) -> dict:
+        return self._meta.get(ws, {})
+
+    def remove_meta(self, ws: WebSocket) -> None:
+        self._meta.pop(ws, None)
 
 
 # Module-level singleton — import `manager` wherever you need to push events.
