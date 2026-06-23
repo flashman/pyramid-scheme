@@ -11,10 +11,14 @@ Client → Server typed messages (JSON objects with a `type` field):
 
 The string "ping" is still handled for keep-alive.
 """
+import asyncio
 import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from sqlalchemy import select
 from app.auth import decode_token
+from app.database import AsyncSessionLocal
+from app.models import Recruit, Inventory, User
 from app.ws import manager
 from app.channels import channels
 
@@ -145,14 +149,136 @@ async def _on_chat(ws: WebSocket, user_id: int, username: str, msg: dict):
 
 
 async def _on_project_start(ws: WebSocket, user_id: int, username: str, msg: dict):
-    # Implemented in Task 3
-    pass
+    target_id = msg.get("target_user_id")
+    if not isinstance(target_id, int):
+        return
+
+    async with AsyncSessionLocal() as db:
+        # 1. Validate: target is a direct (depth=1) real recruit of this user
+        recruit_row = (await db.execute(
+            select(Recruit).where(
+                Recruit.recruiter_id == user_id,
+                Recruit.recruit_id   == target_id,
+                Recruit.recruit_id   != None,      # noqa: E711
+                Recruit.depth        == 1,
+            )
+        )).scalar_one_or_none()
+        if not recruit_row:
+            return
+
+        # 2. Validate: projector owns astral_lens
+        inv = (await db.execute(
+            select(Inventory).where(
+                Inventory.user_id == user_id,
+                Inventory.item_id == "astral_lens",
+                Inventory.quantity >= 1,
+            )
+        )).scalar_one_or_none()
+        if not inv:
+            return
+
+        # 3. Validate: target is online
+        if not manager.is_connected(target_id):
+            return
+
+        # 4. Fetch target's recruits for world_state
+        target_recruits = (await db.execute(
+            select(Recruit).where(Recruit.recruiter_id == target_id)
+        )).scalars().all()
+
+        # 5. Fetch target username
+        target_user = (await db.execute(
+            select(User).where(User.id == target_id)
+        )).scalar_one_or_none()
+        target_username = target_user.username if target_user else str(target_id)
+
+    recruits_payload = [
+        {"id": r.id, "name": r.recruit_name, "depth": r.depth,
+         "payout": float(r.payout), "parent_name": r.parent_name, "meta": r.meta}
+        for r in target_recruits
+    ]
+
+    # 6. Notify target — "A presence stirs"
+    await manager.send_to_user(target_id, {
+        "type": "projection_started", "from_username": username,
+    })
+
+    # 7. Find target's current realm from their socket metadata
+    target_realm = "world"
+    for t_ws in list(getattr(manager, "_conns", {}).get(target_id, [])):
+        t_meta = manager.get_meta(t_ws)
+        if t_meta.get("channel_key"):
+            target_realm = t_meta["channel_key"][1]
+            break
+
+    # 8. Send world_state point-to-point to projector only
+    meta = manager.get_meta(ws)
+    await ws.send_json({
+        "type": "world_state",
+        "realm": target_realm,
+        "owner_username": target_username,
+        "recruits": recruits_payload,
+    })
+
+    # 9. Move projector into target's channel
+    own_channel = meta.get("channel_key") or (user_id, "world")
+    new_key = (target_id, target_realm)
+    await channels.join(ws, new_key)
+
+    # 10. Broadcast peer_entered to target's channel (excluding projector)
+    await channels.broadcast(new_key, {
+        "type": "peer_entered", "username": username,
+        "px": meta.get("px", 0), "py": meta.get("py", 0),
+        "pZ": meta.get("pZ", 0), "facing": meta.get("facing", 1),
+        "frame": meta.get("frame", 0), "is_projector": True,
+    }, exclude=ws)
+
+    # 11. Schedule server-authoritative 180s expiry
+    expiry_task = asyncio.create_task(_projection_expiry(ws, user_id, username))
+    manager.set_meta(ws,
+                     channel_key=new_key,
+                     projection_session={
+                         "target_id": target_id,
+                         "own_channel": own_channel,
+                         "expiry_task": expiry_task,
+                     })
+
+
+async def _projection_expiry(ws: WebSocket, user_id: int, username: str):
+    await asyncio.sleep(180)
+    await _on_project_end(ws, user_id, username, reason="timeout")
 
 
 async def _on_project_end(ws: WebSocket, user_id: int, username: str,
                           reason: str = "departed"):
-    # Implemented in Task 3
-    pass
+    meta    = manager.get_meta(ws)
+    session = meta.get("projection_session")
+    if not session:
+        return
+
+    # Cancel expiry timer if still running
+    task = session.get("expiry_task")
+    if task:
+        task.cancel()
+
+    target_id   = session["target_id"]
+    old_key     = channels.channel_of(ws)
+    own_channel = session.get("own_channel") or (user_id, "world")
+
+    # Notify old channel: ghost leaves
+    if old_key:
+        await channels.broadcast(old_key,
+                                 {"type": "peer_left", "username": username},
+                                 exclude=ws)
+
+    # Restore projector to own channel
+    await channels.join(ws, own_channel)
+    manager.set_meta(ws, channel_key=own_channel, projection_session=None)
+
+    # Notify both parties session ended
+    ended_event = {"type": "projection_ended", "from_username": username, "reason": reason}
+    await ws.send_json(ended_event)
+    await manager.send_to_user(target_id, ended_event)
 
 
 async def _handle_disconnect(ws: WebSocket, user_id: int, username: str):
