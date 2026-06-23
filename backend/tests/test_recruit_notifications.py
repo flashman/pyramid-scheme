@@ -84,13 +84,13 @@ async def _make_admin(username="pharaoh", email="pharaoh@pyramid-scheme.live"):
 # Email function unit tests — sender addresses
 # ---------------------------------------------------------------------------
 
-async def test_send_recruit_joined_inviter_uses_chainmail_sender():
+async def test_send_recruit_joined_inviter_uses_pigeon_sender():
     from app.email import send_recruit_joined_inviter
     with patch("app.email._dispatch", new_callable=AsyncMock) as mock_dispatch:
         await send_recruit_joined_inviter("inviter@example.com", "Pharaoh", "Recruit")
     assert mock_dispatch.called
     from_email = mock_dispatch.call_args.kwargs["from_email"]
-    assert "chainmail@" in from_email
+    assert "pigeon@" in from_email
 
 
 async def test_send_recruit_joined_admin_uses_amun_sender():

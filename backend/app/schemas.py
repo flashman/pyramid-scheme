@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Any
 import re
 
@@ -11,6 +11,13 @@ class RegisterRequest(BaseModel):
     password:     str = Field(..., min_length=6, max_length=128)
     email:        str | None = None
     invite_token: str | None = None   # hex UUID from invite link ?invite=TOKEN
+
+    @field_validator('username')
+    @classmethod
+    def username_no_newlines(cls, v: str) -> str:
+        if '\r' in v or '\n' in v:
+            raise ValueError('username may not contain newline characters')
+        return v
 
 
 class LoginRequest(BaseModel):
@@ -156,6 +163,13 @@ class ChangePasswordRequest(BaseModel):
 
 class ChangeUsernameRequest(BaseModel):
     new_username: str = Field(..., min_length=3, max_length=32)
+
+    @field_validator('new_username')
+    @classmethod
+    def username_no_newlines(cls, v: str) -> str:
+        if '\r' in v or '\n' in v:
+            raise ValueError('username may not contain newline characters')
+        return v
 
 
 class ChangeEmailRequest(BaseModel):
