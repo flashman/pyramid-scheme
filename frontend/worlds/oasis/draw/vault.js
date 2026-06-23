@@ -5,7 +5,7 @@
 
 import { X, CW, CH }                    from '../../../engine/canvas.js';
 import { VAULT_FLOOR, STELE_X, ALTAR_X } from '../constants.js';
-import { drawVaultPharaoh }              from '../../../draw/pharaoh.js';
+import { drawVaultPharaoh, drawAllPeers } from '../../../draw/pharaoh.js';
 import { Flags }                         from '../../../engine/flags.js';
 
 const STONE    = '#8a5c1c';
@@ -801,5 +801,6 @@ export function drawVault(realm) {
   drawShadowFigures(realm.px, t);
 
   drawVaultPharaoh(realm);
+  drawAllPeers(0);
   drawHUD(vaultOpened);
 }

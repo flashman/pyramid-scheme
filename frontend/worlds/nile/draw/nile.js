@@ -12,7 +12,7 @@
 import { X, CW, CH }        from '../../../engine/canvas.js';
 import { G }                from '../../../game/state.js';
 import { Flags }            from '../../../engine/flags.js';
-import { drawRealmPharaoh } from '../../../draw/pharaoh.js';
+import { drawRealmPharaoh, drawAllPeers } from '../../../draw/pharaoh.js';
 import { DialogueManager }  from '../../../engine/dialogue.js';
 import {
   NILE_W, BANK_Y, WATER_Y, WATER_BOTTOM,
@@ -1187,6 +1187,7 @@ export function drawNile(realm) {
 
   // Player (screen-space; reads realm.getPlayerPose())
   drawRealmPharaoh(realm);
+  drawAllPeers(G.camX);
 
   // Screen-space overlays
   drawNpcHint(realm, t);

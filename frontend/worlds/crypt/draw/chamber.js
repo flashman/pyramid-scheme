@@ -4,7 +4,7 @@ import { X, CW, CH }           from '../../../engine/canvas.js';
 import { COL }                  from '../../../engine/colors.js';
 import { CHAMBER_FLOOR, CHIEF_X } from '../constants.js';
 import { Flags }                from '../../../engine/flags.js';
-import { drawChamberPharaoh }   from '../../../draw/pharaoh.js';
+import { drawChamberPharaoh, drawAllPeers } from '../../../draw/pharaoh.js';
 
 // All chamber/crypt interior draw functions.
 // drawChamber(realm) receives the ChamberRealm instance for state access.
@@ -93,6 +93,7 @@ export function drawChamber(realm) {
   }
 
   drawChamberPharaoh(realm);
+  drawAllPeers(0);
 
   // Chamber HUD
   X.fillStyle = '#020a05'; X.fillRect(0, CH-28, CW, 28);

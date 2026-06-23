@@ -12,6 +12,7 @@ import { G }                        from '../game/state.js';
 import { X, CW, CH }                from '../engine/canvas.js';
 import { COL }                      from '../engine/colors.js';
 import { getTier }                  from '../game/tiers.js';
+import { PresenceStore }            from '../game/presence.js';
 
 export function drawPharaoh(pose) {
   const p = pose || {
@@ -108,4 +109,29 @@ export function drawVaultPharaoh(realm)   { drawPharaoh(realm.getPlayerPose()); 
 export function drawRealmPharaoh(realm) {
   const pose = realm.getPlayerPose();
   if (pose) drawPharaoh(pose);
+}
+
+// Renders a peer's ghost pharaoh at 0.55 opacity.
+// camY is 0 for all non-free-move realms (Y handled by canvas pre-translate or camY=0).
+export function drawPeerPharaoh(peer, camX, camY = 0) {
+  const sx  = Math.round(peer.px - camX);
+  const sy  = Math.round(peer.py - camY - 48);
+  const bob = Math.sin(Date.now() / 600) * 1.5;
+  const dir = peer.facing ?? 1;
+  const fr  = peer.frame  ?? 0;
+
+  X.save();
+  X.globalAlpha = 0.55;
+  if (dir === -1) { X.translate(sx + 16, 0); X.scale(-1, 1); }
+  const bx = dir === -1 ? 0 : sx;
+  _drawBody(bx, sy + bob, fr);
+  X.restore();
+}
+
+// Draws all peers registered in PresenceStore as ghost pharaohs.
+// camX/camY: viewer's camera; camY defaults to 0 for realms with a pre-translate.
+export function drawAllPeers(camX, camY = 0) {
+  for (const peer of PresenceStore.peers()) {
+    drawPeerPharaoh(peer, camX, camY);
+  }
 }

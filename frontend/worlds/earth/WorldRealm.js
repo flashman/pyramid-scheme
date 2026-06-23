@@ -24,7 +24,7 @@ import { drawBG }                         from './draw/background.js';
 import { drawCloudsAndCelestial }         from './draw/celestial.js';
 import { buildGodEntities, drawGodsLayer } from './draw/gods.js';
 import { drawPyr }                        from './draw/pyramids.js';
-import { drawPharaoh }                    from '../../draw/pharaoh.js';
+import { drawPharaoh, drawAllPeers }       from '../../draw/pharaoh.js';
 import { drawParts, drawHUD, drawMinimap } from '../../draw/hud.js';
 import { log }                            from '../../ui/panels.js';
 
@@ -249,6 +249,7 @@ export class WorldRealm extends PhysicsRealm {
       for (const p of G.pyramids) if (!p.isPlayer && (p.zLayer||0) === z) drawPyr(p);
     for (const p of G.pyramids) if (p.isPlayer) drawPyr(p);
     drawPharaoh();
+    drawAllPeers(G.camX);
     drawParts();
     X.restore();
     drawGodsLayer(this.godEntities, this.registry);

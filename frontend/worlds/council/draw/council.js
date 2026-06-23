@@ -4,7 +4,7 @@ import { X, CW, CH }            from '../../../engine/canvas.js';
 import { COL }                   from '../../../engine/colors.js';
 import { COUNCIL_FLOOR, COUNCIL_ARCHON_X, COUNCIL_PORTAL_X } from '../constants.js';
 import { Flags }                 from '../../../engine/flags.js';
-import { drawCouncilPharaoh }    from '../../../draw/pharaoh.js';
+import { drawCouncilPharaoh, drawAllPeers } from '../../../draw/pharaoh.js';
 
 // ── FILE: draw/council.js ─────────────────────────────────
 // All drawing for the Galactic Council realm.
@@ -503,6 +503,7 @@ export function drawCouncil(realm) {
 
   // Player
   drawCouncilPharaoh(realm);
+  drawAllPeers(0);
 
   // Grand Archon (drawn after player so nameplate is on top)
   drawArchon(COUNCIL_ARCHON_X, COUNCIL_FLOOR, t);
