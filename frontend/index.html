@@ -82,33 +82,13 @@
       <div class="pt">▶ INVITES SENT</div>
       <div id="invite-list"></div>
     </div>
-    <div class="pb">
-      <div class="pt">▶ HOW IT WORKS</div>
-      <div style="color:var(--tan);font-size:5px;line-height:2.2">
-        BUY IN $10<br>
-        GET 4 invite scrolls<br>
-        ———————<br>
-        EACH JOIN PAYS:<br>
-        <span id="hw-d1" style="color:var(--gold)">D1 → $4.00</span><br>
-        <span id="hw-d2" style="color:var(--gold-dim)">D2 → $2.00</span><br>
-        <span id="hw-d3" style="color:var(--tan)">D3 → $1.00</span><br>
-        <span style="color:var(--tan-muted)">D4+ → halves...</span><br>
-        ———————<br>
-        WALK to friend pyrs!<br>
-        SPACE to inspect.<br>
-        <span style="color:var(--red)">TOTALLY LEGAL™</span>
-      </div>
+    <div class="pb" id="inventory-panel" style="display:none">
+      <div class="pt">▶ RELICS &amp; KEEPSAKES</div>
+      <div id="inventory-list"></div>
     </div>
     <div class="pb" style="padding:5px 7px">
-      <div class="pt">▶ CONTROLS</div>
-      <div style="color:var(--tan);font-size:5px;line-height:2.4">
-        <span style="color:var(--gold)">← →</span> WALK<br>
-        <span style="color:var(--gold)">⇧</span> SPRINT<br>
-        <span style="color:var(--gold)">Z</span> JUMP<br>
-        <span style="color:var(--gold)">↓</span> WALK IN FRONT<br>
-        <span style="color:var(--gold)">↑</span> BACK TO SURFACE<br>
-        <span style="color:var(--gold)">SPACE</span> INTERACT
-      </div>
+      <div class="pt">▶ HELP</div>
+      <button onclick="window.toggleHelp()" style="width:100%;margin-top:2px;font:700 6px/1 monospace;letter-spacing:1px;background:#1a0e00;border:1px solid #8a6a20;color:#f0c020;padding:5px 0;cursor:pointer">? HOW TO PLAY  [<span style="font-family:monospace">`</span>]</button>
     </div>
     <div class="pb" style="padding:5px 7px">
       <div class="pt">▶ SOUND</div>
@@ -126,6 +106,42 @@
   </div>
 </div>
 
+
+<div id="help-panel">
+  <div id="help-inner">
+    <button id="help-close" onclick="window.toggleHelp()">✕</button>
+    <div class="help-col">
+      <div class="help-heading">HOW IT WORKS</div>
+      <div class="help-body">
+        BUY IN $10<br>
+        GET 4 invite scrolls<br>
+        ———————<br>
+        EACH JOIN PAYS:<br>
+        <span id="hw-d1" style="color:var(--gold)">D1 → $4.00</span><br>
+        <span id="hw-d2" style="color:var(--gold-dim)">D2 → $2.00</span><br>
+        <span id="hw-d3" style="color:var(--tan)">D3 → $1.00</span><br>
+        <span style="color:var(--tan-muted)">D4+ → halves...</span><br>
+        ———————<br>
+        WALK to friend pyrs!<br>
+        SPACE to inspect.<br>
+        <span style="color:var(--red)">TOTALLY LEGAL™</span>
+      </div>
+    </div>
+    <div class="help-col">
+      <div class="help-heading">CONTROLS</div>
+      <div class="help-body">
+        <span style="color:var(--gold)">← →</span> WALK<br>
+        <span style="color:var(--gold)">⇧</span> SPRINT<br>
+        <span style="color:var(--gold)">Z</span> JUMP<br>
+        <span style="color:var(--gold)">↓</span> WALK IN FRONT<br>
+        <span style="color:var(--gold)">↑</span> BACK TO SURFACE<br>
+        <span style="color:var(--gold)">SPACE</span> INTERACT<br>
+        <span style="color:var(--gold)">WASD</span> SWIM<br>
+        <span style="color:var(--gold)">`</span> CLOSE HELP
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="mo"><div id="md">
   <h2 id="mh">GLORIOUS!</h2>

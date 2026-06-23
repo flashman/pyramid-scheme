@@ -105,11 +105,20 @@ Events.on('realm:enter', ({ id }) => {
 });
 document.addEventListener('keyup', e => { G.keys[e.key] = false; });
 
+// ── Help panel ────────────────────────────────────────────
+function _toggleHelp() {
+  document.getElementById('help-panel')?.classList.toggle('open');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === '`') { e.preventDefault(); _toggleHelp(); }
+});
+
 // ── Expose UI callbacks referenced by inline HTML handlers ──
 window.buyIn          = buyIn;
 window.recruitFriend  = recruitFriend;
 window.closeModal     = closeModal;
 window.openProfile    = () => openProfile(Api, G, () => window.location.reload());
+window.toggleHelp     = _toggleHelp;
 
 // Expose a quick-mute toggle for the sidebar button (no import needed in HTML)
 window.toggleSound = () => {

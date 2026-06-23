@@ -90,6 +90,23 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 .pt-sep{border-top:1px dashed var(--brown-mid);margin:2px 0}
 .db-row{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}
 .db-chip{font-size:4px;padding:2px 3px;border:1px solid var(--brown-mid)}
+/* ── Help panel ── */
+#help-panel{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.82);z-index:500;align-items:center;justify-content:center}
+#help-panel.open{display:flex}
+#help-inner{background:#0a0500;border:2px solid var(--gold-dim);padding:20px 24px;font-family:monospace;position:relative;display:flex;gap:32px;max-width:480px}
+#help-close{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--tan-muted);font:700 10px monospace;cursor:pointer;line-height:1}
+#help-close:hover{color:var(--gold)}
+.help-heading{color:var(--gold);font-size:7px;letter-spacing:1px;margin-bottom:8px;border-bottom:1px solid var(--amber-dark);padding-bottom:4px}
+.help-body{color:var(--tan);font-size:6px;line-height:2.3}
+
+/* ── Inventory panel ── */
+#inventory-panel{display:none}
+#inventory-panel.has-items{display:block}
+#inventory-list{padding:2px 0}
+.inv-item{color:var(--tan);font-size:5px;line-height:2;padding:1px 0;display:flex;justify-content:space-between;align-items:center}
+.inv-item-name{color:var(--gold-dim)}
+.inv-item-kind{color:var(--tan-muted);font-size:4px;text-transform:uppercase;letter-spacing:1px}
+
 #mo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.88);z-index:100;align-items:center;justify-content:center}
 #mo.show{display:flex}
 #md{background:var(--bg-panel);border:4px solid var(--gold-dim);padding:20px;max-width:380px;width:90%;text-align:center;position:relative}
