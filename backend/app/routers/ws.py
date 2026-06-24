@@ -14,6 +14,7 @@ The string "ping" is still handled for keep-alive.
 import asyncio
 import json
 import logging
+import time
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 from app.auth import decode_token
@@ -24,6 +25,22 @@ from app.channels import channels
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Per-socket flood guards. Pose is a 10 Hz client stream, so the cap only trips
+# on abuse; chat is throttled to a rate a human typing can't reach. Excess
+# messages are silently dropped (same policy as unknown message types).
+POSE_MIN_INTERVAL = 0.05   # ≤20 Hz
+CHAT_MIN_INTERVAL = 0.5    # ≤2 msg/s
+
+
+def _rate_ok(ws: WebSocket, slot: str, min_interval: float) -> bool:
+    """Token-free min-interval gate, stamped per-socket in connection meta."""
+    now  = time.monotonic()
+    last = manager.get_meta(ws).get(slot, 0.0)
+    if now - last < min_interval:
+        return False
+    manager.set_meta(ws, **{slot: now})
+    return True
 
 
 @router.websocket("/ws")
@@ -120,6 +137,8 @@ async def _on_realm_enter(ws: WebSocket, user_id: int, username: str, msg: dict)
 
 
 async def _on_pose_update(ws: WebSocket, user_id: int, msg: dict):
+    if not _rate_ok(ws, "_pose_ts", POSE_MIN_INTERVAL):
+        return
     meta = manager.get_meta(ws)
     key  = meta.get("channel_key")
     if not key:
@@ -137,6 +156,8 @@ async def _on_pose_update(ws: WebSocket, user_id: int, msg: dict):
 
 
 async def _on_chat(ws: WebSocket, user_id: int, username: str, msg: dict):
+    if not _rate_ok(ws, "_chat_ts", CHAT_MIN_INTERVAL):
+        return
     text = str(msg.get("text", ""))[:200]
     if not text.strip():
         return
@@ -204,12 +225,7 @@ async def _on_project_start(ws: WebSocket, user_id: int, username: str, msg: dic
     })
 
     # 7. Find target's current realm from their socket metadata
-    target_realm = "world"
-    for t_ws in list(getattr(manager, "_conns", {}).get(target_id, [])):
-        t_meta = manager.get_meta(t_ws)
-        if t_meta.get("channel_key"):
-            target_realm = t_meta["channel_key"][1]
-            break
+    target_realm = manager.realm_of(target_id) or "world"
 
     # 8. Send world_state point-to-point to projector only
     meta = manager.get_meta(ws)

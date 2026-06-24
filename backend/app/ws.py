@@ -50,6 +50,15 @@ class ConnectionManager:
     def is_connected(self, user_id: int) -> bool:
         return bool(self._conns.get(user_id))
 
+    def realm_of(self, user_id: int) -> str | None:
+        """Realm id of the user's first socket that occupies a channel, else None.
+        Channel keys are (owner_id, realm_id); we return the realm component."""
+        for ws in self._conns.get(user_id, set()):
+            ch = self._meta.get(ws, {}).get("channel_key")
+            if ch:
+                return ch[1]
+        return None
+
     def set_meta(self, ws: WebSocket, **kwargs) -> None:
         self._meta.setdefault(ws, {}).update(kwargs)
 

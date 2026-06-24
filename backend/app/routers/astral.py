@@ -14,14 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.channels import channels  # noqa: F401  — imported for test patching
+from app.config import settings
 from app.database import get_db
 from app.email import send_beckon_email
 from app.models import Recruit, Transaction, User
 from app.ws import manager
 
 router = APIRouter()
-
-GAME_URL = "https://pyramid-scheme.live"   # overridden by env in future
 
 
 class BeckonRequest(BaseModel):
@@ -47,15 +46,7 @@ async def downline_presence(
     result = []
     for recruit_row, user_row in rows:
         online = manager.is_connected(user_row.id)
-        realm  = None
-        if online:
-            # Find realm from the socket metadata
-            for ws in list(getattr(manager, "_conns", {}).get(user_row.id, [])):
-                meta = manager.get_meta(ws)
-                ch   = meta.get("channel_key")
-                if ch:
-                    realm = ch[1]
-                    break
+        realm  = manager.realm_of(user_row.id) if online else None
         result.append({
             "user_id":  user_row.id,
             "username": user_row.username,
@@ -116,7 +107,7 @@ async def beckon(
     await send_beckon_email(
         to_email=target_user.email,
         from_username=current_user.username,
-        game_url=GAME_URL,
+        game_url=settings.frontend_url,
     )
 
     return {"ok": True}

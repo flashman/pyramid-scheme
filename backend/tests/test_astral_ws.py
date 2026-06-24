@@ -62,7 +62,7 @@ async def test_project_start_happy_path():
         mock_mgr.is_connected.return_value = True
         mock_mgr.set_meta = MagicMock()
         mock_mgr.send_to_user = AsyncMock()
-        mock_mgr._conns = {bob_id: {ws_bob}}
+        mock_mgr.realm_of.return_value = "world"   # bob is in the Desert
 
         from app.routers.ws import _on_project_start
         await _on_project_start(ws_alice, alice_id, "alice",

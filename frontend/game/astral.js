@@ -26,8 +26,10 @@ import { RealmManager }     from '../engine/realm.js';
 import { DialogueManager }  from '../engine/dialogue.js';
 import { GND }              from '../worlds/earth/constants.js';
 
-const POSE_INTERVAL_MS    = 100;
-const SESSION_DURATION_MS = 180_000;
+const POSE_INTERVAL_MS = 100;
+// Session expiry is server-authoritative (ws.py schedules a 180s timer and
+// emits ws:projection_ended). The client ends only on that event or on ESC —
+// no local countdown, so there's a single source of truth for "session over".
 
 class _AstralSession {
   constructor() {
@@ -36,7 +38,6 @@ class _AstralSession {
     this._downline      = [];
     this._selectedIdx   = 0;
     this._poseTimer     = null;
-    this._sessionTimer  = null;
     this._homeRealm     = null;
     this._hostMode      = false;
     this._hostPoseTimer = null;
@@ -296,7 +297,6 @@ class _AstralSession {
   _activate() {
     this._active    = true;
     this._poseTimer = setInterval(() => this._broadcastPose(), POSE_INTERVAL_MS);
-    this._sessionTimer = setTimeout(() => this._deactivate(), SESSION_DURATION_MS);
   }
 
   _end() {
@@ -310,9 +310,7 @@ class _AstralSession {
     this._active      = false;
     this._overlayOpen = false;
     clearInterval(this._poseTimer);
-    clearTimeout(this._sessionTimer);
-    this._poseTimer    = null;
-    this._sessionTimer = null;
+    this._poseTimer = null;
     PresenceStore.clear();
     DialogueManager.unlockDlg();
     document.getElementById('dlg')?.classList.remove('active');
