@@ -26,7 +26,6 @@ import { addRecruit, restoreRecruits } from './recruits.js';
 import { renderPayoutTable }   from '../ui/config-editor.js';
 import { updateStats, updateSlots, log, updateInvitePanel } from '../ui/panels.js';
 import { devPanelSetAuthMode } from '../ui/dev-panel.js';
-import { initInventoryPanel }  from '../ui/inventory-panel.js';
 
 export class GameSession {
   constructor(token) {
@@ -57,7 +56,6 @@ export class GameSession {
     this._wireStateSyncEvents();
     this._wireBeforeUnload();
     this._wireWsEvents();
-    initInventoryPanel();
 
     // Non-critical: invite panel and dev-panel mode; don't await.
     Api.getInvites()

@@ -13,7 +13,11 @@
 <div id="title-bar">
   <h1>⚡ PYRAMID SCHEME™ ⚡</h1>
   <div class="sub">★ WALK THE DESERT ★ BUILD YOUR EMPIRE ★ TOTALLY LEGAL ★</div>
-  <button id="profile-btn" onclick="openProfile()" style="display:none;position:absolute;top:6px;right:10px;font:700 7px/1 monospace;letter-spacing:1px;background:#1a0e00;border:1px solid #8a6a20;color:#f0c020;padding:5px 8px;cursor:pointer;">◈ PROFILE</button>
+  <div id="hdr-actions">
+    <button id="sound-btn" class="hdr-btn" onclick="window.toggleSound()" title="Toggle music"><span id="sound-note">♪</span><span id="sound-glyph">𓅓</span></button>
+    <button class="hdr-btn" onclick="window.toggleHelp()">? HELP</button>
+    <button id="profile-btn" class="hdr-btn" onclick="openProfile()" style="display:none">◈ PROFILE</button>
+  </div>
 </div>
 <div id="game-wrapper">
   <div id="lp">
@@ -86,23 +90,6 @@
       <div class="pt">▶ RELICS &amp; KEEPSAKES</div>
       <div id="inventory-list"></div>
     </div>
-    <div class="pb" style="padding:5px 7px">
-      <div class="pt">▶ HELP</div>
-      <button onclick="window.toggleHelp()" style="width:100%;margin-top:2px;font:700 6px/1 monospace;letter-spacing:1px;background:#1a0e00;border:1px solid #8a6a20;color:#f0c020;padding:5px 0;cursor:pointer">? HOW TO PLAY  [<span style="font-family:monospace">`</span>]</button>
-    </div>
-    <div class="pb" style="padding:5px 7px">
-      <div class="pt">▶ SOUND</div>
-      <button
-        id="sound-btn"
-        onclick="window.toggleSound()"
-        style="width:100%;margin-top:2px;font:700 6px/1 monospace;letter-spacing:1px;
-               background:#1a0e00;border:1px solid #8a6a20;color:#f0c020;
-               padding:5px 0;cursor:pointer"
-      >♪ MUSIC ON</button>
-      <div style="color:var(--tan-muted);font-size:4px;text-align:center;margin-top:3px;line-height:1.8">
-        Volume in ◈ PROFILE
-      </div>
-    </div>
   </div>
 </div>
 
@@ -110,35 +97,30 @@
 <div id="help-panel">
   <div id="help-inner">
     <button id="help-close" onclick="window.toggleHelp()">✕</button>
-    <div class="help-col">
-      <div class="help-heading">HOW IT WORKS</div>
-      <div class="help-body">
-        BUY IN $10<br>
-        GET 4 invite scrolls<br>
-        ———————<br>
-        EACH JOIN PAYS:<br>
-        <span id="hw-d1" style="color:var(--gold)">D1 → $4.00</span><br>
-        <span id="hw-d2" style="color:var(--gold-dim)">D2 → $2.00</span><br>
-        <span id="hw-d3" style="color:var(--tan)">D3 → $1.00</span><br>
-        <span style="color:var(--tan-muted)">D4+ → halves...</span><br>
-        ———————<br>
-        WALK to friend pyrs!<br>
-        SPACE to inspect.<br>
-        <span style="color:var(--red)">TOTALLY LEGAL™</span>
-      </div>
+    <div id="help-title">◈ HOW TO PLAY ◈</div>
+
+    <div class="help-section">
+      <div class="help-section-title">▶ THE GAME</div>
+      <div class="help-row"><span class="help-key">BUY IN</span><span class="help-val">$10 → 4 invite scrolls</span></div>
+      <div class="help-row"><span class="help-key">INVITE</span><span class="help-val">send scrolls to friends</span></div>
+      <div class="help-row"><span class="help-key">EARN</span><span class="help-val">credits when they buy in</span></div>
+      <div class="help-row"><span class="help-key">CHAIN</span><span class="help-val">credits flow up, halving each level</span></div>
+      <div class="help-row"><span class="help-key">EXPLORE</span><span class="help-val">walk the desert, find pyramids</span></div>
+      <div class="help-row" style="margin-top:8px"><span class="help-key" style="color:var(--red)">★ TOTALLY LEGAL™ ★</span><span></span></div>
     </div>
-    <div class="help-col">
-      <div class="help-heading">CONTROLS</div>
-      <div class="help-body">
-        <span style="color:var(--gold)">← →</span> WALK<br>
-        <span style="color:var(--gold)">⇧</span> SPRINT<br>
-        <span style="color:var(--gold)">Z</span> JUMP<br>
-        <span style="color:var(--gold)">↓</span> WALK IN FRONT<br>
-        <span style="color:var(--gold)">↑</span> BACK TO SURFACE<br>
-        <span style="color:var(--gold)">SPACE</span> INTERACT<br>
-        <span style="color:var(--gold)">WASD</span> SWIM<br>
-        <span style="color:var(--gold)">`</span> CLOSE HELP
-      </div>
+
+    <div class="help-section">
+      <div class="help-section-title">▶ CONTROLS</div>
+      <div class="help-row"><span class="help-key">← →</span><span class="help-val">walk</span></div>
+      <div class="help-row"><span class="help-key">⇧ + ← →</span><span class="help-val">sprint</span></div>
+      <div class="help-row"><span class="help-key">Z</span><span class="help-val">jump</span></div>
+      <div class="help-row"><span class="help-key">↓ / ↑</span><span class="help-val">descend / surface</span></div>
+      <div class="help-row"><span class="help-key">SPACE</span><span class="help-val">interact</span></div>
+      <div class="help-row"><span class="help-key">WASD</span><span class="help-val">swim</span></div>
+    </div>
+
+    <div class="help-section" style="text-align:center;padding-top:12px">
+      <span style="color:#3a2810;font-size:5px;letter-spacing:1px">` or ESC to close</span>
     </div>
   </div>
 </div>

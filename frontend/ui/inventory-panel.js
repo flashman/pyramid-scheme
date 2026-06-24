@@ -2,9 +2,17 @@
 // Renders the player's owned keepsakes in #inventory-panel.
 // Updated on every inventory:change event.
 
-import { Events }   from '../engine/events.js';
-import { Inventory } from '../game/inventory.js';
-import { getShop }  from '../game/config.js';
+import { Events }     from '../engine/events.js';
+import { Inventory }  from '../game/inventory.js';
+import { getShop }   from '../game/config.js';
+import { drawWareArt } from '../worlds/nile/shop/ware-art.js';
+
+function makeIconSrc(itemId) {
+  const cv = document.createElement('canvas');
+  cv.width = 28; cv.height = 28;
+  drawWareArt(cv.getContext('2d'), itemId, 14, 14, 20, Date.now());
+  return cv.toDataURL();
+}
 
 function render() {
   const list = document.getElementById('inventory-list');
@@ -18,13 +26,15 @@ function render() {
     return;
   }
 
-  list.innerHTML = owned.map(i => {
+  list.innerHTML = '';
+  for (const i of owned) {
     const info = shop[i.item_id] || {};
     const name = info.name || i.item_id;
-    return `<div class="inv-item">
-      <span class="inv-item-name">${name}</span>
-    </div>`;
-  }).join('');
+    const div = document.createElement('div');
+    div.className = 'inv-item';
+    div.innerHTML = `<img class="inv-icon" src="${makeIconSrc(i.item_id)}" alt=""><span class="inv-item-name">${name}</span>`;
+    list.appendChild(div);
+  }
 }
 
 export function initInventoryPanel() {
