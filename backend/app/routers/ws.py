@@ -275,6 +275,11 @@ async def _on_project_end(ws: WebSocket, user_id: int, username: str,
     target_id   = session["target_id"]
     old_key     = channels.channel_of(ws)
     own_channel = session.get("own_channel") or (user_id, "world")
+    ended_event = {"type": "projection_ended", "from_username": username, "reason": reason}
+
+    # Notify the host FIRST — this must not be blocked by a dead projector
+    # socket (the disconnect path calls us with ws already closed).
+    await manager.send_to_user(target_id, ended_event)
 
     # Notify old channel: ghost leaves
     if old_key:
@@ -286,13 +291,21 @@ async def _on_project_end(ws: WebSocket, user_id: int, username: str,
     await channels.join(ws, own_channel)
     manager.set_meta(ws, channel_key=own_channel, projection_session=None)
 
-    # Notify both parties session ended
-    ended_event = {"type": "projection_ended", "from_username": username, "reason": reason}
-    await ws.send_json(ended_event)
-    await manager.send_to_user(target_id, ended_event)
+    # Notify the projector last, best-effort — on disconnect the socket is gone.
+    try:
+        await ws.send_json(ended_event)
+    except Exception:
+        pass
 
 
 async def _handle_disconnect(ws: WebSocket, user_id: int, username: str):
+    # If the player was mid-projection, tear the session down cleanly so the
+    # host isn't left stuck in projection mode with a runaway pose timer and a
+    # dangling 180s expiry task. project_end notifies the host and cancels the
+    # task; it tolerates the already-closed projector socket.
+    if manager.get_meta(ws).get("projection_session"):
+        await _on_project_end(ws, user_id, username, reason="disconnected")
+
     key = channels.channel_of(ws)
     if key:
         await channels.broadcast(key, {"type": "peer_left", "username": username})

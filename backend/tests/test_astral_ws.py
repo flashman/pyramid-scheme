@@ -178,3 +178,49 @@ async def test_project_end_restores_own_channel():
     assert ws_alice not in reg.peers((bob_id, "world"))
     # Expiry task was cancelled
     expiry_task.cancel.assert_called_once()
+
+
+async def test_disconnect_during_projection_notifies_host():
+    """A projector closing their tab mid-session must cleanly end the session:
+    cancel the expiry task and notify the host, even though the projector's
+    own socket is already dead (send_json raises)."""
+    alice_id, bob_id = await make_recruit_pair()
+    reg = ChannelRegistry()
+    ws_alice = make_ws()
+    ws_bob   = make_ws()
+
+    await reg.join(ws_alice, (bob_id, "world"))   # alice projecting into bob
+    await reg.join(ws_bob,   (bob_id, "world"))
+
+    # Projector socket is gone — any send blows up.
+    ws_alice.send_json = AsyncMock(side_effect=RuntimeError("socket closed"))
+
+    expiry_task = MagicMock()
+    expiry_task.cancel = MagicMock()
+
+    with patch("app.routers.ws.channels", reg), \
+         patch("app.routers.ws.manager") as mock_mgr:
+
+        mock_mgr.get_meta.return_value = {
+            "username": "alice", "channel_key": (bob_id, "world"),
+            "projection_session": {"target_id": bob_id, "expiry_task": expiry_task,
+                                   "own_channel": (alice_id, "world")},
+        }
+        mock_mgr.set_meta   = MagicMock()
+        mock_mgr.disconnect = MagicMock()
+        mock_mgr.send_to_user = AsyncMock()
+
+        from app.routers.ws import _handle_disconnect
+        # Must not raise despite the dead projector socket.
+        await _handle_disconnect(ws_alice, alice_id, "alice")
+
+    # Host was notified the session ended...
+    host_calls = [c for c in mock_mgr.send_to_user.await_args_list
+                  if c.args[0] == bob_id
+                  and c.args[1].get("type") == "projection_ended"]
+    assert host_calls, "host must receive projection_ended on projector disconnect"
+    assert host_calls[0].args[1]["reason"] == "disconnected"
+    # ...the runaway expiry timer was cancelled...
+    expiry_task.cancel.assert_called_once()
+    # ...and the connection was reaped.
+    mock_mgr.disconnect.assert_called_once()
