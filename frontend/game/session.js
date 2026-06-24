@@ -16,7 +16,6 @@
 import { Events }              from '../engine/events.js';
 import { Flags }               from '../engine/flags.js';
 import { Inventory }            from './inventory.js';
-import { PresenceStore }       from './presence.js';
 import { CW }                  from '../engine/canvas.js';
 import { G }                   from './state.js';
 import { Api }                 from './api.js';
@@ -197,15 +196,8 @@ export class GameSession {
         .catch(() => {});
     });
 
-    // Peer presence — ghost pharaoh tracking.
-    Events.on('ws:peer_entered', ({ username, px, py, pZ, facing, frame }) => {
-      PresenceStore.upsert(username, { px, py, pZ, facing, frame });
-    });
-    Events.on('ws:peer_left', ({ username }) => {
-      PresenceStore.remove(username);
-    });
-    Events.on('ws:peer_pose', ({ username, px, py, pZ, facing, frame }) => {
-      PresenceStore.upsert(username, { px, py, pZ, facing, frame });
-    });
+    // Peer presence events are handled in game/astral.js so they can be
+    // gated on session state (preventing stale events from re-populating
+    // PresenceStore after a session ends).
   }
 }

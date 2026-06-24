@@ -93,6 +93,20 @@ class _AstralSession {
       this._appendChat(from_username, text);
     });
 
+    // Peer presence — gated on session state so stale events after session end
+    // don't re-populate PresenceStore (prevents ghost staying visible on exit).
+    Events.on('ws:peer_entered', ({ username, px, py, pZ, facing, frame }) => {
+      if (this._active || this._hostMode)
+        PresenceStore.upsert(username, { px, py, pZ, facing, frame });
+    });
+    Events.on('ws:peer_pose', ({ username, px, py, pZ, facing, frame }) => {
+      if (this._active || this._hostMode)
+        PresenceStore.upsert(username, { px, py, pZ, facing, frame });
+    });
+    Events.on('ws:peer_left', ({ username }) => {
+      PresenceStore.remove(username);  // always remove — cleanup is idempotent
+    });
+
     // Relic click in inventory panel.
     Events.on('inventory:use', ({ item_id }) => {
       if (item_id === 'astral_lens') this._openOverlay();
@@ -104,7 +118,9 @@ class _AstralSession {
     if (this._overlayOpen)     return this._overlayKeyDown(key);
     if (this._active || this._hostMode) {
       if (key === 'Enter' && !DialogueManager.isActive()) {
-        this._openChatInput(); return true;
+        // Re-focus the always-visible input if the user clicked away from it.
+        const inp = document.getElementById('dlg-choices')?.querySelector('input');
+        if (inp) { inp.focus(); return true; }
       }
       if (key === 'Escape' && this._active) { this._end(); return true; }
     }
@@ -126,9 +142,32 @@ class _AstralSession {
     speakerEl.textContent = `🔮 ${peerName}`;
     textEl.innerHTML      = '';
     textEl.style.cssText  = 'max-height:80px;overflow-y:auto;';
-    choicesEl.innerHTML   = '';
-    hintEl.textContent    = 'ENTER to speak';
+    hintEl.textContent    = 'ESC to leave';
     el.classList.add('active');
+
+    // Always-visible input — focus immediately so typing works right away.
+    choicesEl.innerHTML = '';
+    const inp = document.createElement('input');
+    inp.type        = 'text';
+    inp.maxLength   = 200;
+    inp.placeholder = 'say something...';
+    inp.style.cssText = [
+      'width:100%', 'background:transparent', 'border:none',
+      'color:#ffe066', 'outline:none', 'font-size:11px',
+      'font-family:monospace', 'caret-color:#ffe066',
+    ].join(';');
+    inp.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') e.stopPropagation(); // let Escape bubble for session end
+      if (e.key === 'Enter') {
+        const text = inp.value.trim().slice(0, 200);
+        inp.value = '';
+        if (text) gameSocket.send({ type: 'chat', text });
+      } else if (e.key === 'Escape') {
+        inp.blur();
+      }
+    });
+    choicesEl.appendChild(inp);
+    inp.focus();
   }
 
   _appendChat(speaker, text) {
@@ -136,55 +175,29 @@ class _AstralSession {
     const textEl = document.getElementById('dlg-text');
     if (!textEl) return;
     const line = document.createElement('div');
-    line.textContent = `${speaker}: ${text}`;
+    line.textContent   = `${speaker}: ${text}`;
     line.style.cssText = 'margin-bottom:2px;';
     textEl.appendChild(line);
     textEl.scrollTop = textEl.scrollHeight;
+    // Re-focus input after incoming message so typing continues uninterrupted.
+    document.getElementById('dlg-choices')?.querySelector('input')?.focus();
   }
 
-  _openChatInput() {
+  _closeDlg() {
     if (DialogueManager.isActive()) return;
+    DialogueManager.unlockDlg();
+    const el = document.getElementById('dlg');
+    if (!el) return;
+    el.classList.remove('active');
     const choicesEl = document.getElementById('dlg-choices');
-    const hintEl    = document.getElementById('dlg-hint');
-    if (!choicesEl || this._chatInputOpen()) return;
-
-    hintEl.textContent  = 'ENTER to send  •  ESC to cancel';
-    choicesEl.innerHTML = '';
-
-    const inp = document.createElement('input');
-    inp.type        = 'text';
-    inp.maxLength   = 200;
-    inp.placeholder = 'speak...';
-    inp.style.cssText = [
-      'width:100%', 'background:transparent', 'border:none',
-      'border-bottom:1px solid #c8a400', 'color:#ffe066', 'outline:none',
-      'font:inherit', 'caret-color:#ffe066',
-    ].join(';');
-    choicesEl.appendChild(inp);
-    inp.focus();
-
-    const cleanup = () => {
-      inp.removeEventListener('keydown', onKey);
-      choicesEl.innerHTML = '';
-      document.getElementById('dlg-hint').textContent = 'ENTER to speak';
-    };
-    const onKey = e => {
-      e.stopPropagation();
-      if (e.key === 'Enter') {
-        const text = inp.value.trim().slice(0, 200);
-        cleanup();
-        if (text) {
-          gameSocket.send({ type: 'chat', text });
-        }
-      } else if (e.key === 'Escape') {
-        cleanup();
-      }
-    };
-    inp.addEventListener('keydown', onKey);
+    if (choicesEl) { choicesEl.innerHTML = ''; }
+    const textEl = document.getElementById('dlg-text');
+    if (textEl) { textEl.innerHTML = ''; textEl.style.cssText = ''; }
   }
 
   _chatInputOpen() {
-    return !!document.getElementById('dlg-text')?.querySelector('input');
+    const inp = document.getElementById('dlg-choices')?.querySelector('input');
+    return inp === document.activeElement;
   }
 
   // ── Overlay ───────────────────────────────────────────────
