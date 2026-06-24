@@ -37,14 +37,10 @@ class _AstralSession {
     this._overlayOpen   = false;
     this._downline      = [];
     this._selectedIdx   = 0;
-    this._poseTimer     = null;
+    this._poseTimer     = null;   // one pose loop, shared by host + projector modes
     this._homeRealm     = null;
     this._hostMode      = false;
-    this._hostPoseTimer = null;
-    this._savedPyramids = null;
-    this._savedPx       = null;
-    this._savedPy       = null;
-    this._savedCamX     = null;
+    this._saved         = null;   // snapshot of the projector's real world while away
   }
 
   get isActive()    { return this._active; }
@@ -70,7 +66,7 @@ class _AstralSession {
     // ── Host side (downline receiving a visitor) ───────────────
     Events.on('ws:projection_started', ({ from_username }) => {
       this._hostMode = true;
-      this._hostPoseTimer = setInterval(() => this._broadcastPose(), POSE_INTERVAL_MS);
+      this._startPose();
       this._openAstralDlg(from_username);
       Events.emit('game:log', { msg: `🔮 ${from_username} is watching...`, cls: 'hi' });
       Events.emit('game:log', { msg: 'ENTER to chat with them', cls: '' });
@@ -80,8 +76,7 @@ class _AstralSession {
     Events.on('ws:projection_ended', ({ from_username }) => {
       if (this._hostMode) {
         this._hostMode = false;
-        clearInterval(this._hostPoseTimer);
-        this._hostPoseTimer = null;
+        this._stopPose();
         PresenceStore.clear();
         this._closeDlg();
         Events.emit('game:log', { msg: `🔮 ${from_username} has returned to their realm.`, cls: '' });
@@ -227,11 +222,12 @@ class _AstralSession {
   // ── Projected world ───────────────────────────────────────
 
   _buildProjectedWorld(recruits, ownerUsername, realm) {
-    // Save projector's current state for restoration on exit.
-    this._savedPyramids = G.pyramids;
-    this._savedPx       = G.px;
-    this._savedPy       = G.py;
-    this._savedCamX     = G.camX;
+    // Snapshot the projector's real world once, on first entry. Host realm
+    // changes re-enter this to rebuild the projected scene, so guard against
+    // clobbering the original snapshot with already-projected state.
+    if (!this._saved) {
+      this._saved = { pyramids: G.pyramids, px: G.px, py: G.py, camX: G.camX };
+    }
 
     // Teleport projector to stand near the host's player pyramid.
     G.px   = 2350;
@@ -273,19 +269,26 @@ class _AstralSession {
   }
 
   _restoreWorld() {
-    if (this._savedPyramids !== null) {
-      G.pyramids = this._savedPyramids;
-      this._savedPyramids = null;
-    }
-    if (this._savedPx !== null) {
-      G.px   = this._savedPx;
-      G.py   = this._savedPy;
-      G.camX = this._savedCamX;
-      this._savedPx = this._savedPy = this._savedCamX = null;
-    }
+    if (!this._saved) return;
+    G.pyramids = this._saved.pyramids;
+    G.px       = this._saved.px;
+    G.py       = this._saved.py;
+    G.camX     = this._saved.camX;
+    this._saved = null;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────
+
+  // Single pose loop, shared by host and projector modes (start is idempotent).
+  _startPose() {
+    if (!this._poseTimer)
+      this._poseTimer = setInterval(() => this._broadcastPose(), POSE_INTERVAL_MS);
+  }
+
+  _stopPose() {
+    clearInterval(this._poseTimer);
+    this._poseTimer = null;
+  }
 
   _start(targetUserId) {
     this._homeRealm   = RealmManager.currentId;
@@ -295,8 +298,8 @@ class _AstralSession {
   }
 
   _activate() {
-    this._active    = true;
-    this._poseTimer = setInterval(() => this._broadcastPose(), POSE_INTERVAL_MS);
+    this._active = true;
+    this._startPose();
   }
 
   _end() {
@@ -309,8 +312,7 @@ class _AstralSession {
     if (!this._active && !this._overlayOpen) return;
     this._active      = false;
     this._overlayOpen = false;
-    clearInterval(this._poseTimer);
-    this._poseTimer = null;
+    this._stopPose();
     PresenceStore.clear();
     DialogueManager.unlockDlg();
     document.getElementById('dlg')?.classList.remove('active');

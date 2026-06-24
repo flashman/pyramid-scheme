@@ -249,16 +249,9 @@ async def _on_project_start(ws: WebSocket, user_id: int, username: str, msg: dic
         "frame": meta.get("frame", 0), "is_projector": True,
     }, exclude=ws)
 
-    # 10b. Catch projector up on existing channel occupants (they were there before we joined)
-    for peer_ws in channels.peers(new_key, exclude=ws):
-        peer_meta = manager.get_meta(peer_ws)
-        await ws.send_json({
-            "type": "peer_entered",
-            "username": peer_meta.get("username", "?"),
-            "px": peer_meta.get("px", 0), "py": peer_meta.get("py", 0),
-            "pZ": peer_meta.get("pZ", 0), "facing": peer_meta.get("facing", 1),
-            "frame": peer_meta.get("frame", 0), "is_projector": False,
-        })
+    # The host (the only existing occupant) broadcasts pose every 100ms while
+    # hosting, so the projector's ghost of them fills in within one tick — no
+    # explicit catch-up needed, matching the plain realm_enter join path.
 
     # 11. Schedule server-authoritative 180s expiry
     expiry_task = asyncio.create_task(_projection_expiry(ws, user_id, username))
