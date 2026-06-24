@@ -111,7 +111,7 @@ export function drawRealmPharaoh(realm) {
   if (pose) drawPharaoh(pose);
 }
 
-// Renders a peer's ghost pharaoh at 0.55 opacity.
+// Renders a peer's ghost pharaoh at 0.55 opacity with a floating username label.
 // camY is 0 for all non-free-move realms (Y handled by canvas pre-translate or camY=0).
 export function drawPeerPharaoh(peer, camX, camY = 0) {
   const sx  = Math.round(peer.px - camX);
@@ -126,6 +126,21 @@ export function drawPeerPharaoh(peer, camX, camY = 0) {
   const bx = dir === -1 ? 0 : sx;
   _drawBody(bx, sy + bob, fr);
   X.restore();
+
+  // Floating username label above the ghost
+  if (peer.username) {
+    X.save();
+    X.globalAlpha = 0.75;
+    X.font = '5px monospace';
+    X.textAlign = 'center';
+    const labelY = sy + bob - 6;
+    X.fillStyle = 'rgba(0,0,0,0.5)';
+    const tw = X.measureText(peer.username).width;
+    X.fillRect(sx + 8 - tw / 2 - 2, labelY - 6, tw + 4, 8);
+    X.fillStyle = '#ffe066';
+    X.fillText(peer.username, sx + 8, labelY);
+    X.restore();
+  }
 }
 
 // Draws all peers registered in PresenceStore as ghost pharaohs.

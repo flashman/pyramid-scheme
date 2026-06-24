@@ -100,7 +100,9 @@ document.addEventListener('keydown', e => {
 // ── Music + WS channel: fire when active realm changes ────
 Events.on('realm:enter', ({ id }) => {
   SoundManager.playRealm(id);
-  if (G.userId != null) {
+  // Suppress realm_enter during projection — admin is in flop's channel and must stay there.
+  // _activate() sets isActive before transitionTo fires, so this guard is safe.
+  if (G.userId != null && !AstralSession.isActive) {
     gameSocket.send({ type: 'realm_enter', realm: id, owner_id: G.userId });
   }
 });

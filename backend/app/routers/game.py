@@ -51,7 +51,7 @@ async def me(
 
 # ── PUT /api/state ────────────────────────────────────────
 
-@router.put("/state")
+@router.api_route("/state", methods=["PUT", "POST"])  # POST for navigator.sendBeacon
 async def save_state(
     body: SaveStateRequest,
     current_user: User = Depends(get_current_user),

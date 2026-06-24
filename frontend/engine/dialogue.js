@@ -16,6 +16,7 @@ export const DialogueManager = (() => {
   let _typeLen   = 0;
   let _typeStart = 0;
   let _choiceIdx = 0;
+  let _locked    = false;  // set by AstralSession to prevent per-frame class removal
   const TYPE_SPEED = 35;
 
   function _resolveNode(raw) {
@@ -76,6 +77,7 @@ export const DialogueManager = (() => {
 
   return {
     start(dialogue, startNode = 'start') {
+      _locked   = false;  // NPC dialogue always takes precedence over astral chat lock
       _dialogue = dialogue;
       _active   = true;
       _goto(startNode);
@@ -83,6 +85,10 @@ export const DialogueManager = (() => {
     },
 
     isActive() { return _active; },
+
+    // Called by AstralSession to prevent per-frame #dlg class removal while showing chat.
+    lockDlg()   { _locked = true; },
+    unlockDlg() { _locked = false; },
 
     update() {
       if (!_active || !_node) return;
@@ -102,7 +108,7 @@ export const DialogueManager = (() => {
 
     render() {
       if (!_active || !_node) {
-        document.getElementById('dlg').classList.remove('active');
+        if (!_locked) document.getElementById('dlg').classList.remove('active');
         return;
       }
       this.update();

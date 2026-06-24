@@ -33,6 +33,8 @@ function render() {
     const div = document.createElement('div');
     div.className = 'inv-item';
     div.innerHTML = `<img class="inv-icon" src="${makeIconSrc(i.item_id)}" alt=""><span class="inv-item-name">${name}</span>`;
+    div.style.cursor = 'pointer';
+    div.onclick = () => Events.emit('inventory:use', { item_id: i.item_id });
     list.appendChild(div);
   }
 }
