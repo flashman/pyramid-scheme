@@ -145,13 +145,23 @@ const MATERIALISE_MS = 600;
 // (peer.isProjector) is the only ghost — drawn spectral/scarab-gold; everyone
 // else is in their own body and renders fully solid. Both fade in/out smoothly.
 // camY is 0 for all non-free-move realms (Y handled by canvas pre-translate or camY=0).
+const VAULT_SCALE = 1.4;          // indoor realms draw the sprite feet-anchored, 1.4×
+const VAULT_FEET  = CH - 32;       //   (mirrors drawPharaoh's pZ === -1 branch)
+
 export function drawPeerPharaoh(peer, camX, camY = 0) {
-  const sx  = Math.round(peer.px - camX);
-  const sy  = Math.round(peer.py - camY - 48);
+  // ── Interpolate toward the latest networked pose (10 Hz → 60 fps) so the ghost
+  //    glides instead of stepping. Snap on a big jump (teleport / realm change)
+  //    rather than sliding across the screen. PresenceStore preserves rx/ry. ──
+  if (peer.rx === undefined) { peer.rx = peer.px; peer.ry = peer.py; }
+  const k = (Math.abs(peer.px - peer.rx) > 220 || Math.abs(peer.py - peer.ry) > 220) ? 1 : 0.25;
+  peer.rx += (peer.px - peer.rx) * k;
+  peer.ry += (peer.py - peer.ry) * k;
+
   const bob = Math.sin(Date.now() / 600) * 1.5;
   const dir = peer.facing ?? 1;
   const fr  = peer.frame  ?? 0;
   const isGhost = !!peer.isProjector;   // only out-of-body projectors are spectral
+  const vault   = peer.pZ === -1;       // flat indoor realm (Beneath the Sphinx, etc.)
 
   const now = Date.now();
 
@@ -168,8 +178,14 @@ export function drawPeerPharaoh(peer, camX, camY = 0) {
   const ease = matIn * (1 - leaveProg);   // overall visibility 0..1
   const t    = now / 600;
 
-  const cx = sx + 16;          // sprite centre (same for both facings)
-  const cy = sy + bob + 24;
+  const sx = Math.round(peer.rx - camX);
+  const sy = Math.round(peer.ry - camY - 48);   // only used in the non-vault path
+
+  // Sprite centre + label anchor differ between the two draw modes.
+  const cx     = sx + 16;
+  const cy     = vault ? VAULT_FEET - 34 : sy + bob + 24;
+  const labelX = vault ? sx + 16 : sx + 8;
+  const labelY = vault ? VAULT_FEET - 76 : sy + bob - 6;
 
   X.save();
 
@@ -197,9 +213,16 @@ export function drawPeerPharaoh(peer, camX, camY = 0) {
     X.globalAlpha = ease;
   }
 
-  if (dir === -1) { X.translate(sx + 16, 0); X.scale(-1, 1); }
-  const bx = dir === -1 ? 0 : sx;
-  _drawBody(bx, sy + bob, fr, false);   // peers never show the viewer's regalia
+  // Body — indoor realms use the same scaled, feet-anchored transform as the
+  // local player (drawPharaoh's pZ === -1 branch); elsewhere the sprite tracks py.
+  if (vault) {
+    X.translate(sx + 16, VAULT_FEET);
+    X.scale(dir === -1 ? -VAULT_SCALE : VAULT_SCALE, VAULT_SCALE);
+    _drawBody(-16, -48 + bob, fr, false);
+  } else {
+    if (dir === -1) { X.translate(sx + 16, 0); X.scale(-1, 1); }
+    _drawBody(dir === -1 ? 0 : sx, sy + bob, fr, false);   // peers never show the viewer's regalia
+  }
   X.restore();   // resets globalAlpha, transform, AND filter
 
   // Floating username label above the ghost (fades in with the body)
@@ -208,12 +231,11 @@ export function drawPeerPharaoh(peer, camX, camY = 0) {
     X.globalAlpha = 0.75 * ease;
     X.font = '5px monospace';
     X.textAlign = 'center';
-    const labelY = sy + bob - 6;
     X.fillStyle = 'rgba(0,0,0,0.5)';
     const tw = X.measureText(peer.username).width;
-    X.fillRect(sx + 8 - tw / 2 - 2, labelY - 6, tw + 4, 8);
+    X.fillRect(labelX - tw / 2 - 2, labelY - 6, tw + 4, 8);
     X.fillStyle = '#ffe066';
-    X.fillText(peer.username, sx + 8, labelY);
+    X.fillText(peer.username, labelX, labelY);
     X.restore();
   }
 }

@@ -29,6 +29,10 @@ class _PresenceStore {
       _leaveT: null,
       // isProjector arrives on peer_entered only; preserve it across pose updates.
       isProjector: pose.isProjector ?? ex?.isProjector ?? false,
+      // Smoothed render position — preserved across pose updates so the renderer
+      // can interpolate. Reset on re-entry so the ghost snaps to its new spot.
+      rx: reentering ? undefined : ex?.rx,
+      ry: reentering ? undefined : ex?.ry,
     };
   }
 
