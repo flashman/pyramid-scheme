@@ -8,6 +8,7 @@ from __future__ import annotations
 
 SHOP_CATALOGUE: dict = {
     "invite_scroll":      {"name": "Invite Scroll",                           "price": 2,  "kind": "consumable", "effect": {"type": "invites", "amount": 1}},
+    "astral_lens":        {"name": "A Lens Ground from Crushed Scarab",     "price": 1,  "kind": "keepsake"},
     "scarab_amulet":      {"name": "Scarab Amulet",                           "price": 4,  "kind": "keepsake"},
     "bronze_coin":        {"name": "Bronze Coin",                             "price": 3,  "kind": "keepsake"},
     "croc_sandals":       {"name": "Crocodile-leather Sandals",               "price": 6,  "kind": "keepsake"},
@@ -24,7 +25,6 @@ SHOP_CATALOGUE: dict = {
     "seed_phrase":        {"name": "A Founder's Seed Phrase",               "price": 22, "kind": "keepsake"},
     "future_receipt":     {"name": "A Receipt from the Future",             "price": 6,  "kind": "keepsake"},
     "self_equity":        {"name": "Stock Certificate in Yourself",         "price": 10, "kind": "keepsake"},
-    "astral_lens":        {"name": "A Lens Ground from Crushed Scarab",     "price": 8,  "kind": "keepsake"},
 }
 
 

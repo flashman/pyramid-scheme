@@ -7,6 +7,8 @@
 export const WARES = [
   { id: 'invite_scroll',      name: 'Invite Scroll',                 tier: 'SCROLLS',     art: 'invite_scroll',
     blurb: 'ANOTHER SCROLL. ANOTHER SOUL.\nYOU DO NOT RECRUIT THEM — YOU OFFER THEM THE CHANCE\nTO RECRUIT THEMSELVES. THE SAME CHANCE I OFFERED YOU.' },
+  { id: 'astral_lens',        name: 'A Lens Ground from Crushed Scarab', tier: 'RELICS', art: 'astral_lens',
+    blurb: 'GRIND YOUR EYE TO A FINE POWDER AND SEE THROUGH WALLS.\nYOUR CONSCIOUSNESS WILL DEPART YOUR BODY.\nDO NOT LEAVE IT UNATTENDED — PEOPLE WILL TALK.' },
   { id: 'scarab_amulet',      name: 'Scarab Amulet',                 tier: 'AMULETS',     art: 'scarab_amulet',
     blurb: 'PRESSED FROM RIVER CLAY BY HANDS THAT BELIEVED.\nIT CONFERS NOTHING YOU CAN MEASURE.\nMEASUREMENT IS FOR PEOPLE WITHOUT AMULETS.' },
   { id: 'bronze_coin',        name: 'Bronze Coin',                   tier: 'RELICS',      art: 'bronze_coin',
@@ -39,8 +41,6 @@ export const WARES = [
     blurb: 'PROOF OF A PAYMENT YOU HAVE NOT YET MADE.\nVERY USEFUL. VERY BINDING.\nIT DOES NOT SURVIVE THE CROSSING. NEITHER, STATISTICALLY, DO YOU.' },
   { id: 'self_equity',        name: 'Stock Certificate in Yourself', tier: 'CURIOS',      art: 'self_equity',
     blurb: 'ONE SHARE. THE ISSUER IS YOU.\nYOU ARE NOW LONG ON YOURSELF —\nTHE MOST VOLATILE POSITION ON THE RIVER. CONGRATULATIONS.' },
-  { id: 'astral_lens',        name: 'A Lens Ground from Crushed Scarab', tier: 'RELICS', art: 'astral_lens',
-    blurb: 'GRIND YOUR EYE TO A FINE POWDER AND SEE THROUGH WALLS.\nYOUR CONSCIOUSNESS WILL DEPART YOUR BODY.\nDO NOT LEAVE IT UNATTENDED — PEOPLE WILL TALK.' },
 ];
 
 export const WARES_BY_ID = Object.fromEntries(WARES.map(w => [w.id, w]));

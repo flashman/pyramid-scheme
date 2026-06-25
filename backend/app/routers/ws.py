@@ -32,6 +32,11 @@ router = APIRouter()
 POSE_MIN_INTERVAL = 0.05   # ≤20 Hz
 CHAT_MIN_INTERVAL = 0.5    # ≤2 msg/s
 
+# How long a projection session lasts before the server force-ends it.
+# The client's pre-expiry warning (game/astral.js) is coupled to this — keep
+# them in sync if you change it.
+PROJECTION_TTL_SECONDS = 60
+
 
 def _rate_ok(ws: WebSocket, slot: str, min_interval: float) -> bool:
     """Token-free min-interval gate, stamped per-socket in connection meta."""
@@ -253,7 +258,7 @@ async def _on_project_start(ws: WebSocket, user_id: int, username: str, msg: dic
     # hosting, so the projector's ghost of them fills in within one tick — no
     # explicit catch-up needed, matching the plain realm_enter join path.
 
-    # 11. Schedule server-authoritative 180s expiry
+    # 11. Schedule server-authoritative expiry (PROJECTION_TTL_SECONDS)
     expiry_task = asyncio.create_task(_projection_expiry(ws, user_id, username))
     manager.set_meta(ws,
                      channel_key=new_key,
@@ -265,7 +270,7 @@ async def _on_project_start(ws: WebSocket, user_id: int, username: str, msg: dic
 
 
 async def _projection_expiry(ws: WebSocket, user_id: int, username: str):
-    await asyncio.sleep(180)
+    await asyncio.sleep(PROJECTION_TTL_SECONDS)
     await _on_project_end(ws, user_id, username, reason="timeout")
 
 
@@ -310,7 +315,7 @@ async def _on_project_end(ws: WebSocket, user_id: int, username: str,
 async def _handle_disconnect(ws: WebSocket, user_id: int, username: str):
     # If the player was mid-projection, tear the session down cleanly so the
     # host isn't left stuck in projection mode with a runaway pose timer and a
-    # dangling 180s expiry task. project_end notifies the host and cancels the
+    # dangling expiry task. project_end notifies the host and cancels the
     # task; it tolerates the already-closed projector socket.
     if manager.get_meta(ws).get("projection_session"):
         await _on_project_end(ws, user_id, username, reason="disconnected")

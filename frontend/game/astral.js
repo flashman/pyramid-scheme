@@ -17,7 +17,7 @@
 //   dialogue closes, the chat panel reappears with the buffered lines.
 //
 // Deactivation: projector presses Escape while not typing, or the server
-//   sends projection_ended (180s server-side timer or target disconnects).
+//   sends projection_ended (server-side expiry timer or target disconnects).
 //
 // Pose broadcast: 100ms interval while session is active.
 
@@ -38,9 +38,14 @@ const IS_TOUCH = () => navigator.maxTouchPoints > 0;
 
 const POSE_INTERVAL_MS = 100;
 const MAX_CHAT_LINES   = 60;
-// Session expiry is server-authoritative (ws.py schedules a 180s timer and
-// emits ws:projection_ended). The client ends only on that event or on ESC —
-// no local countdown, so there's a single source of truth for "session over".
+// Session expiry is server-authoritative (ws.py schedules the timer and emits
+// ws:projection_ended). The client ends only on that event or on ESC — no local
+// countdown, so there's a single source of truth for "session over".
+// PROJECTION_TTL_MS MUST match ws.py PROJECTION_TTL_SECONDS; the warning fires
+// 15s before the end. These drive the upfront notice + the "vision thins" nudge.
+const PROJECTION_TTL_MS  = 60_000;
+const PROJECTION_WARN_MS = PROJECTION_TTL_MS - 15_000;
+const PROJECTION_SECS    = Math.round(PROJECTION_TTL_MS / 1000);
 
 class _AstralSession {
   constructor() {
@@ -81,6 +86,7 @@ class _AstralSession {
       Events.emit('game:log', { msg: `${this._speakVerb()} to speak  •  ESC to return`, cls: '' });
       Events.emit('game:log', { msg: '◈ you leave your body unattended', cls: 'mystic' });
       Events.emit('game:log', { msg: `◈ astral-projecting into ${owner_username}'s world…`, cls: 'mystic' });
+      Events.emit('game:log', { msg: `◈ the lens holds ${PROJECTION_SECS} seconds — you bought the cheap one`, cls: 'mystic' });
     });
 
     Events.on('ws:host_realm_changed', ({ realm, world_state }) => {
@@ -99,6 +105,7 @@ class _AstralSession {
       this._armExpiryWarning();
       this._showChatPanel(from_username);
       Events.emit('game:log', { msg: `${this._speakVerb()} to speak with them`, cls: '' });
+      Events.emit('game:log', { msg: `◈ the watcher lingers but ${PROJECTION_SECS} seconds`, cls: 'mystic' });
       Events.emit('game:log', { msg: `◈ ${from_username} is watching. for support.`, cls: 'mystic' });
       Events.emit('game:log', { msg: '◈ a presence stirs nearby…', cls: 'mystic' });
     });
@@ -111,7 +118,7 @@ class _AstralSession {
         this._clearExpiryWarning();
         PresenceStore.remove(from_username);   // fade the ghost out (don't pop)
         this._closeDlg();
-        Events.emit('game:log', { msg: `◈ ${from_username} blinks out`, cls: 'mystic' });
+        Events.emit('game:log', { msg: `◈ ${from_username} has left the meeting`, cls: 'mystic' });
       }
       this._deactivate();
     });
@@ -465,18 +472,18 @@ class _AstralSession {
     this._armExpiryWarning();
   }
 
-  // The session expiry is server-authoritative at 180s (ws.py). This is only a
-  // soft heads-up ~15s before that, on both sides — not a second source of truth.
+  // The session expiry is server-authoritative (ws.py). This is only a soft
+  // heads-up 15s before that, on both sides — not a second source of truth.
   _armExpiryWarning() {
     this._clearExpiryWarning();
     this._warnTimer = setTimeout(() => {
       // POV-correct per side: the projector holds the failing lens; the host is
       // merely being visited.
       if (this._active)
-        Events.emit('game:log', { msg: '◈ your vision thins — the lens cannot hold much longer', cls: 'mystic' });
+        Events.emit('game:log', { msg: '◈ the lens is failing — circle back later', cls: 'mystic' });
       else if (this._hostMode)
-        Events.emit('game:log', { msg: '◈ the presence grows faint — they cannot linger much longer', cls: 'mystic' });
-    }, 165000);
+        Events.emit('game:log', { msg: '◈ the presence grows faint…', cls: 'mystic' });
+    }, PROJECTION_WARN_MS);
   }
 
   _clearExpiryWarning() {
