@@ -63,7 +63,10 @@ class _AstralSession {
     this._warp          = null;   // active gold-iris transition { startT, duration, pinchAt, onPinch, pinched }
     // Chat state
     this._peerName      = null;   // name shown in the chat panel header
-    this._chatMode      = false;  // true while the text input is focused (typing)
+    this._chatMode      = false;  // true while typing a message
+    this._chatBuf       = '';     // the message being composed
+    this._chatCur       = 0;      // caret index within _chatBuf
+    this._chatField     = null;   // { row, before, after } DOM spans of the input line
     this._godActive     = false;  // true while a game dialogue has taken over #dlg
     this._dlgClaimed    = false;  // #dlg owned by another system (NPC/shop/riddle), session or not
     this._chatLines     = [];     // model of the chat log; survives the takeover
@@ -71,6 +74,7 @@ class _AstralSession {
 
   get isActive()    { return this._active; }
   get overlayOpen() { return this._overlayOpen; }
+  get chatMode()    { return this._chatMode; }
 
   init() {
     // ── Projector side ────────────────────────────────────────
@@ -191,7 +195,7 @@ class _AstralSession {
     if (this._warp)        return true;   // swallow input during the warp wipe
     if (this._overlayOpen) return this._overlayKeyDown(key);
     if (this._godActive)   return false;  // NPC dialogue owns input this frame
-    if (this._chatMode)    return false;  // focused text input handles its own keys
+    if (this._chatMode)    { this._chatKey(key); return true; }   // typing — feed the buffer
     if (this._active || this._hostMode) {
       if (key === 's' || key === 'S') { this._enterChatMode(); return true; }
       if (key === 'Escape' && this._active) { this._end(); return true; }
@@ -248,66 +252,93 @@ class _AstralSession {
     if (!textEl) return;
 
     this._chatMode = true;
+    this._chatBuf  = '';
+    this._chatCur  = 0;
     if (choicesEl) choicesEl.innerHTML = '';
-    const inp = document.createElement('input');
-    inp.type        = 'text';
-    inp.maxLength    = 200;
-    inp.placeholder  = 'say something...';
-    // Same size as the sent lines, and pinned to the bottom of the log so it
-    // reads as the next line of the conversation.
-    inp.style.cssText = [
-      'width:100%', 'background:transparent', 'border:none', 'padding:0',
-      'display:block', 'color:#ffe066', 'outline:none', 'font-size:6px',
-      'line-height:1.9', 'font-family:monospace', 'caret-color:#ffe066',
-    ].join(';');
-    textEl.appendChild(inp);
-    textEl.scrollTop = textEl.scrollHeight;
+    // Stop any held movement so you don't drift while typing.
+    for (const k in G.keys) G.keys[k] = false;
 
+    // A self-rendered input line pinned to the bottom of the log: before-text +
+    // a block caret + after-text. Same technique as the Sphinx riddle, so the
+    // caret blinks (via .kb-cursor) on BOTH desktop and the in-app keyboard,
+    // with no native <input> focus required. Same 6px size as the sent lines.
+    const row = document.createElement('div');
+    row.style.cssText = 'margin-top:2px;color:#ffe066;font-size:6px;line-height:1.9';
+    const before = document.createElement('span');
+    const caret  = document.createElement('span');
+    caret.textContent = '█';
+    caret.className   = 'kb-cursor';
+    const after  = document.createElement('span');
+    row.append(before, caret, after);
+    textEl.appendChild(row);
+    textEl.scrollTop = textEl.scrollHeight;
+    this._chatField = { row, before, after };
+    this._renderChatField();
+
+    // Mobile feeds the buffer from the in-app QWERTY; desktop feeds it from
+    // onKeyDown (see _chatKey). Both go through the same buffer ops below.
     if (IS_TOUCH()) {
-      // The native keyboard would fight the canvas — drive a buffer from the
-      // in-app QWERTY instead and mirror it into the (read-only) display field.
-      inp.readOnly = true;
-      let buf = '', cur = 0;
-      const sync = () => { inp.value = buf; };
       InAppKeyboard.open({
-        onChar: (ch) => {
-          if (ch === '\b') { if (cur > 0) { buf = buf.slice(0, cur - 1) + buf.slice(cur); cur--; } }
-          else if (buf.length < 200) { buf = buf.slice(0, cur) + ch + buf.slice(cur); cur++; }
-          sync();
-        },
-        onSubmit: () => {
-          const text = buf.trim().slice(0, 200);
-          buf = ''; cur = 0; sync();
-          if (text) gameSocket.send({ type: 'chat', text });
-        },
-        onEscape: () => this._exitChatMode(),
-        onCursor: (dir) => {
-          if (dir === 'left')  cur = Math.max(0, cur - 1);
-          if (dir === 'right') cur = Math.min(buf.length, cur + 1);
-        },
+        onChar:   (ch) => ch === '\b' ? this._chatBackspace() : this._chatInsert(ch),
+        onSubmit: ()   => this._sendChat(),
+        onEscape: ()   => this._exitChatMode(),
+        onCursor: (dir) => this._chatMoveCursor(dir),
       });
-    } else {
-      inp.addEventListener('keydown', e => {
-        e.stopPropagation();  // keep typing out of the game's global key handler
-        if (e.key === 'Enter') {
-          const text = inp.value.trim().slice(0, 200);
-          inp.value = '';
-          if (text) gameSocket.send({ type: 'chat', text });
-        } else if (e.key === 'Escape') {
-          inp.blur();  // blur handler returns us to movement mode (session lives on)
-        }
-      });
-      inp.addEventListener('blur', () => this._exitChatMode());
-      inp.focus();
     }
     if (hintEl) hintEl.textContent = 'ENTER send  •  ESC done';
+  }
+
+  // Desktop keystrokes, routed from onKeyDown while _chatMode is on.
+  _chatKey(key) {
+    if      (key === 'Enter')      this._sendChat();
+    else if (key === 'Escape')     this._exitChatMode();
+    else if (key === 'Backspace')  this._chatBackspace();
+    else if (key === 'ArrowLeft')  this._chatMoveCursor('left');
+    else if (key === 'ArrowRight') this._chatMoveCursor('right');
+    else if (key.length === 1)     this._chatInsert(key);
+    // ArrowUp/Down, Shift, etc. are ignored while typing.
+  }
+
+  _chatInsert(ch) {
+    if (this._chatBuf.length >= 200) return;
+    this._chatBuf = this._chatBuf.slice(0, this._chatCur) + ch + this._chatBuf.slice(this._chatCur);
+    this._chatCur++;
+    this._renderChatField();
+  }
+
+  _chatBackspace() {
+    if (this._chatCur <= 0) return;
+    this._chatBuf = this._chatBuf.slice(0, this._chatCur - 1) + this._chatBuf.slice(this._chatCur);
+    this._chatCur--;
+    this._renderChatField();
+  }
+
+  _chatMoveCursor(dir) {
+    if (dir === 'left')  this._chatCur = Math.max(0, this._chatCur - 1);
+    if (dir === 'right') this._chatCur = Math.min(this._chatBuf.length, this._chatCur + 1);
+    this._renderChatField();
+  }
+
+  _sendChat() {
+    const text = this._chatBuf.trim().slice(0, 200);
+    this._chatBuf = ''; this._chatCur = 0;
+    this._renderChatField();
+    if (text) gameSocket.send({ type: 'chat', text });
+  }
+
+  _renderChatField() {
+    const f = this._chatField;
+    if (!f) return;
+    f.before.textContent = this._chatBuf.slice(0, this._chatCur);
+    f.after.textContent  = this._chatBuf.slice(this._chatCur);
   }
 
   _exitChatMode() {
     if (!this._chatMode) return;
     this._chatMode = false;
     if (IS_TOUCH()) InAppKeyboard.close();
-    document.getElementById('dlg-text')?.querySelector('input')?.remove();
+    this._chatField?.row?.remove();
+    this._chatField = null;
     const choicesEl = document.getElementById('dlg-choices');
     if (choicesEl) choicesEl.innerHTML = '';
     this._setPassiveHint();
@@ -327,9 +358,9 @@ class _AstralSession {
     const line = document.createElement('div');
     line.textContent   = `${speaker}: ${text}`;
     line.style.cssText = 'margin-bottom:2px;';
-    const inp = textEl.querySelector('input');   // keep the input pinned below the messages
-    if (inp) textEl.insertBefore(line, inp);
-    else     textEl.appendChild(line);
+    const field = this._chatField?.row;   // keep the input line pinned below the messages
+    if (field && field.parentNode === textEl) textEl.insertBefore(line, field);
+    else textEl.appendChild(line);
     textEl.scrollTop = textEl.scrollHeight;
   }
 

@@ -83,7 +83,9 @@ Events.on('milestone',(payload) => Api.hasToken() && Api.logEvent('milestone',pa
 
 // ── Input ─────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  G.keys[e.key] = true;
+  // Suppress movement-key state while typing an astral message (the keys feed
+  // the chat buffer instead — see AstralSession.onKeyDown / _chatKey).
+  if (!AstralSession.chatMode) G.keys[e.key] = true;
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
     e.preventDefault();
   }
@@ -118,6 +120,9 @@ function _toggleHelp() {
   document.getElementById('help-panel')?.classList.toggle('open');
 }
 document.addEventListener('keydown', e => {
+  // Astral chat rides the global keydown path (no stopPropagation), so guard
+  // this listener while typing — otherwise '`' would both type and toggle help.
+  if (AstralSession.chatMode) return;
   if (e.key === '`') { e.preventDefault(); _toggleHelp(); return; }
   if (e.key === 'Escape') {
     const hp = document.getElementById('help-panel');
