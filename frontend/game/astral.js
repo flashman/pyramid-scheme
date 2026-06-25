@@ -31,7 +31,7 @@ import { X, CW, CH }        from '../engine/canvas.js';
 import { COL }              from '../engine/colors.js';
 import { RealmManager }     from '../engine/realm.js';
 import { DialogueManager }  from '../engine/dialogue.js';
-import { InAppKeyboard }    from '../ui/in-app-keyboard.js';
+import { createInlineInput } from '../ui/inline-input.js';
 import { GND }              from '../worlds/earth/constants.js';
 
 const IS_TOUCH = () => navigator.maxTouchPoints > 0;
@@ -64,9 +64,7 @@ class _AstralSession {
     // Chat state
     this._peerName      = null;   // name shown in the chat panel header
     this._chatMode      = false;  // true while typing a message
-    this._chatBuf       = '';     // the message being composed
-    this._chatCur       = 0;      // caret index within _chatBuf
-    this._chatField     = null;   // { row, before, after } DOM spans of the input line
+    this._chatInput     = null;   // shared InlineInput controller (created in init)
     this._godActive     = false;  // true while a game dialogue has taken over #dlg
     this._dlgClaimed    = false;  // #dlg owned by another system (NPC/shop/riddle), session or not
     this._chatLines     = [];     // model of the chat log; survives the takeover
@@ -77,6 +75,21 @@ class _AstralSession {
   get chatMode()    { return this._chatMode; }
 
   init() {
+    // Shared block-caret input (same module the Sphinx riddle uses). Submit
+    // sends and stays open (clear the buffer); Escape leaves chat.
+    this._chatInput = createInlineInput({
+      maxLength: 200,
+      textColor: '#ffe066',
+      caretColor: '#ffe066',
+      rowStyle: 'margin-top:2px;color:#ffe066;font-size:6px;line-height:1.9',
+      onSubmit: (text) => {
+        const t = text.trim().slice(0, 200);
+        this._chatInput.clear();
+        if (t) gameSocket.send({ type: 'chat', text: t });
+      },
+      onCancel: () => this._exitChatMode(),
+    });
+
     // ── Projector side ────────────────────────────────────────
     Events.on('ws:world_state', ({ realm, owner_username, recruits }) => {
       if (!this._active) this._activate();
@@ -195,7 +208,7 @@ class _AstralSession {
     if (this._warp)        return true;   // swallow input during the warp wipe
     if (this._overlayOpen) return this._overlayKeyDown(key);
     if (this._godActive)   return false;  // NPC dialogue owns input this frame
-    if (this._chatMode)    { this._chatKey(key); return true; }   // typing — feed the buffer
+    if (this._chatMode)    { this._chatInput.handleKey(key); return true; }   // typing
     if (this._active || this._hostMode) {
       if (key === 's' || key === 'S') { this._enterChatMode(); return true; }
       if (key === 'Escape' && this._active) { this._end(); return true; }
@@ -239,10 +252,9 @@ class _AstralSession {
     if (hintEl) hintEl.textContent = this._active ? `${speak}  •  ESC leave` : speak;
   }
 
-  // Enter "speak" mode — show a text field and an on-screen keyboard.
-  // Desktop: a focused <input> captures keys (stopPropagation). Touch: the
-  // shared InAppKeyboard QWERTY drives a buffer (the same path the Sphinx
-  // riddle uses — reliable on a canvas game where native focus is flaky).
+  // Enter "speak" mode — mount the shared block-caret field at the bottom of
+  // the log. Keystrokes flow through onKeyDown → _chatInput.handleKey (desktop)
+  // or the in-app QWERTY (touch); the caret blinks on both.
   _enterChatMode() {
     if (this._godActive || this._chatMode) return;
     if (!this._active && !this._hostMode) return;
@@ -252,93 +264,19 @@ class _AstralSession {
     if (!textEl) return;
 
     this._chatMode = true;
-    this._chatBuf  = '';
-    this._chatCur  = 0;
     if (choicesEl) choicesEl.innerHTML = '';
     // Stop any held movement so you don't drift while typing.
     for (const k in G.keys) G.keys[k] = false;
 
-    // A self-rendered input line pinned to the bottom of the log: before-text +
-    // a block caret + after-text. Same technique as the Sphinx riddle, so the
-    // caret blinks (via .kb-cursor) on BOTH desktop and the in-app keyboard,
-    // with no native <input> focus required. Same 6px size as the sent lines.
-    const row = document.createElement('div');
-    row.style.cssText = 'margin-top:2px;color:#ffe066;font-size:6px;line-height:1.9';
-    const before = document.createElement('span');
-    const caret  = document.createElement('span');
-    caret.textContent = '█';
-    caret.className   = 'kb-cursor';
-    const after  = document.createElement('span');
-    row.append(before, caret, after);
-    textEl.appendChild(row);
+    this._chatInput.open(textEl);
     textEl.scrollTop = textEl.scrollHeight;
-    this._chatField = { row, before, after };
-    this._renderChatField();
-
-    // Mobile feeds the buffer from the in-app QWERTY; desktop feeds it from
-    // onKeyDown (see _chatKey). Both go through the same buffer ops below.
-    if (IS_TOUCH()) {
-      InAppKeyboard.open({
-        onChar:   (ch) => ch === '\b' ? this._chatBackspace() : this._chatInsert(ch),
-        onSubmit: ()   => this._sendChat(),
-        onEscape: ()   => this._exitChatMode(),
-        onCursor: (dir) => this._chatMoveCursor(dir),
-      });
-    }
     if (hintEl) hintEl.textContent = 'ENTER send  •  ESC done';
-  }
-
-  // Desktop keystrokes, routed from onKeyDown while _chatMode is on.
-  _chatKey(key) {
-    if      (key === 'Enter')      this._sendChat();
-    else if (key === 'Escape')     this._exitChatMode();
-    else if (key === 'Backspace')  this._chatBackspace();
-    else if (key === 'ArrowLeft')  this._chatMoveCursor('left');
-    else if (key === 'ArrowRight') this._chatMoveCursor('right');
-    else if (key.length === 1)     this._chatInsert(key);
-    // ArrowUp/Down, Shift, etc. are ignored while typing.
-  }
-
-  _chatInsert(ch) {
-    if (this._chatBuf.length >= 200) return;
-    this._chatBuf = this._chatBuf.slice(0, this._chatCur) + ch + this._chatBuf.slice(this._chatCur);
-    this._chatCur++;
-    this._renderChatField();
-  }
-
-  _chatBackspace() {
-    if (this._chatCur <= 0) return;
-    this._chatBuf = this._chatBuf.slice(0, this._chatCur - 1) + this._chatBuf.slice(this._chatCur);
-    this._chatCur--;
-    this._renderChatField();
-  }
-
-  _chatMoveCursor(dir) {
-    if (dir === 'left')  this._chatCur = Math.max(0, this._chatCur - 1);
-    if (dir === 'right') this._chatCur = Math.min(this._chatBuf.length, this._chatCur + 1);
-    this._renderChatField();
-  }
-
-  _sendChat() {
-    const text = this._chatBuf.trim().slice(0, 200);
-    this._chatBuf = ''; this._chatCur = 0;
-    this._renderChatField();
-    if (text) gameSocket.send({ type: 'chat', text });
-  }
-
-  _renderChatField() {
-    const f = this._chatField;
-    if (!f) return;
-    f.before.textContent = this._chatBuf.slice(0, this._chatCur);
-    f.after.textContent  = this._chatBuf.slice(this._chatCur);
   }
 
   _exitChatMode() {
     if (!this._chatMode) return;
     this._chatMode = false;
-    if (IS_TOUCH()) InAppKeyboard.close();
-    this._chatField?.row?.remove();
-    this._chatField = null;
+    this._chatInput.close();
     const choicesEl = document.getElementById('dlg-choices');
     if (choicesEl) choicesEl.innerHTML = '';
     this._setPassiveHint();
@@ -358,7 +296,7 @@ class _AstralSession {
     const line = document.createElement('div');
     line.textContent   = `${speaker}: ${text}`;
     line.style.cssText = 'margin-bottom:2px;';
-    const field = this._chatField?.row;   // keep the input line pinned below the messages
+    const field = this._chatInput?.el;   // keep the input line pinned below the messages
     if (field && field.parentNode === textEl) textEl.insertBefore(line, field);
     else textEl.appendChild(line);
     textEl.scrollTop = textEl.scrollHeight;
