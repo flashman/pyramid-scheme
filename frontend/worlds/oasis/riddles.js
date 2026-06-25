@@ -5,7 +5,7 @@
 // elements — same as every other dialogue in the game.
 
 import { Flags }           from '../../engine/flags.js';
-import { createInlineInput } from '../../ui/inline-input.js';
+import { InAppKeyboard } from '../../ui/in-app-keyboard.js';
 import { Events }           from '../../engine/events.js';
 import { DialogueManager }  from '../../engine/dialogue.js';
 
@@ -92,26 +92,56 @@ export const RiddleManager = (() => {
   let _active     = false;
   let _riddle     = null;
   let _phase      = 'idle';      // 'reading' | 'typing' | 'wrong' | 'correct'
+  let _input      = '';
+  let _cursorPos  = 0;
   let _typeLen    = 0;
   let _typeStart  = 0;
   let _respText   = '';
   let _attempts   = 0;
   const _used     = new Set();
+
+  // Stable DOM refs for the answer row — created once per typing phase,
+  // then updated via textContent only (avoids full innerHTML reflow every frame)
+  let _answerBeforeEl = null;
+  let _answerCursorEl = null;
+  let _answerAfterEl  = null;
   const TYPE_MS   = 36;          // ms per character
 
-  // The answer field — shared block-caret input (see ui/inline-input.js).
-  // Single-word, uppercased, capped at 18. Submit validates; Escape leaves.
-  const _answer = createInlineInput({
-    maxLength: 18,
-    transform: (c) => c.toUpperCase(),
-    label: 'YOUR ANSWER › ',
-    rowClass: 'dlg-choice',
-    rowStyle: 'padding-top:6px',
-    onSubmit: (v) => { if (v.trim().length > 0) _submit(v); },
-    onCancel: () => _close(),
-  });
+  function _buildAnswerRow() {
+    const choicesEl = document.getElementById('dlg-choices');
+    if (!choicesEl || _answerBeforeEl) return;
 
-  function _openAnswer() { _answer.open(document.getElementById('dlg-choices')); }
+    const row = document.createElement('div');
+    row.className = 'dlg-choice';
+    row.style.paddingTop = '6px';
+
+    const label = document.createElement('span');
+    label.style.color = 'var(--gold-dim)';
+    label.textContent = 'YOUR ANSWER › ';
+
+    _answerBeforeEl = document.createElement('span');
+    _answerBeforeEl.style.color = 'var(--gold)';
+
+    _answerCursorEl = document.createElement('span');
+    _answerCursorEl.style.color = 'var(--gold)';
+    _answerCursorEl.textContent = '█';
+    _answerCursorEl.className = 'kb-cursor';
+
+    _answerAfterEl = document.createElement('span');
+    _answerAfterEl.style.color = 'var(--gold)';
+
+    row.appendChild(label);
+    row.appendChild(_answerBeforeEl);
+    row.appendChild(_answerCursorEl);
+    row.appendChild(_answerAfterEl);
+    choicesEl.appendChild(row);
+  }
+
+  function _destroyAnswerRow() {
+    const choicesEl = document.getElementById('dlg-choices');
+    if (choicesEl) choicesEl.innerHTML = '';
+    _answerBeforeEl = _answerCursorEl = _answerAfterEl = null;
+  }
 
   // Single exit path for the riddle — used by every close site (Escape,
   // mobile escape, correct-answer dismiss). Releases the shared #dlg window
@@ -120,7 +150,7 @@ export const RiddleManager = (() => {
   function _close() {
     _active = false;
     _phase  = 'idle';
-    _answer.close();
+    InAppKeyboard.close();
     const el = document.getElementById('dlg');
     if (el && !DialogueManager.isLocked()) el.classList.remove('active');
     Events.emit('dialogue:end', {});
@@ -142,19 +172,50 @@ export const RiddleManager = (() => {
     return _typeLen >= _currentText().length;
   }
 
+  function _openMobileInput() {
+    if (navigator.maxTouchPoints > 0) {
+      _cursorPos = _input.length;
+      InAppKeyboard.open({
+        onChar(ch) {
+          if (ch === '\b') {
+            if (_cursorPos > 0) {
+              _input = _input.slice(0, _cursorPos - 1) + _input.slice(_cursorPos);
+              _cursorPos--;
+            }
+          } else if (_input.length < 18) {
+            const upper = ch.toUpperCase();
+            _input = _input.slice(0, _cursorPos) + upper + _input.slice(_cursorPos);
+            _cursorPos++;
+          }
+        },
+        onSubmit() {
+          if (_input.trim().length > 0) _submit();
+        },
+        onEscape() {
+          _close();
+        },
+        onCursor(dir) {
+          if (dir === 'left')  _cursorPos = Math.max(0, _cursorPos - 1);
+          if (dir === 'right') _cursorPos = Math.min(_input.length, _cursorPos + 1);
+        },
+      });
+    }
+  }
+
   function _skipOrAdvance() {
     if (!_typewriterDone()) {
       _typeLen = _currentText().length;
     } else if (_phase === 'reading') {
       _phase    = 'typing';
+      _input    = '';
       _attempts = 0;
-      _openAnswer();
+      _openMobileInput();
     }
   }
 
-  function _submit(answerRaw) {
-    const answer = answerRaw.trim().toLowerCase();
-    _answer.close();
+  function _submit() {
+    const answer = _input.trim().toLowerCase();
+    InAppKeyboard.close();
     if (_riddle.answers.includes(answer)) {
       _phase     = 'correct';
       _respText  = _riddle.response;
@@ -185,15 +246,13 @@ export const RiddleManager = (() => {
       _riddle    = _pick();
       _active    = true;
       _phase     = 'reading';
+      _input     = '';
+      _cursorPos = 0;
       _typeLen   = 0;
       _typeStart = Date.now();
       _respText  = '';
       _attempts  = 0;
-      _answer.close();   // clear any leftover field from a prior riddle
-      // Clear #dlg-choices — a prior NPC dialogue's choice <div>s aren't cleared
-      // by DialogueManager.close(), and would otherwise sit above the answer.
-      const _ch = document.getElementById('dlg-choices');
-      if (_ch) _ch.innerHTML = '';
+      _destroyAnswerRow();
       // Claim the shared #dlg window — astral chat (if any) yields and buffers.
       Events.emit('dialogue:start', {});
     },
@@ -212,9 +271,18 @@ export const RiddleManager = (() => {
         return true;
       }
 
-      // ── Typing phase: free-text input (the field owns editing) ──
+      // ── Typing phase: free-text input ─────────────────────
       if (_phase === 'typing') {
-        _answer.handleKey(key);
+        if (key === 'Backspace') {
+          _input = _input.slice(0, -1);
+          _cursorPos = _input.length;
+        } else if (key === 'Enter') {
+          if (_input.trim().length > 0) _submit();
+        } else if (key.length === 1 && _input.length < 18) {
+          // Accept letters, numbers, hyphens
+          _input += key.toUpperCase();
+          _cursorPos = _input.length;
+        }
         return true;
       }
 
@@ -223,8 +291,10 @@ export const RiddleManager = (() => {
         if (!_typewriterDone()) {
           _typeLen = _currentText().length;
         } else if (key === 'Enter' || key === ' ') {
-          _phase = 'typing';
-          _openAnswer();
+          _phase     = 'typing';
+          _input     = '';
+          _cursorPos = 0;
+          _openMobileInput();
         }
         return true;
       }
@@ -261,6 +331,7 @@ export const RiddleManager = (() => {
       const el        = document.getElementById('dlg');
       const speakerEl = document.getElementById('dlg-speaker');
       const textEl    = document.getElementById('dlg-text');
+      const choicesEl = document.getElementById('dlg-choices');
       const hintEl    = document.getElementById('dlg-hint');
       if (!el) return;
 
@@ -284,11 +355,16 @@ export const RiddleManager = (() => {
         : _currentText().substring(0, _typeLen);
       textEl.textContent = displayText;
 
-      // The answer field renders itself; it's opened on entering the typing
-      // phase and closed on submit/leave, so render only sets the hint here.
+      // Typing phase: answer input row, built once then updated via textContent
       if (_phase === 'typing') {
+        _buildAnswerRow();
+        if (_answerBeforeEl) {
+          _answerBeforeEl.textContent = _input.slice(0, _cursorPos);
+          _answerAfterEl.textContent  = _input.slice(_cursorPos);
+        }
         hintEl.textContent = '[ENTER] SUBMIT     [ESC] LEAVE';
       } else {
+        if (_answerBeforeEl) _destroyAnswerRow();
         const done = _typewriterDone();
         if (!done) {
           hintEl.textContent = '';

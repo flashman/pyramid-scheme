@@ -31,7 +31,7 @@ import { X, CW, CH }        from '../engine/canvas.js';
 import { COL }              from '../engine/colors.js';
 import { RealmManager }     from '../engine/realm.js';
 import { DialogueManager }  from '../engine/dialogue.js';
-import { createInlineInput } from '../ui/inline-input.js';
+import { InAppKeyboard }    from '../ui/in-app-keyboard.js';
 import { GND }              from '../worlds/earth/constants.js';
 
 const IS_TOUCH = () => navigator.maxTouchPoints > 0;
@@ -63,8 +63,7 @@ class _AstralSession {
     this._warp          = null;   // active gold-iris transition { startT, duration, pinchAt, onPinch, pinched }
     // Chat state
     this._peerName      = null;   // name shown in the chat panel header
-    this._chatMode      = false;  // true while typing a message
-    this._chatInput     = null;   // shared InlineInput controller (created in init)
+    this._chatMode      = false;  // true while the text input is focused (typing)
     this._godActive     = false;  // true while a game dialogue has taken over #dlg
     this._dlgClaimed    = false;  // #dlg owned by another system (NPC/shop/riddle), session or not
     this._chatLines     = [];     // model of the chat log; survives the takeover
@@ -72,24 +71,8 @@ class _AstralSession {
 
   get isActive()    { return this._active; }
   get overlayOpen() { return this._overlayOpen; }
-  get chatMode()    { return this._chatMode; }
 
   init() {
-    // Shared block-caret input (same module the Sphinx riddle uses). Submit
-    // sends and stays open (clear the buffer); Escape leaves chat.
-    this._chatInput = createInlineInput({
-      maxLength: 200,
-      textColor: '#ffe066',
-      caretColor: '#ffe066',
-      rowStyle: 'margin-top:2px;color:#ffe066;font-size:6px;line-height:1.9',
-      onSubmit: (text) => {
-        const t = text.trim().slice(0, 200);
-        this._chatInput.clear();
-        if (t) gameSocket.send({ type: 'chat', text: t });
-      },
-      onCancel: () => this._exitChatMode(),
-    });
-
     // ── Projector side ────────────────────────────────────────
     Events.on('ws:world_state', ({ realm, owner_username, recruits }) => {
       if (!this._active) this._activate();
@@ -208,7 +191,7 @@ class _AstralSession {
     if (this._warp)        return true;   // swallow input during the warp wipe
     if (this._overlayOpen) return this._overlayKeyDown(key);
     if (this._godActive)   return false;  // NPC dialogue owns input this frame
-    if (this._chatMode)    { this._chatInput.handleKey(key); return true; }   // typing
+    if (this._chatMode)    return false;  // focused text input handles its own keys
     if (this._active || this._hostMode) {
       if (key === 's' || key === 'S') { this._enterChatMode(); return true; }
       if (key === 'Escape' && this._active) { this._end(); return true; }
@@ -252,9 +235,10 @@ class _AstralSession {
     if (hintEl) hintEl.textContent = this._active ? `${speak}  •  ESC leave` : speak;
   }
 
-  // Enter "speak" mode — mount the shared block-caret field at the bottom of
-  // the log. Keystrokes flow through onKeyDown → _chatInput.handleKey (desktop)
-  // or the in-app QWERTY (touch); the caret blinks on both.
+  // Enter "speak" mode — show a text field and an on-screen keyboard.
+  // Desktop: a focused <input> captures keys (stopPropagation). Touch: the
+  // shared InAppKeyboard QWERTY drives a buffer (the same path the Sphinx
+  // riddle uses — reliable on a canvas game where native focus is flaky).
   _enterChatMode() {
     if (this._godActive || this._chatMode) return;
     if (!this._active && !this._hostMode) return;
@@ -265,18 +249,65 @@ class _AstralSession {
 
     this._chatMode = true;
     if (choicesEl) choicesEl.innerHTML = '';
-    // Stop any held movement so you don't drift while typing.
-    for (const k in G.keys) G.keys[k] = false;
-
-    this._chatInput.open(textEl);
+    const inp = document.createElement('input');
+    inp.type        = 'text';
+    inp.maxLength    = 200;
+    inp.placeholder  = '';   // wordless — just the native blinking caret
+    // Same size as the sent lines, and pinned to the bottom of the log so it
+    // reads as the next line of the conversation.
+    inp.style.cssText = [
+      'width:100%', 'background:transparent', 'border:none', 'padding:0',
+      'display:block', 'color:#ffe066', 'outline:none', 'font-size:6px',
+      'line-height:1.9', 'font-family:monospace', 'caret-color:#ffe066',
+    ].join(';');
+    textEl.appendChild(inp);
     textEl.scrollTop = textEl.scrollHeight;
+
+    if (IS_TOUCH()) {
+      // The native keyboard would fight the canvas — drive a buffer from the
+      // in-app QWERTY instead and mirror it into the (read-only) display field.
+      inp.readOnly = true;
+      let buf = '', cur = 0;
+      const sync = () => { inp.value = buf; };
+      InAppKeyboard.open({
+        onChar: (ch) => {
+          if (ch === '\b') { if (cur > 0) { buf = buf.slice(0, cur - 1) + buf.slice(cur); cur--; } }
+          else if (buf.length < 200) { buf = buf.slice(0, cur) + ch + buf.slice(cur); cur++; }
+          sync();
+        },
+        onSubmit: () => {
+          const text = buf.trim().slice(0, 200);
+          buf = ''; cur = 0; sync();
+          if (text) gameSocket.send({ type: 'chat', text });
+        },
+        onEscape: () => this._exitChatMode(),
+        onCursor: (dir) => {
+          if (dir === 'left')  cur = Math.max(0, cur - 1);
+          if (dir === 'right') cur = Math.min(buf.length, cur + 1);
+        },
+      });
+    } else {
+      inp.addEventListener('keydown', e => {
+        e.stopPropagation();  // keep typing out of the game's global key handler
+        if (e.key === 'Enter') {
+          const text = inp.value.trim().slice(0, 200);
+          inp.value = '';
+          if (text) gameSocket.send({ type: 'chat', text });
+        } else if (e.key === 'Escape') {
+          inp.blur();  // blur handler returns us to movement mode (session lives on)
+        }
+      });
+      inp.addEventListener('blur', () => this._exitChatMode());
+      inp.focus();
+    }
     if (hintEl) hintEl.textContent = 'ENTER send  •  ESC done';
   }
 
   _exitChatMode() {
     if (!this._chatMode) return;
     this._chatMode = false;
-    this._chatInput.close();
+    if (IS_TOUCH()) InAppKeyboard.close();
+    document.getElementById('dlg-text')?.querySelector('input')?.remove();
     const choicesEl = document.getElementById('dlg-choices');
     if (choicesEl) choicesEl.innerHTML = '';
     this._setPassiveHint();
@@ -296,9 +327,9 @@ class _AstralSession {
     const line = document.createElement('div');
     line.textContent   = `${speaker}: ${text}`;
     line.style.cssText = 'margin-bottom:2px;';
-    const field = this._chatInput?.el;   // keep the input line pinned below the messages
-    if (field && field.parentNode === textEl) textEl.insertBefore(line, field);
-    else textEl.appendChild(line);
+    const inp = textEl.querySelector('input');   // keep the input pinned below the messages
+    if (inp) textEl.insertBefore(line, inp);
+    else     textEl.appendChild(line);
     textEl.scrollTop = textEl.scrollHeight;
   }
 
