@@ -34,6 +34,7 @@ async def me(
 
     inv = await inventory_list(db, current_user.id)
     return MeResponse(
+        id=current_user.id,
         username=current_user.username,
         email=current_user.email,
         bought=state.bought,
@@ -50,7 +51,7 @@ async def me(
 
 # ── PUT /api/state ────────────────────────────────────────
 
-@router.put("/state")
+@router.api_route("/state", methods=["PUT", "POST"])  # POST for navigator.sendBeacon
 async def save_state(
     body: SaveStateRequest,
     current_user: User = Depends(get_current_user),

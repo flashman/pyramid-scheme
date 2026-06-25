@@ -5,6 +5,10 @@ import { GND }       from '../worlds/earth/constants.js';
 import { CW }        from '../engine/canvas.js';
 
 export const G = {
+  // ── Identity (set on auth; used by WS channel join) ───
+  userId: null,
+  username: null,
+
   // ── Economics ──────────────────────────────────────────
   bought: false, invested: 0, earned: 0, invitesLeft: 0,
   recruits: [],
@@ -14,6 +18,9 @@ export const G = {
   pvy: 0,
   facing: 1,
   pframe: 0, pmoving: false,
+
+  // True while astral-projecting — the local player renders as a spectral ghost.
+  astralProjecting: false,
 
   // Shared leg-animation timer.
   legT: 0,

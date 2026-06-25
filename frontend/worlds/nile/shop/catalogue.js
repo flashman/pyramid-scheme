@@ -7,6 +7,8 @@
 export const WARES = [
   { id: 'invite_scroll',      name: 'Invite Scroll',                 tier: 'SCROLLS',     art: 'invite_scroll',
     blurb: 'ANOTHER SCROLL. ANOTHER SOUL.\nYOU DO NOT RECRUIT THEM — YOU OFFER THEM THE CHANCE\nTO RECRUIT THEMSELVES. THE SAME CHANCE I OFFERED YOU.' },
+  { id: 'astral_lens',        name: 'A Lens Ground from Crushed Scarab', tier: 'RELICS', art: 'astral_lens',
+    blurb: 'GRIND YOUR EYE TO A FINE POWDER AND SEE THROUGH WALLS.\nYOUR CONSCIOUSNESS WILL DEPART YOUR BODY.\nDO NOT LEAVE IT UNATTENDED — PEOPLE WILL TALK.' },
   { id: 'scarab_amulet',      name: 'Scarab Amulet',                 tier: 'AMULETS',     art: 'scarab_amulet',
     blurb: 'PRESSED FROM RIVER CLAY BY HANDS THAT BELIEVED.\nIT CONFERS NOTHING YOU CAN MEASURE.\nMEASUREMENT IS FOR PEOPLE WITHOUT AMULETS.' },
   { id: 'bronze_coin',        name: 'Bronze Coin',                   tier: 'RELICS',      art: 'bronze_coin',
@@ -66,6 +68,7 @@ export const WARE_RETORTS = {
   future_receipt:   'PAID. OR YOU WILL HAVE. THE TENSES GET LOOSE BACK HERE.',
   self_equity:      'CONGRATULATIONS — YOU ARE NOW A SHAREHOLDER AND THE PRODUCT.',
   attentive_reel:   "ENJOY THE FOOTAGE. THEY HAVE THE DIRECTOR'S CUT.",
+  astral_lens:      'SOLD. YOUR BODY STAYS HERE. HOLD THAT THOUGHT.',
 };
 
 // Fired when you try to buy something you can't afford.

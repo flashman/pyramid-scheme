@@ -46,9 +46,9 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{background:var(--bg-page);display:flex;flex-direction:column;align-items:center;min-height:100vh;font-family:'Press Start 2P',monospace;overflow-x:hidden}
-#title-bar{width:100%;background:var(--bg-dark);border-bottom:4px solid var(--gold-dim);padding:8px 0;text-align:center;position:relative}
-#title-bar h1{color:var(--gold);font-size:15px;text-shadow:3px 3px 0 var(--amber-dark)}
-#title-bar .sub{color:var(--subtitle);font-size:6px;margin-top:3px}
+#title-bar{width:100%;background:var(--bg-dark);border-bottom:4px solid var(--gold-dim);position:relative;padding:8px 0}
+#title-bar h1{color:var(--gold);font-size:15px;text-shadow:3px 3px 0 var(--amber-dark);text-align:center}
+#title-bar .sub{color:var(--subtitle);font-size:6px;margin-top:3px;text-align:center}
 #game-wrapper{display:flex;width:100%;max-width:1140px;padding:8px;gap:0}
 #lp{width:178px;flex-shrink:0;display:flex;flex-direction:column;gap:5px}
 #cc{flex:1;position:relative}
@@ -75,6 +75,7 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 #lb{max-height:100px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--gold-dim) var(--bg-panel)}
 .le{color:var(--tan);font-size:5px;padding:2px 0;line-height:1.5;border-bottom:1px solid var(--bg-input);animation:fi2 .3s}
 .le.hi{color:var(--gold)}.le.mo{color:var(--green)}
+.le.mystic{color:var(--gold-bright,#f0e040);text-shadow:0 0 3px rgba(240,192,32,.55)}
 @keyframes fi2{from{opacity:0}to{opacity:1}}
 .ss{width:26px;height:26px;border:2px solid var(--border-slot);background:var(--bg-slot);display:flex;align-items:center;justify-content:center;font-size:13px}
 .ss.av{border-color:var(--gold-dim);background:var(--bg-slot-active);box-shadow:0 0 4px rgba(200,160,32,.4)}
@@ -90,12 +91,50 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 .pt-sep{border-top:1px dashed var(--brown-mid);margin:2px 0}
 .db-row{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}
 .db-chip{font-size:4px;padding:2px 3px;border:1px solid var(--brown-mid)}
+/* ── Help panel ── */
+#help-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:500;align-items:center;justify-content:center;padding:16px;font-family:monospace}
+#help-panel.open{display:flex}
+#help-inner{background:#0d0800;border:2px solid var(--gold-dim);padding:22px 24px 18px;position:relative;width:min(340px,100%);max-height:90vh;overflow-y:auto;box-sizing:border-box;box-shadow:0 0 60px #ff600028}
+#help-title{color:var(--gold);font-size:11px;letter-spacing:3px;text-align:center;margin-bottom:16px}
+#help-close{position:absolute;top:0;right:0;padding:6px 10px;font:700 13px/1 monospace;background:none;border:none;color:var(--gold-dim);cursor:pointer}
+#help-close:hover{color:var(--gold)}
+.help-section{border-top:1px solid #2a1800;padding-top:10px;margin-top:10px}
+.help-section-title{color:var(--tan-muted);font-size:6px;letter-spacing:2px;margin-bottom:8px}
+.help-row{display:flex;justify-content:space-between;margin-bottom:5px}
+.help-key{color:#5a4020;font-size:6px;letter-spacing:1px}
+.help-val{color:var(--tan);font-size:6px;text-align:right}
+/* ── Header buttons: JS sets right dynamically to match #rp's rendered right edge ── */
+#hdr-actions{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:5px}
+.hdr-btn{font:700 7px/1 'Press Start 2P',monospace;letter-spacing:1px;background:#1a0e00;border:1px solid #8a6a20;color:#f0c020;height:28px;padding:0 9px;cursor:pointer;display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+.hdr-btn:hover{background:#2a1800}
+/* ── Sound glyph ── */
+#sound-note{font-size:16px;line-height:1;margin-right:2px;transition:color .15s}
+#sound-note.off{color:var(--red)}
+#sound-glyph{font-family:serif;font-size:16px;line-height:1;transition:opacity .15s}
+#sound-glyph.off{opacity:0.4}
+
+/* ── Inventory panel ── */
+#inventory-list{padding:2px 0}
+.inv-item{display:flex;align-items:center;gap:4px;color:var(--tan);font-size:5px;line-height:2;padding:2px 0;border-bottom:1px solid var(--brown-dim)}
+.inv-item:last-child{border-bottom:none}
+.inv-icon{width:22px;height:22px;flex-shrink:0;image-rendering:pixelated}
+.inv-item-name{color:var(--gold-dim)}
+.inv-empty{color:var(--tan-muted);font-size:5px;line-height:2;font-style:italic}
+
 #mo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.88);z-index:100;align-items:center;justify-content:center}
 #mo.show{display:flex}
 #md{background:var(--bg-panel);border:4px solid var(--gold-dim);padding:20px;max-width:380px;width:90%;text-align:center;position:relative}
 #md::before{content:'';position:absolute;top:4px;left:4px;right:4px;bottom:4px;border:2px solid var(--amber-dark);pointer-events:none}
 #md h2{color:var(--gold);font-size:10px;margin-bottom:12px;text-shadow:2px 2px 0 var(--amber-dark)}
 #md p{color:var(--gold-dim);font-size:6px;line-height:2;margin-bottom:12px}
+
+/* ── Astral chat overlay (top-right of canvas) ── */
+#astral-chat{display:none;position:absolute;top:6px;right:6px;width:220px;background:rgba(0,0,0,0.75);border:1px solid #664400;font-family:monospace;box-sizing:border-box;padding:6px;z-index:10}
+#astral-chat.active{display:block}
+#astral-chat-log{color:#e8c878;font-size:6px;line-height:1.8;max-height:120px;overflow-y:auto}
+#astral-chat-log div{white-space:pre-wrap;word-break:break-word}
+#astral-chat-input{display:none;width:100%;background:#000;border:1px solid #664400;color:#e8c878;font-family:monospace;font-size:6px;box-sizing:border-box;margin-top:4px;padding:2px 4px;outline:none}
+#astral-chat-input.active{display:block}
 
 /* ── Dialogue panel (below canvas) ── */
 #dlg{display:none;width:780px;background:#060200;border:4px solid var(--gold-dim);border-top:2px solid var(--amber-dark);box-sizing:border-box;padding:10px 14px 12px;font-family:monospace;position:relative}

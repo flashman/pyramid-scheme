@@ -315,7 +315,33 @@ export function restoreRecruits(serverRecruits) {
     const { name, depth, payout, parent_name: parentName, meta = {} } = sr;
     const { pid, rootPid, zLayer, wx } = meta;
 
-    if (!pid || wx == null) continue;  // skip records with incomplete layout data
+    if (!pid || wx == null) {
+      // No canvas slot saved — buy-in was confirmed while the game tab was closed.
+      // Assign a slot now so the pyramid appears, and persist it for future loads.
+      if (depth === 1) {
+        const newWx  = earthLayout.nextX(1);
+        const newPid = 'f' + sr.id;
+        G.pyramids.push(mkPyr(newPid, newWx, name, false, 0));
+        addLayer(newPid, 1, name);
+        addLayer('player', 1, name);
+        const rec = {
+          id: sr.id, name, depth: 1, pid: newPid, rootPid: newPid,
+          zLayer: 0, wx: newWx, parentName, payoutToPlayer: payout,
+        };
+        G.recruits.push(rec);
+        addFriendUI(rec);
+        if (Api.hasToken()) {
+          Api.patchRecruitMeta(sr.id, { pid: newPid, rootPid: newPid, zLayer: 0, wx: newWx }).catch(() => {});
+        }
+      } else {
+        // Depth > 1: can't place pyramid without parent context, but credit the player layer.
+        addLayer('player', depth, name);
+        const rec = { id: sr.id, name, depth, pid: null, wx: null, parentName, payoutToPlayer: payout };
+        G.recruits.push(rec);
+        addFriendUI(rec);
+      }
+      continue;
+    }
 
     // Rebuild the pyramid entry if it doesn't already exist
     const existingPyr = G.pyramids.find(p => p.id === pid);

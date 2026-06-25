@@ -104,6 +104,19 @@ const ICON = {
     X.fillStyle = '#6a4a8a'; X.beginPath(); X.arc(x, y - s*0.02, s*0.08, Math.PI, 0); X.fill(); X.fillRect(x - s*0.05, y - s*0.02, s*0.1, s*0.1);   // tiny self portrait
     X.fillStyle = '#9a8a6a'; X.fillRect(x - s*0.18, y + s*0.12, s*0.36, s*0.02);
   },
+  astral_lens(X, x, y, s, t) {
+    // A glowing lens — circle with inner shimmer
+    const pulse = 0.7 + 0.3 * Math.sin(t / 400);
+    X.fillStyle = '#2a4a6a';
+    X.beginPath(); X.arc(x, y, s * 0.36, 0, Math.PI * 2); X.fill();
+    X.fillStyle = '#4a8ab0';
+    X.beginPath(); X.arc(x, y, s * 0.28, 0, Math.PI * 2); X.fill();
+    X.save(); X.globalAlpha = pulse;
+    X.fillStyle = '#a0d8ef';
+    X.beginPath(); X.arc(x, y, s * 0.18, 0, Math.PI * 2); X.fill();
+    X.restore();
+    X.fillStyle = '#e0f0ff'; X.fillRect(x - s * 0.04, y - s * 0.22, s * 0.08, s * 0.06);
+  },
 };
 
 function _crate(X, x, y, s) {

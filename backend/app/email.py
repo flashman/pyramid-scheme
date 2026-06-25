@@ -205,3 +205,38 @@ async def send_recruit_joined_admin(
 </html>"""
     await _dispatch(to_email, subject, html_body, text_body,
                     from_email="amun@pyramid-scheme.live", from_name="Amun-Ra")
+
+
+async def send_beckon_email(
+    to_email: str,
+    from_username: str,
+    game_url: str,
+) -> None:
+    import html as _html
+    safe_from = _html.escape(from_username)
+    subject   = "A vision from above"
+    text_body = (
+        f"{from_username} is attempting to reach you across the astral plane.\n\n"
+        f"The pyramid stirs. Enter the Desert:\n{game_url}\n\n"
+        f"⚡ PYRAMID SCHEME™ — TOTALLY LEGAL™"
+    )
+    html_body = f"""<!DOCTYPE html>
+<html>
+<body style="background:#0a0500;color:#d0a060;font-family:monospace;padding:24px;margin:0">
+  <h1 style="color:#f0c020;letter-spacing:3px;font-size:18px">⚡ PYRAMID SCHEME™ ⚡</h1>
+  <p style="margin:16px 0">
+    <strong style="color:#f0c020">{safe_from}</strong>
+    is attempting to reach you across the astral plane.
+  </p>
+  <p style="color:#d0a060;margin:0 0 20px">The pyramid stirs.</p>
+  <a href="{game_url}"
+     style="display:inline-block;background:#1a0e00;border:1px solid #8a6a20;
+            color:#f0c020;padding:10px 22px;text-decoration:none;
+            letter-spacing:2px;font-size:13px;font-family:monospace">
+    ► ENTER THE DESERT
+  </a>
+  <p style="color:#6a5030;font-size:11px;margin-top:16px">★ TOTALLY LEGAL™ ★</p>
+</body>
+</html>"""
+    await _dispatch(to_email, subject, html_body, text_body,
+                    from_email=settings.smtp_from, from_name="PYRAMID SCHEME")

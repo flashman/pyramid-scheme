@@ -6,6 +6,7 @@
 import { X, CW, CH }  from '../../../engine/canvas.js';
 import { G }           from '../../../game/state.js';
 import { Flags }       from '../../../engine/flags.js';
+import { drawAllPeers } from '../../../draw/pharaoh.js';
 import {
   DEEP_WORLD_W, DEEP_WORLD_H, DEEP_FLOOR_Y, DEEP_EXIT_Y,
   SHELF_END, FRANCHISE_END, PELAGIC_END,
@@ -1015,6 +1016,7 @@ export function drawDeep(realm) {
 
   // Player
   drawDeepSwimmer(realm);
+  drawAllPeers(realm.camX, realm.camY);
 
   // Overlays
   drawInteractHint(realm);

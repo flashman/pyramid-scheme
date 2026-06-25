@@ -25,6 +25,9 @@ import { loadConfig }             from './game/config.js';
 import { renderPayoutTable }      from './ui/config-editor.js';
 import { openProfile }            from './ui/profile.js';
 import { SoundManager }           from './audio/sound.js';
+import { AstralSession }          from './game/astral.js';
+import { gameSocket }             from './game/ws.js';
+import { initInventoryPanel }     from './ui/inventory-panel.js';
 
 // ── Realms ────────────────────────────────────────────────
 // Realm instances are created in worlds/manifest.js.
@@ -88,31 +91,78 @@ document.addEventListener('keydown', e => {
   SoundManager.resume();
   // Don't forward key events during a realm transition animation.
   if (!RealmManager.isTransitioning) {
-    RealmManager.current.onKeyDown(e.key);
+    // preventDefault on consumed keys so e.g. the 'S' that opens astral chat
+    // isn't also typed into the input it just focused.
+    if (AstralSession.onKeyDown(e.key)) {
+      e.preventDefault();
+    } else {
+      RealmManager.current.onKeyDown(e.key);
+    }
   }
 });
 
-// ── Music: change theme when the active realm changes ─────
-Events.on('realm:enter', ({ id }) => SoundManager.playRealm(id));
+// ── Music + WS channel: fire when active realm changes ────
+Events.on('realm:enter', ({ id }) => {
+  SoundManager.playRealm(id);
+  // Suppress realm_enter during projection — admin is in flop's channel and must stay there.
+  // _activate() sets isActive before transitionTo fires, so this guard is safe.
+  if (G.userId != null && !AstralSession.isActive) {
+    gameSocket.send({ type: 'realm_enter', realm: id, owner_id: G.userId });
+  }
+});
 document.addEventListener('keyup', e => { G.keys[e.key] = false; });
+
+
+// ── Help panel ────────────────────────────────────────────
+function _toggleHelp() {
+  document.getElementById('help-panel')?.classList.toggle('open');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === '`') { e.preventDefault(); _toggleHelp(); return; }
+  if (e.key === 'Escape') {
+    const hp = document.getElementById('help-panel');
+    if (hp?.classList.contains('open')) { hp.classList.remove('open'); e.preventDefault(); }
+  }
+});
 
 // ── Expose UI callbacks referenced by inline HTML handlers ──
 window.buyIn          = buyIn;
 window.recruitFriend  = recruitFriend;
 window.closeModal     = closeModal;
 window.openProfile    = () => openProfile(Api, G, () => window.location.reload());
+window.toggleHelp     = _toggleHelp;
 
 // Expose a quick-mute toggle for the sidebar button (no import needed in HTML)
 window.toggleSound = () => {
   SoundManager.setEnabled(!SoundManager.enabled);
-  const btn = document.getElementById('sound-btn');
-  if (btn) btn.textContent = SoundManager.enabled ? '♪ MUSIC ON' : '✕ MUSIC OFF';
+  const on = SoundManager.enabled;
+  const note  = document.getElementById('sound-note');
+  const glyph = document.getElementById('sound-glyph');
+  if (note)  { note.textContent = on ? '♪' : '✕'; note.classList.toggle('off', !on); }
+  if (glyph) { glyph.classList.toggle('off', !on); }
 };
+
+// ── Header button alignment ───────────────────────────────
+// Pins #hdr-actions right edge to #rp right edge — even when #rp overflows off-screen.
+// Uses getBoundingClientRect() so the 780px canvas border overflow is measured, not guessed.
+// No Math.max clamp: negative right values are intentional (pushes buttons off-screen with #rp).
+function _alignHdrActions() {
+  const rp = document.getElementById('rp');
+  const ha = document.getElementById('hdr-actions');
+  const tb = document.getElementById('title-bar');
+  if (!rp || !ha || !tb) return;
+  // right is relative to title-bar's right edge, not window.innerWidth —
+  // the body may expand past the viewport when game-wrapper overflows.
+  ha.style.right = (tb.getBoundingClientRect().right - rp.getBoundingClientRect().right) + 'px';
+}
+document.fonts.ready.then(_alignHdrActions);
+window.addEventListener('resize', _alignHdrActions);
 
 // ── Game loop ─────────────────────────────────────────────
 function gameLoop(ts) {
-  // Only update the current realm when no transition animation is playing.
-  if (!RealmManager.isTransitioning) {
+  // Only update the current realm when no transition animation is playing
+  // (RealmManager swaps, or the astral warp wipe).
+  if (!RealmManager.isTransitioning && !AstralSession.isWarping) {
     RealmManager.current.update(ts);
   }
 
@@ -126,6 +176,7 @@ function gameLoop(ts) {
   }
   X.clearRect(0, 0, CW, CH);
   RealmManager.current.render();
+  AstralSession.renderOverlay();
 
   // Draw the transition overlay (if any) on top of the current render.
   RealmManager.renderTransition();
@@ -144,6 +195,7 @@ async function init() {
 
   if (token) {
     await new GameSession(token).start();
+    AstralSession.init();
   } else {
     G.isGuest = true;
     log('Playing as guest — progress will not be saved.', '');
@@ -154,6 +206,7 @@ async function init() {
       .catch(() => devPanelSetAuthMode(false));
   }
 
+  initInventoryPanel();
   updateStats();
   updateSlots();
   log('Welcome, future Pharaoh!', 'hi');

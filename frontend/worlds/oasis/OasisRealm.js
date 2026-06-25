@@ -210,8 +210,8 @@ export class OasisRealm extends PhysicsRealm {
     let dx = 0;
     const baseSpeed = inPool ? SPEED * 0.55 : SPEED;
     const speed = G.keys['Shift'] ? baseSpeed * 2 : baseSpeed;
-    if (G.keys['ArrowLeft'] || G.keys['a'] || G.keys['A']) { dx = -speed; this.facing = -1; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  speed; this.facing =  1; }
+    if (G.keys['ArrowLeft'])  { dx = -speed; this.facing = -1; }
+    if (G.keys['ArrowRight']) { dx =  speed; this.facing =  1; }
     this.moving = dx !== 0;
 
     if (dx !== 0) this.px = this._clampX(this.px + dx, SPDHALF);

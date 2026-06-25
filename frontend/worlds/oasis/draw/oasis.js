@@ -10,7 +10,7 @@ import { OASIS_FLOOR,
          PASSAGE_WX,
          POOL_CENTER_WX,
          POOL_DIVE_RANGE }   from '../constants.js';
-import { drawPharaoh }       from '../../../draw/pharaoh.js';
+import { drawPharaoh, drawAllPeers } from '../../../draw/pharaoh.js';
 import { RiddleManager }     from '../riddles.js';
 import { Flags }             from '../../../engine/flags.js';
 
@@ -807,6 +807,7 @@ export function drawOasis(realm) {
     px: realm.px, py: realm.py, camX: camX,
     pZ: 0, facing: realm.facing, frame: realm.frame,
   });
+  drawAllPeers(camX);
 
   drawSphinxHint(realm.px, camX, t);
   drawPassageHint(realm.px, camX, t, riddlesSolved);

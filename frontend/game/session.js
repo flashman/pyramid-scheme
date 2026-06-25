@@ -20,6 +20,7 @@ import { CW }                  from '../engine/canvas.js';
 import { G }                   from './state.js';
 import { Api }                 from './api.js';
 import { gameSocket }          from './ws.js';
+import { RealmManager }        from '../engine/realm.js';
 import { loadConfig }          from './config.js';
 import { addRecruit, restoreRecruits } from './recruits.js';
 import { renderPayoutTable }   from '../ui/config-editor.js';
@@ -75,6 +76,7 @@ export class GameSession {
     if (me.earned       != null) G.earned      = me.earned;
     if (me.bought       != null) G.bought      = me.bought;
     if (me.invites_left != null) G.invitesLeft = me.invites_left;
+    if (me.id       != null)     G.userId      = me.id;
     if (me.username)             G.username    = me.username;
     if (me.offering_code)        G.offeringCode = me.offering_code;
     if (me.flags && typeof me.flags === 'object') {
@@ -147,6 +149,12 @@ export class GameSession {
   _wireWsEvents() {
     gameSocket.connect(this._token);
 
+    // Announce current realm immediately on connect so the server can place us
+    // in a channel right away (realm:enter only fires on transitions, not initial load).
+    Events.on('ws:connected', () => {
+      gameSocket.send({ type: 'realm_enter', realm: RealmManager.currentId, owner_id: G.userId });
+    });
+
     // A real user bought in somewhere in our downline — add their pyramid.
     Events.on('ws:recruit_joined', (evt) => {
       const parentRec = evt.parent_name
@@ -187,5 +195,9 @@ export class GameSession {
         .then(data => { if (data.invites) updateInvitePanel(data.invites); })
         .catch(() => {});
     });
+
+    // Peer presence events are handled in game/astral.js so they can be
+    // gated on session state (preventing stale events from re-populating
+    // PresenceStore after a session ends).
   }
 }

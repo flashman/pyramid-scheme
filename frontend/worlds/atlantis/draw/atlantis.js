@@ -6,6 +6,7 @@
 import { X, CW, CH }   from '../../../engine/canvas.js';
 import { G }            from '../../../game/state.js';
 import { Flags }        from '../../../engine/flags.js';
+import { drawAllPeers } from '../../../draw/pharaoh.js';
 import {
   ATLANTIS_WORLD_W, ATLANTIS_WORLD_H,
   ATLANTIS_FLOOR_Y, ATLANTIS_EXIT_Y,
@@ -2186,6 +2187,7 @@ export function drawAtlantis(realm) {
 
   // 8. Player
   drawSwimmingPharaoh(realm);
+  drawAllPeers(realm.camX, realm.camY);
 
   // 9. Screen-space overlays
   drawChoirWarning(realm, t);

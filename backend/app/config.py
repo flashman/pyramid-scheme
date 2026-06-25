@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     smtp_tls:      bool = False
     smtp_user:     str  = ""
     smtp_password: str  = ""
-    smtp_from:     str  = "no-reply@pyramid-scheme.live"
+    smtp_from:     str  = "pigeon@pyramid-scheme.live"
 
     # Resend HTTPS API key (re_...). Render blocks outbound SMTP, so in
     # production we deliver over https://api.resend.com instead of SMTP.

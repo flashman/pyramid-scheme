@@ -73,8 +73,11 @@ Key files:
 - `app/chain.py` — `run_buyin_chain()` walks the upline and credits ancestors. Shared by real buy-ins (`routers/payments.py`) and the dev sim (`routers/dev.py`). Does NOT commit — caller commits then pushes WS events.
 - `app/payout.py` — `PAYOUT_CONFIG` is the **single source of truth** for all payout math. The frontend fetches it via `GET /api/config`; never duplicate these values in JS.
 - `app/shop.py` — `SHOP_CATALOGUE` is the **single source of truth** for bazaar ware ids/prices (mirrors `payout.py`); served via `GET /api/config`. Never hardcode ware prices in JS. `app/inventory.py` has the inventory helpers; ownership lives in the `inventory` table (**keepsakes only**, qty 1 — consumables are effect-only, never inventoried), and every buy writes a `shop_buy` row to `Transaction` (the DB ledger). **Namespace lock:** `PUT /api/state` strips reserved flag prefixes (`shop_owned_*`) so clients can't forge ownership — keep server-owned state out of the client-settable `flags`.
-- `app/ws.py` — `manager` singleton (`ConnectionManager`). Supports multiple tabs per user. Import `manager` wherever you need to push real-time events.
+- `app/ws.py` — `manager` singleton (`ConnectionManager`). Supports multiple tabs per user. Import `manager` wherever you need to push real-time events. `manager.realm_of(user_id)` resolves a user's current realm from socket metadata (used by astral presence) — don't reach into `manager._conns`/`_meta` directly.
+- `app/channels.py` — `channels` singleton (`ChannelRegistry`). Maps `(owner_id | None, realm_id) → set[WebSocket]` so co-presence (ghost peers, chat, astral projection) is scoped to one realm instance. `(None, realm)` keys are reserved for future shared "system" realms (cantina/ocean).
 - `app/models.py` — `User`, `GameState`, `Invite`, `Recruit`, `Transaction`, `GameEvent`, `Inventory`. `Recruit.meta` (JSON) is patched by the frontend after slot assignment via `PATCH /api/recruits/{id}/meta`.
+
+> **⚠️ Single-instance invariant.** `manager` and `channels` hold all WebSocket / co-presence state in **process memory**. The backend therefore runs as **exactly one web instance** — there is no cross-process fan-out. Consequences: (1) never enable horizontal autoscaling on Render — two instances = split-brain co-presence (users on different instances can't see each other, and a rolling deploy briefly runs two); (2) every deploy / idle spin-down wipes live channels and in-flight projection sessions (clients reconnect and re-`realm_enter`, but an active projection is lost). Scaling past one instance, or building a many-occupant shared realm, requires a pub/sub backplane (Render Key Value / Redis) behind `channels.broadcast` + interest management — see `PYRAMID_SCHEME_TODO.md`.
 
 ## Frontend architecture
 
@@ -123,7 +126,7 @@ onKeyDown(key) {
 }
 ```
 
-Swimming realms (Atlantis, Deep) normalize WASD → arrow keys before calling `handleKey()`. Portals with `key: null` are for graph completeness only (boundary exits handled in `update()`).
+Movement is arrow-keys only (WASD was dropped as redundant; `S` is the astral-chat "speak" key). Portals with `key: null` are for graph completeness only (boundary exits handled in `update()`).
 
 **To add a portal from an existing realm to a new one**: register it in the new realm's constructor with `from: 'existing-realm'` — no edit to the existing realm file required.
 

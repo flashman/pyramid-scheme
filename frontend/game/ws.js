@@ -92,6 +92,12 @@ class GameSocket {
   get isOpen() {
     return this._ws?.readyState === WebSocket.OPEN;
   }
+
+  send(data) {
+    if (this._ws?.readyState === WebSocket.OPEN) {
+      this._ws.send(JSON.stringify(data));
+    }
+  }
 }
 
 // Singleton — import this everywhere you need WS access.

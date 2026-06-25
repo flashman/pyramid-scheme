@@ -645,9 +645,6 @@ export function initDevPanel() {
 
   toggle.onclick = () => isOpen() ? closePanel() : openPanel();
   document.getElementById('dev-close').onclick = closePanel;
-  document.addEventListener('keydown', e => {
-    if (e.key === '`') { isOpen() ? closePanel() : openPanel(); }
-  });
 
   window.addEventListener('flag:change', refreshPanel);
 
@@ -657,5 +654,5 @@ export function initDevPanel() {
     if (isOpen()) refreshPanel();
   };
 
-  log('[DEV] Dev panel loaded. Press ` to toggle.', '');
+  log('[DEV] Dev panel loaded. Use ⚠ DEV button to toggle.', '');
 }

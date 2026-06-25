@@ -6,6 +6,8 @@
 
 import { Flags }           from '../../engine/flags.js';
 import { InAppKeyboard } from '../../ui/in-app-keyboard.js';
+import { Events }           from '../../engine/events.js';
+import { DialogueManager }  from '../../engine/dialogue.js';
 
 // ── Riddle pool ───────────────────────────────────────────
 const RIDDLES = [
@@ -141,6 +143,19 @@ export const RiddleManager = (() => {
     _answerBeforeEl = _answerCursorEl = _answerAfterEl = null;
   }
 
+  // Single exit path for the riddle — used by every close site (Escape,
+  // mobile escape, correct-answer dismiss). Releases the shared #dlg window
+  // (unless astral chat holds the lock) and emits dialogue:end so astral
+  // chat, if active, restores its panel.
+  function _close() {
+    _active = false;
+    _phase  = 'idle';
+    InAppKeyboard.close();
+    const el = document.getElementById('dlg');
+    if (el && !DialogueManager.isLocked()) el.classList.remove('active');
+    Events.emit('dialogue:end', {});
+  }
+
   function _pick() {
     let pool = RIDDLES.filter(r => !_used.has(r.id));
     if (pool.length === 0) { _used.clear(); pool = RIDDLES; }
@@ -177,11 +192,7 @@ export const RiddleManager = (() => {
           if (_input.trim().length > 0) _submit();
         },
         onEscape() {
-          _active = false;
-          _phase  = 'idle';
-          InAppKeyboard.close();
-          const el = document.getElementById('dlg');
-          if (el) el.classList.remove('active');
+          _close();
         },
         onCursor(dir) {
           if (dir === 'left')  _cursorPos = Math.max(0, _cursorPos - 1);
@@ -242,17 +253,15 @@ export const RiddleManager = (() => {
       _respText  = '';
       _attempts  = 0;
       _destroyAnswerRow();
+      // Claim the shared #dlg window — astral chat (if any) yields and buffers.
+      Events.emit('dialogue:start', {});
     },
 
     onKeyDown(key) {
       if (!_active) return false;
 
       if (key === 'Escape') {
-        _active = false;
-        _phase  = 'idle';
-        InAppKeyboard.close();
-        const el = document.getElementById('dlg');
-        if (el) el.classList.remove('active');
+        _close();
         return true;
       }
 
@@ -295,10 +304,7 @@ export const RiddleManager = (() => {
         if (!_typewriterDone()) {
           _typeLen = _currentText().length;
         } else if (key === 'Enter' || key === ' ') {
-          _active = false;
-          _phase  = 'idle';
-          const el = document.getElementById('dlg');
-          if (el) el.classList.remove('active');
+          _close();
         }
         return true;
       }
@@ -308,8 +314,9 @@ export const RiddleManager = (() => {
 
     render() {
       if (!_active) {
+        // Don't strip the panel if astral chat holds the #dlg lock.
         const el = document.getElementById('dlg');
-        if (el) el.classList.remove('active');
+        if (el && !DialogueManager.isLocked()) el.classList.remove('active');
         return;
       }
 

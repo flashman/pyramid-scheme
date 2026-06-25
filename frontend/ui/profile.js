@@ -397,9 +397,12 @@ export function openProfile(Api, G, onLogout) {
     SoundManager.setEnabled(!SoundManager.enabled);
     document.getElementById('prof-sound-toggle').textContent =
       SoundManager.enabled ? '♪ ON' : '✕ OFF';
-    // Keep sidebar button in sync
-    const sideBtn = document.getElementById('sound-btn');
-    if (sideBtn) sideBtn.textContent = SoundManager.enabled ? '♪ MUSIC ON' : '✕ MUSIC OFF';
+    // Keep header sound button in sync
+    const on2 = SoundManager.enabled;
+    const note2  = document.getElementById('sound-note');
+    const glyph2 = document.getElementById('sound-glyph');
+    if (note2)  { note2.textContent = on2 ? '♪' : '✕'; note2.classList.toggle('off', !on2); }
+    if (glyph2) { glyph2.classList.toggle('off', !on2); }
   });
 
   document.getElementById('prof-volume-slider').addEventListener('input', e => {
