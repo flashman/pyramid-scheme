@@ -499,7 +499,6 @@ export class AtlantisRealm extends FreeMoveRealm {
 
     // ── Portal exits ──────────────────────────────────────
     // Conditions use `this` (available here in the constructor).
-    // onKeyDown() normalises WASD → arrow keys before calling handleKey().
     PortalRegistry.register({
       from: 'atlantis', to: 'oasis',
       key: 'ArrowUp',
@@ -842,9 +841,7 @@ export class AtlantisRealm extends FreeMoveRealm {
   onKeyDown(key) {
     if (RealmManager.isTransitioning || this.health.isDying) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
-    // Normalise WASD → arrow keys so portals only need to handle canonical keys.
-    const k = { w: 'ArrowUp', W: 'ArrowUp', s: 'ArrowDown', S: 'ArrowDown' }[key] ?? key;
-    if (PortalRegistry.handleKey(k, 'atlantis', null)) return true;
+    if (PortalRegistry.handleKey(key, 'atlantis', null)) return true;
     if (key === ' ') return this.registry.interact();
     return false;
   }

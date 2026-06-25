@@ -126,7 +126,7 @@ onKeyDown(key) {
 }
 ```
 
-Swimming realms (Atlantis, Deep) normalize WASD → arrow keys before calling `handleKey()`. Portals with `key: null` are for graph completeness only (boundary exits handled in `update()`).
+Movement is arrow-keys only (WASD was dropped as redundant; `S` is the astral-chat "speak" key). Portals with `key: null` are for graph completeness only (boundary exits handled in `update()`).
 
 **To add a portal from an existing realm to a new one**: register it in the new realm's constructor with `from: 'existing-realm'` — no edit to the existing realm file required.
 

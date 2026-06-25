@@ -27,8 +27,8 @@ import { G } from '../game/state.js';
 export function inputDx(baseSpeed) {
   const speed = G.keys['Shift'] ? baseSpeed * 2 : baseSpeed;
   let dx = 0;
-  if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { dx = -speed; G.facing = -1; }
-  if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  speed; G.facing =  1; }
+  if (G.keys['ArrowLeft'])  { dx = -speed; G.facing = -1; }
+  if (G.keys['ArrowRight']) { dx =  speed; G.facing =  1; }
   G.pmoving = dx !== 0;
   return dx;
 }

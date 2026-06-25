@@ -12,7 +12,7 @@ import { G }                        from '../game/state.js';
 import { X, CW, CH }                from '../engine/canvas.js';
 import { COL }                      from '../engine/colors.js';
 import { getTier }                  from '../game/tiers.js';
-import { PresenceStore }            from '../game/presence.js';
+import { PresenceStore, PEER_FADE_MS } from '../game/presence.js';
 
 export function drawPharaoh(pose) {
   const p = pose || {
@@ -26,8 +26,19 @@ export function drawPharaoh(pose) {
   const bob = Math.sin(Date.now() / 600) * 1.5;
   const dir = p.facing;
   const fr  = p.frame;
+  const ghost = !!G.astralProjecting;   // you've left your body — render yourself spectral
 
   X.save();
+
+  // While projecting, the local player is a gold spirit: an aura, plus a tint +
+  // transparency applied to the body (the filter affects only the body draw).
+  if (ghost) {
+    const acx = sx + 16;
+    const acy = p.pZ === -1 ? (CH - 32 - 38) : Math.round(p.py - 24 + bob);
+    _spectralAura(acx, acy);
+    X.globalAlpha = 0.62;
+    X.filter = 'sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.12)';
+  }
 
   if (p.pZ === -1) {
     const scale = 1.4;
@@ -63,7 +74,9 @@ export function drawPharaoh(pose) {
   if (G.speakT <= 0) G.speech = null;
 }
 
-export function _drawBody(bx, sy, fr) {
+// showCrook defaults to the LOCAL player's tier. Peers pass false explicitly —
+// a ghost must not sprout the viewer's PHARAOH regalia (the old getTier() bug).
+export function _drawBody(bx, sy, fr, showCrook = getTier().name === 'PHARAOH') {
   X.fillStyle = COL.WHITE;
   X.fillRect(bx + 8,  sy + 34, 6, 14);
   X.fillRect(bx + 18, sy + 34 + (fr ? -2 : 0), 6, 14);
@@ -78,7 +91,7 @@ export function _drawBody(bx, sy, fr) {
   X.fillRect(bx + 4, sy + 6, 6, 14);
   X.fillRect(bx + 22, sy + 6, 6, 14);
   X.fillStyle = COL.GOLD; X.fillRect(bx + 7, sy, 18, 3);
-  if (getTier().name === 'PHARAOH') {
+  if (showCrook) {
     X.fillStyle = COL.GOLD;
     X.fillRect(bx + 24, sy + 16, 3, 20);
     X.fillRect(bx + 24, sy + 16, 10, 3);
@@ -111,7 +124,26 @@ export function drawRealmPharaoh(realm) {
   if (pose) drawPharaoh(pose);
 }
 
-// Renders a peer's ghost pharaoh at 0.55 opacity with a floating username label.
+// A steady scarab-gold glow centred on (cx, cy). Used for the local player's
+// own spectral look while projecting (no materialise/fade ramps — just a pulse).
+function _spectralAura(cx, cy) {
+  const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 600 * 1.6);
+  const r = 26 + pulse * 3;
+  const g = X.createRadialGradient(cx, cy, 2, cx, cy, r);
+  g.addColorStop(0,   'rgba(240,224,64,0.22)');
+  g.addColorStop(0.5, 'rgba(240,192,32,0.10)');
+  g.addColorStop(1,   'rgba(240,192,32,0)');
+  X.save();
+  X.fillStyle = g;
+  X.fillRect(cx - r, cy - r, r * 2, r * 2);
+  X.restore();
+}
+
+const MATERIALISE_MS = 600;
+
+// Renders a peer with a floating username label. A peer who is astral-projecting
+// (peer.isProjector) is the only ghost — drawn spectral/scarab-gold; everyone
+// else is in their own body and renders fully solid. Both fade in/out smoothly.
 // camY is 0 for all non-free-move realms (Y handled by canvas pre-translate or camY=0).
 export function drawPeerPharaoh(peer, camX, camY = 0) {
   const sx  = Math.round(peer.px - camX);
@@ -119,18 +151,61 @@ export function drawPeerPharaoh(peer, camX, camY = 0) {
   const bob = Math.sin(Date.now() / 600) * 1.5;
   const dir = peer.facing ?? 1;
   const fr  = peer.frame  ?? 0;
+  const isGhost = !!peer.isProjector;   // only out-of-body projectors are spectral
+
+  const now = Date.now();
+
+  // Materialisation: ramp 0→1 over MATERIALISE_MS after first sighting.
+  const inRamp = Math.max(0, Math.min(1, (now - (peer._spawnT ?? 0)) / MATERIALISE_MS));
+  const matIn  = inRamp * inRamp * (3 - 2 * inRamp);   // smoothstep
+
+  // De-materialisation: once leaving, ramp the whole ghost back down to nothing.
+  let leaveProg = 0;
+  if (peer._leaveT != null) {
+    const lr  = Math.min(1, (now - peer._leaveT) / PEER_FADE_MS);
+    leaveProg = lr * lr * (3 - 2 * lr);                // smoothstep
+  }
+  const ease = matIn * (1 - leaveProg);   // overall visibility 0..1
+  const t    = now / 600;
+
+  const cx = sx + 16;          // sprite centre (same for both facings)
+  const cy = sy + bob + 24;
 
   X.save();
-  X.globalAlpha = 0.55;
+
+  if (isGhost) {
+    // ── Spectral aura — a gold radial glow. Blooms bright at spawn (announcing
+    //    the arrival), expands and dissipates on departure, else a faint pulse. ──
+    const bloom   = 1 - matIn;
+    const pulse   = 0.5 + 0.5 * Math.sin(t * 1.6);
+    const auraR   = 24 + bloom * 22 + pulse * 3 + leaveProg * 16;   // expands as it leaves
+    const auraVis = 1 - leaveProg;                                  // fades on departure
+    const aura    = X.createRadialGradient(cx, cy, 2, cx, cy, auraR);
+    aura.addColorStop(0,   `rgba(240,224,64,${(0.16 + bloom * 0.46) * auraVis})`);
+    aura.addColorStop(0.5, `rgba(240,192,32,${(0.07 + bloom * 0.24) * auraVis})`);
+    aura.addColorStop(1,   'rgba(240,192,32,0)');
+    X.fillStyle = aura;
+    X.fillRect(cx - auraR, cy - auraR, auraR * 2, auraR * 2);
+
+    // The ghost body — translucent and washed warm gold (the filter tints ONLY
+    // the body draw, not the scene; harmlessly ignored where unsupported).
+    X.globalAlpha = 0.55 * ease;
+    X.filter = 'sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.12)';
+  } else {
+    // Fully real — they're in their own body. Solid, normal colours; the alpha
+    // ramp only smooths the appear/disappear, settling at full opacity.
+    X.globalAlpha = ease;
+  }
+
   if (dir === -1) { X.translate(sx + 16, 0); X.scale(-1, 1); }
   const bx = dir === -1 ? 0 : sx;
-  _drawBody(bx, sy + bob, fr);
-  X.restore();
+  _drawBody(bx, sy + bob, fr, false);   // peers never show the viewer's regalia
+  X.restore();   // resets globalAlpha, transform, AND filter
 
-  // Floating username label above the ghost
+  // Floating username label above the ghost (fades in with the body)
   if (peer.username) {
     X.save();
-    X.globalAlpha = 0.75;
+    X.globalAlpha = 0.75 * ease;
     X.font = '5px monospace';
     X.textAlign = 'center';
     const labelY = sy + bob - 6;

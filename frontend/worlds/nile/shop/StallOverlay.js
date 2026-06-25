@@ -7,6 +7,7 @@
 
 import { X, CW, CH }        from '../../../engine/canvas.js';
 import { G }                from '../../../game/state.js';
+import { Events }           from '../../../engine/events.js';
 import { Api }              from '../../../game/api.js';
 import { loadConfig, getShop, shopLoaded } from '../../../game/config.js';
 import { WARES, GENERIC_RETORTS, WARE_RETORTS, POOR_RETORTS, OWNED_RETORTS } from './catalogue.js';
@@ -48,6 +49,8 @@ export class StallOverlay {
 
   async open() {
     this._open = true;
+    // Claim the shared #dlg window — astral chat (if any) yields and buffers.
+    Events.emit('dialogue:start', {});
     this._sel  = 0;
     this._typeFull = '';
     this._welcomed = false;
@@ -65,6 +68,8 @@ export class StallOverlay {
     this._open = false;
     const dlg = document.getElementById('dlg');   // release the shared dialogue window
     if (dlg) dlg.classList.remove('active');
+    // Release the #dlg window — astral chat (if any) restores its panel.
+    Events.emit('dialogue:end', {});
   }
 
   onKeyDown(key) {
@@ -72,10 +77,10 @@ export class StallOverlay {
     if (key === 'Escape' || key === 'q' || key === 'Q') { this.close(); return true; }
     this._welcomed = true;     // first interaction hands off from the welcome to item pitches
     const n = WARES.length;
-    if (key === 'ArrowRight' || key === 'd' || key === 'D') { this._sel = (this._sel + 1) % n; return true; }
-    if (key === 'ArrowLeft'  || key === 'a' || key === 'A') { this._sel = (this._sel - 1 + n) % n; return true; }
-    if (key === 'ArrowDown'  || key === 's' || key === 'S') { this._sel = Math.min(n - 1, this._sel + PER_ROW); return true; }
-    if (key === 'ArrowUp'    || key === 'w' || key === 'W') { this._sel = Math.max(0, this._sel - PER_ROW); return true; }
+    if (key === 'ArrowRight') { this._sel = (this._sel + 1) % n; return true; }
+    if (key === 'ArrowLeft')  { this._sel = (this._sel - 1 + n) % n; return true; }
+    if (key === 'ArrowDown')  { this._sel = Math.min(n - 1, this._sel + PER_ROW); return true; }
+    if (key === 'ArrowUp')    { this._sel = Math.max(0, this._sel - PER_ROW); return true; }
     if (key === ' ' || key === 'Enter' || key === 'z' || key === 'Z') {
       const ware = WARES[this._sel];
       if (ware) purchase(ware.id).then(r => {

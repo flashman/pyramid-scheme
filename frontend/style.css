@@ -75,6 +75,7 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 #lb{max-height:100px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--gold-dim) var(--bg-panel)}
 .le{color:var(--tan);font-size:5px;padding:2px 0;line-height:1.5;border-bottom:1px solid var(--bg-input);animation:fi2 .3s}
 .le.hi{color:var(--gold)}.le.mo{color:var(--green)}
+.le.mystic{color:var(--gold-bright,#f0e040);text-shadow:0 0 3px rgba(240,192,32,.55)}
 @keyframes fi2{from{opacity:0}to{opacity:1}}
 .ss{width:26px;height:26px;border:2px solid var(--border-slot);background:var(--bg-slot);display:flex;align-items:center;justify-content:center;font-size:13px}
 .ss.av{border-color:var(--gold-dim);background:var(--bg-slot-active);box-shadow:0 0 4px rgba(200,160,32,.4)}
@@ -95,7 +96,7 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 #help-panel.open{display:flex}
 #help-inner{background:#0d0800;border:2px solid var(--gold-dim);padding:22px 24px 18px;position:relative;width:min(340px,100%);max-height:90vh;overflow-y:auto;box-sizing:border-box;box-shadow:0 0 60px #ff600028}
 #help-title{color:var(--gold);font-size:11px;letter-spacing:3px;text-align:center;margin-bottom:16px}
-#help-close{position:absolute;top:0;right:0;padding:4px 8px;font:700 10px/1 monospace;background:none;border:none;color:#5a3a10;cursor:pointer}
+#help-close{position:absolute;top:0;right:0;padding:6px 10px;font:700 13px/1 monospace;background:none;border:none;color:var(--gold-dim);cursor:pointer}
 #help-close:hover{color:var(--gold)}
 .help-section{border-top:1px solid #2a1800;padding-top:10px;margin-top:10px}
 .help-section-title{color:var(--tan-muted);font-size:6px;letter-spacing:2px;margin-bottom:8px}

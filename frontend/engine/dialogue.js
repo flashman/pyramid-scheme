@@ -87,8 +87,11 @@ export const DialogueManager = (() => {
     isActive() { return _active; },
 
     // Called by AstralSession to prevent per-frame #dlg class removal while showing chat.
+    // Other #dlg renderers (riddles, shop) check isLocked() so they don't strip the
+    // panel out from under an active astral chat session.
     lockDlg()   { _locked = true; },
     unlockDlg() { _locked = false; },
+    isLocked()  { return _locked; },
 
     update() {
       if (!_active || !_node) return;

@@ -19,6 +19,9 @@ export const G = {
   facing: 1,
   pframe: 0, pmoving: false,
 
+  // True while astral-projecting — the local player renders as a spectral ghost.
+  astralProjecting: false,
+
   // Shared leg-animation timer.
   legT: 0,
 

@@ -448,7 +448,6 @@ export class DeepRealm extends FreeMoveRealm {
     this._zoneLogged = { shelf: false, franchise: false, pelagic: false, abyss: false };
 
     // ── Portal exits ──────────────────────────────────────
-    // onKeyDown() normalises WASD → arrow keys before calling handleKey().
     PortalRegistry.register({
       from: 'deep', to: 'atlantis',
       key: 'ArrowUp',
@@ -668,9 +667,7 @@ export class DeepRealm extends FreeMoveRealm {
   onKeyDown(key) {
     if (RealmManager.isTransitioning || this.health.isDying) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
-    // Normalise WASD → arrow keys so portals only need to handle canonical keys.
-    const k = { w: 'ArrowUp', W: 'ArrowUp', s: 'ArrowDown', S: 'ArrowDown' }[key] ?? key;
-    if (PortalRegistry.handleKey(k, 'deep', null)) return true;
+    if (PortalRegistry.handleKey(key, 'deep', null)) return true;
     if (key === ' ') return this.registry.interact();
     return false;
   }

@@ -234,8 +234,8 @@ export class NileRealm extends PhysicsRealm {
     if (feetInWater) {
       // Swim: reduced control, no sprint; the current dominates.
       let sdx = 0;
-      if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { sdx = -SWIM_SPD; G.facing = -1; }
-      if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { sdx =  SWIM_SPD; G.facing =  1; }
+      if (G.keys['ArrowLeft'])  { sdx = -SWIM_SPD; G.facing = -1; }
+      if (G.keys['ArrowRight']) { sdx =  SWIM_SPD; G.facing =  1; }
       G.pmoving = sdx !== 0;
       // Firm current everywhere except the Delta, where the river spreads and
       // slows so you can wade freely toward the boat. Also no push mid-jump-launch.

@@ -78,8 +78,8 @@ export class FlatRealm extends Realm {
   _walkStep(ts) {
     const speed = G.keys['Shift'] ? SPEED * 2 : SPEED;
     let dx = 0;
-    if (G.keys['ArrowLeft']  || G.keys['a'] || G.keys['A']) { dx = -speed; this.facing = -1; }
-    if (G.keys['ArrowRight'] || G.keys['d'] || G.keys['D']) { dx =  speed; this.facing =  1; }
+    if (G.keys['ArrowLeft'])  { dx = -speed; this.facing = -1; }
+    if (G.keys['ArrowRight']) { dx =  speed; this.facing =  1; }
     this.moving = dx !== 0;
     if (dx !== 0) {
       this.px = Math.max(this._minX, Math.min(this._maxX, this.px + dx));

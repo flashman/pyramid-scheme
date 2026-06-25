@@ -42,7 +42,7 @@
 //     }
 //
 //     onKeyDown(key) {
-//       if (this._aboveSurface() && (key === 'ArrowUp' || key === 'w' || key === 'W')) {
+//       if (this._aboveSurface() && key === 'ArrowUp') {
 //         RealmManager.scheduleTransition('oasis', { ... });
 //         return true;
 //       }
@@ -151,10 +151,10 @@ export class FreeMoveRealm extends Realm {
     this.pvy += p.yDrift;
 
     // ── Input ─────────────────────────────────────────────────────────────
-    if (keys['ArrowLeft']  || keys['a'] || keys['A']) { this.pvx -= p.acc; G.facing = -1; }
-    if (keys['ArrowRight'] || keys['d'] || keys['D']) { this.pvx += p.acc; G.facing =  1; }
-    if (keys['ArrowUp']    || keys['w'] || keys['W'])   this.pvy -= p.acc;
-    if (keys['ArrowDown']  || keys['s'] || keys['S'])   this.pvy += p.acc;
+    if (keys['ArrowLeft'])  { this.pvx -= p.acc; G.facing = -1; }
+    if (keys['ArrowRight']) { this.pvx += p.acc; G.facing =  1; }
+    if (keys['ArrowUp'])      this.pvy -= p.acc;
+    if (keys['ArrowDown'])    this.pvy += p.acc;
 
     // ── Drag ──────────────────────────────────────────────────────────────
     this.pvx *= p.drag;

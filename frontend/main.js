@@ -91,7 +91,11 @@ document.addEventListener('keydown', e => {
   SoundManager.resume();
   // Don't forward key events during a realm transition animation.
   if (!RealmManager.isTransitioning) {
-    if (!AstralSession.onKeyDown(e.key)) {
+    // preventDefault on consumed keys so e.g. the 'S' that opens astral chat
+    // isn't also typed into the input it just focused.
+    if (AstralSession.onKeyDown(e.key)) {
+      e.preventDefault();
+    } else {
       RealmManager.current.onKeyDown(e.key);
     }
   }
@@ -156,8 +160,9 @@ window.addEventListener('resize', _alignHdrActions);
 
 // ── Game loop ─────────────────────────────────────────────
 function gameLoop(ts) {
-  // Only update the current realm when no transition animation is playing.
-  if (!RealmManager.isTransitioning) {
+  // Only update the current realm when no transition animation is playing
+  // (RealmManager swaps, or the astral warp wipe).
+  if (!RealmManager.isTransitioning && !AstralSession.isWarping) {
     RealmManager.current.update(ts);
   }
 
