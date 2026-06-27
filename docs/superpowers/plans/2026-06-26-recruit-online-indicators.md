@@ -197,8 +197,10 @@ The behavioral core. A new `app/presence.py` owns the recruiter lookup and the p
 **Interfaces:**
 - Consumes: `manager.is_connected`, `manager.connect`, `manager.disconnect`, `manager.send_to_user` (`app/ws.py`); `Recruit` model.
 - Produces:
-  - `async def direct_recruiter_id(db: AsyncSession, user_id: int) -> int | None`
-  - `async def notify_presence(user_id: int, online: bool) -> None` — opens its own `AsyncSessionLocal`, looks up the direct recruiter, pushes `{"type": "recruit_presence", "user_id": user_id, "online": online}` to them if found.
+  - `async def direct_recruiter_id(db: AsyncSession, user_id: int) -> int | None` — `.limit(1)` so a rebought recruit (multiple `depth=1` rows, all with the same `recruiter_id`) never raises.
+  - `async def notify_presence(user_id: int, online: bool) -> None` — opens its own `AsyncSessionLocal`, looks up the direct recruiter, pushes `{"type": "recruit_presence", "user_id": user_id, "online": online}` to them if found. **Best-effort: swallows + logs any exception** so presence can never drop a socket.
+  - `async def on_socket_connect(user_id: int, ws) -> None` — owns the offline→online transition decision; `ws.py` delegates to it instead of calling `manager.connect` directly.
+  - `async def on_socket_disconnect(user_id: int, ws) -> None` — owns the online→offline transition decision.
   - WS event `recruit_presence {user_id: int, online: bool}` delivered to the recruiter.
 
 - [ ] **Step 1: Write the failing test**
@@ -279,13 +281,15 @@ logger = logging.getLogger(__name__)
 async def direct_recruiter_id(db: AsyncSession, user_id: int) -> int | None:
     """The user_id of this user's direct (depth=1) recruiter, or None.
 
-    A user has exactly one depth-1 recruiter row keyed on recruit_id, so this
-    is a single indexed lookup (ix_recruits_recruit_id)."""
+    A buy-in inserts a fresh depth=1 Recruit row each time (chain.py), so a
+    rebought recruit has several depth=1 rows — all carrying the same
+    recruiter_id. limit(1) keeps this a safe single indexed lookup
+    (ix_recruits_recruit_id) instead of raising MultipleResultsFound."""
     return (await db.execute(
         select(Recruit.recruiter_id).where(
             Recruit.recruit_id == user_id,
             Recruit.depth      == 1,
-        )
+        ).limit(1)
     )).scalar_one_or_none()
 
 
@@ -293,14 +297,38 @@ async def notify_presence(user_id: int, online: bool) -> None:
     """Push a recruit_presence event to user_id's direct recruiter, if any.
 
     Opens its own short-lived session — called from the WS connect/disconnect
-    path, which holds no DB session. No-op when the user has no recruiter."""
-    async with AsyncSessionLocal() as db:
-        recruiter_id = await direct_recruiter_id(db, user_id)
-    if recruiter_id is None:
-        return
-    await manager.send_to_user(recruiter_id, {
-        "type": "recruit_presence", "user_id": user_id, "online": online,
-    })
+    path, which holds no DB session. No-op when the user has no recruiter.
+    Best-effort: presence is non-critical, so any failure is logged and
+    swallowed rather than allowed to drop the user's socket."""
+    try:
+        async with AsyncSessionLocal() as db:
+            recruiter_id = await direct_recruiter_id(db, user_id)
+        if recruiter_id is None:
+            return
+        await manager.send_to_user(recruiter_id, {
+            "type": "recruit_presence", "user_id": user_id, "online": online,
+        })
+    except Exception:
+        logger.exception("notify_presence failed for user_id=%s", user_id)
+
+
+async def on_socket_connect(user_id: int, ws) -> None:
+    """Accept the socket and push 'online' only on the offline→online edge.
+
+    Capturing is_connected BEFORE manager.connect is what makes multi-tab
+    correct: the 2nd+ tab finds the user already online and pushes nothing."""
+    was_online = manager.is_connected(user_id)
+    await manager.connect(user_id, ws)
+    if not was_online:
+        await notify_presence(user_id, online=True)
+
+
+async def on_socket_disconnect(user_id: int, ws) -> None:
+    """Drop the socket and push 'offline' only on the online→offline edge
+    (i.e. the user's last remaining tab just closed)."""
+    manager.disconnect(user_id, ws)
+    if not manager.is_connected(user_id):
+        await notify_presence(user_id, online=False)
 ```
 
 - [ ] **Step 4: Run module tests to verify they pass**
@@ -313,16 +341,13 @@ Expected: PASS (4 tests).
 In `backend/app/routers/ws.py`, add the import near the existing `from app.ws import manager`:
 
 ```python
-from app.presence import notify_presence
+from app.presence import on_socket_connect, on_socket_disconnect
 ```
 
-Then in `websocket_endpoint`, replace the single `await manager.connect(user_id, ws)` line (around line 64) with a transition-guarded version:
+Then in `websocket_endpoint`, replace the single `await manager.connect(user_id, ws)` line (around line 64) with the delegated call (the transition decision now lives in `presence.py`, keeping this router thin):
 
 ```python
-    was_online = manager.is_connected(user_id)   # capture BEFORE connect
-    await manager.connect(user_id, ws)
-    if not was_online:                            # offline → online (first socket)
-        await notify_presence(user_id, online=True)
+    await on_socket_connect(user_id, ws)
 ```
 
 - [ ] **Step 6: Wire the disconnect transition**
@@ -330,9 +355,7 @@ Then in `websocket_endpoint`, replace the single `await manager.connect(user_id,
 In `_handle_disconnect` (around line 327), replace the final `manager.disconnect(user_id, ws)` with:
 
 ```python
-    manager.disconnect(user_id, ws)
-    if not manager.is_connected(user_id):         # online → offline (last socket)
-        await notify_presence(user_id, online=False)
+    await on_socket_disconnect(user_id, ws)
 ```
 
 - [ ] **Step 7: Write the transition test**
@@ -343,8 +366,10 @@ Append to `backend/tests/test_recruit_presence.py`:
 # ── connect/disconnect transitions (multi-tab) ───────────────────────────
 
 async def test_presence_push_only_on_first_connect_and_last_disconnect():
-    """Two tabs: first connect pushes online; closing one pushes nothing;
+    """Drives the REAL on_socket_connect/on_socket_disconnect against a fresh
+    manager. Two tabs: first connect pushes online; closing one pushes nothing;
     closing the last pushes offline."""
+    from app import presence
     from app.ws import ConnectionManager
     from unittest.mock import MagicMock
 
@@ -354,28 +379,32 @@ async def test_presence_push_only_on_first_connect_and_last_disconnect():
     async def fake_notify(user_id, online):
         pushes.append((user_id, online))
 
-    # Simulate the ws.py transition logic against a real manager + two fake sockets.
     ws1, ws2 = MagicMock(name="ws1"), MagicMock(name="ws2")
     for s in (ws1, ws2):
         s.accept = AsyncMock()
 
-    async def connect(uid, ws):
-        was = mgr.is_connected(uid)
-        await mgr.connect(uid, ws)
-        if not was:
-            await fake_notify(uid, True)
-
-    async def disconnect(uid, ws):
-        mgr.disconnect(uid, ws)
-        if not mgr.is_connected(uid):
-            await fake_notify(uid, False)
-
-    await connect(7, ws1)      # online push
-    await connect(7, ws2)      # no push (already online)
-    await disconnect(7, ws1)   # no push (still has ws2)
-    await disconnect(7, ws2)   # offline push
+    # Patch the module globals the transition fns look up at call time.
+    with patch.object(presence, "manager", mgr), \
+         patch.object(presence, "notify_presence", fake_notify):
+        await presence.on_socket_connect(7, ws1)      # online push
+        await presence.on_socket_connect(7, ws2)      # no push (already online)
+        await presence.on_socket_disconnect(7, ws1)   # no push (still has ws2)
+        await presence.on_socket_disconnect(7, ws2)   # offline push
 
     assert pushes == [(7, True), (7, False)]
+
+
+async def test_direct_recruiter_id_survives_rebuy_duplicate_rows():
+    """A rebought recruit has multiple depth=1 rows (chain.py inserts one per
+    buy-in), all with the same recruiter_id. limit(1) must not raise."""
+    from app.presence import direct_recruiter_id
+    alice_id, bob_id = await _make_pair()
+    async with TestingSessionLocal() as db:
+        db.add(Recruit(recruiter_id=alice_id, recruit_id=bob_id,
+                       recruit_name="bob", parent_name="alice", depth=1, payout=5.0))
+        await db.commit()
+    async with TestingSessionLocal() as db:
+        assert await direct_recruiter_id(db, bob_id) == alice_id
 ```
 
 - [ ] **Step 8: Run the full file + sanity-check the WS suite still passes**
