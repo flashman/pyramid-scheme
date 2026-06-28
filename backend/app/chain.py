@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, GameState, Recruit, Transaction
 from app.payout import payout_at_depth, max_pay_depth
+from app.ws import manager
 
 
 async def run_buyin_chain(
@@ -93,6 +94,8 @@ async def run_buyin_chain(
             "payout":        payout,
             "db_recruit_id": recruit_row.id,
             "parent_name":   parent_name,
+            "user_id":       buyer_user_id,
+            "online":        manager.is_connected(buyer_user_id) if buyer_user_id else False,
         }))
 
         chain_usernames.append(ancestor.username)

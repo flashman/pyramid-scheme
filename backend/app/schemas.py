@@ -104,6 +104,7 @@ class InviteListResponse(BaseModel):
 
 class RecruitResponse(BaseModel):
     id:          int
+    user_id:     int | None = None
     name:        str
     depth:       int
     payout:      float

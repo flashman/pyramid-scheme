@@ -117,8 +117,9 @@ async def list_recruits(
     rows = result.scalars().all()
     return RecruitListResponse(recruits=[
         RecruitResponse(
-            id=r.id, name=r.recruit_name, depth=r.depth, payout=r.payout,
-            parent_name=r.parent_name, meta=r.meta or {}, created_at=r.created_at,
+            id=r.id, user_id=r.recruit_id, name=r.recruit_name, depth=r.depth,
+            payout=r.payout, parent_name=r.parent_name, meta=r.meta or {},
+            created_at=r.created_at,
         )
         for r in rows
     ])
