@@ -21,6 +21,7 @@ from app.auth import decode_token
 from app.database import AsyncSessionLocal
 from app.models import Recruit, Inventory, User
 from app.ws import manager
+from app.presence import on_socket_connect, on_socket_disconnect
 from app.channels import channels
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
         await ws.close(code=4001)
         return
 
-    await manager.connect(user_id, ws)
+    await on_socket_connect(user_id, ws)
     manager.set_meta(ws, user_id=user_id, username=username,
                      channel_key=None, px=0, py=0, pZ=0,
                      facing=1, frame=0, projection_session=None)
@@ -324,4 +325,4 @@ async def _handle_disconnect(ws: WebSocket, user_id: int, username: str):
     if key:
         await channels.broadcast(key, {"type": "peer_left", "username": username})
         channels.leave(ws)
-    manager.disconnect(user_id, ws)
+    await on_socket_disconnect(user_id, ws)
