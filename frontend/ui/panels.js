@@ -7,6 +7,7 @@ import { G }          from '../game/state.js';
 import { COL }        from '../engine/colors.js';
 import { depthHex }   from '../draw/utils.js';
 import { getTier }    from '../game/tiers.js';
+import { RecruitPresence } from '../game/recruit-presence.js';
 
 /** Refreshes the empire stats block (invested, earned, net, recruits, layers, depth breakdown). */
 export function updateStats() {
@@ -68,10 +69,16 @@ export function addFriendUI(rec) {
   document.getElementById('nf').style.display='none';
   const list = document.getElementById('fl');
   const col  = depthHex(rec.depth);
+  const showDot = rec.depth === 1 && rec.userId != null;
   const d = document.createElement('div');
   d.className='fe';
+  if (showDot) d.dataset.uid = String(rec.userId);
+  const dot = showDot
+    ? `<span class="fo${RecruitPresence.isOnline(rec.userId) ? ' on' : ''}"></span>`
+    : '';
   d.innerHTML=`<canvas class="fi" width="10" height="10" id="fi${rec.id}"></canvas>
     <span class="fn" style="color:${col}">${rec.name}</span>
+    ${dot}
     <span class="fs" style="color:${col}">D${rec.depth}</span>`;
   list.prepend(d);
   setTimeout(()=>{

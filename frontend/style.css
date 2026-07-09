@@ -148,3 +148,8 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 #dlg-hint{color:var(--gold-dim);font-size:5px;text-align:right;margin-top:4px;min-height:14px}
 .kb-cursor{animation:kb-cursor-blink 1s step-end infinite}
 @keyframes kb-cursor-blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* Direct-recruit online indicator (follower-list cards) */
+.fo{display:inline-block;width:5px;height:5px;border-radius:50%;
+    background:#553a2a;margin:0 3px;vertical-align:middle;flex:0 0 auto;}
+.fo.on{background:#40d080;box-shadow:0 0 3px #40d080;}

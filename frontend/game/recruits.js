@@ -109,6 +109,7 @@ export function addRecruit(name, depth, parentRec, opts = {}) {
     parentName: parentRec ? parentRec.name : null,
     payoutToPlayer: payout,
     dbId: opts.dbId || null,   // set for real server-created recruits
+    userId: opts.userId ?? null,   // real User.id for depth-1 real recruits; null for sims
   };
   G.recruits.push(rec);
   G.earned += payout;
@@ -327,6 +328,7 @@ export function restoreRecruits(serverRecruits) {
         const rec = {
           id: sr.id, name, depth: 1, pid: newPid, rootPid: newPid,
           zLayer: 0, wx: newWx, parentName, payoutToPlayer: payout,
+          userId: sr.user_id ?? null,
         };
         G.recruits.push(rec);
         addFriendUI(rec);
@@ -336,7 +338,8 @@ export function restoreRecruits(serverRecruits) {
       } else {
         // Depth > 1: can't place pyramid without parent context, but credit the player layer.
         addLayer('player', depth, name);
-        const rec = { id: sr.id, name, depth, pid: null, wx: null, parentName, payoutToPlayer: payout };
+        const rec = { id: sr.id, name, depth, pid: null, wx: null, parentName,
+                      payoutToPlayer: payout, userId: sr.user_id ?? null };
         G.recruits.push(rec);
         addFriendUI(rec);
       }
@@ -370,6 +373,7 @@ export function restoreRecruits(serverRecruits) {
       wx,
       parentName,
       payoutToPlayer: payout,
+      userId:        sr.user_id ?? null,
     };
     G.recruits.push(rec);
 
