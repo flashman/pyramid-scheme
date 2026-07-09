@@ -9,6 +9,10 @@ import { depthHex }   from '../draw/utils.js';
 import { getTier }    from '../game/tiers.js';
 import { RecruitPresence } from '../game/recruit-presence.js';
 
+// Online-indicator flame (Lucide "flame" glyph) — currentColor fill so
+// .fo/.fo.on can still toggle it with a plain CSS class swap.
+const FLAME_SVG = `<svg viewBox="0 0 24 24" width="8" height="8"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/></svg>`;
+
 /** Refreshes the empire stats block (invested, earned, net, recruits, layers, depth breakdown). */
 export function updateStats() {
   const net = G.earned - G.invested;
@@ -74,7 +78,7 @@ export function addFriendUI(rec) {
   d.className='fe';
   if (showDot) d.dataset.uid = String(rec.userId);
   const dot = showDot
-    ? `<span class="fo${RecruitPresence.isOnline(rec.userId) ? ' on' : ''}"></span>`
+    ? `<span class="fo${RecruitPresence.isOnline(rec.userId) ? ' on' : ''}">${FLAME_SVG}</span>`
     : '';
   d.innerHTML=`<canvas class="fi" width="10" height="10" id="fi${rec.id}"></canvas>
     <span class="fn" style="color:${col}">${rec.name}</span>

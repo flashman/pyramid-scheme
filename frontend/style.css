@@ -149,7 +149,10 @@ canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);
 .kb-cursor{animation:kb-cursor-blink 1s step-end infinite}
 @keyframes kb-cursor-blink{0%,100%{opacity:1}50%{opacity:0}}
 
-/* Direct-recruit online indicator (follower-list cards) */
-.fo{display:inline-block;width:5px;height:5px;border-radius:50%;
-    background:#553a2a;margin:0 3px;vertical-align:middle;flex:0 0 auto;}
-.fo.on{background:#40d080;box-shadow:0 0 3px #40d080;}
+/* Direct-recruit online indicator (follower-list cards) — an inline SVG
+   flame, snuffed grey when offline, lit gold/amber (+ glow) when online.
+   Colored via currentColor so it's still a plain two-class toggle. */
+.fo{display:inline-block;width:8px;height:8px;color:#4a3528;
+    margin:0 3px;vertical-align:middle;flex:0 0 auto;}
+.fo svg{display:block;}
+.fo.on{color:#f0a020;filter:drop-shadow(0 0 2px #f0a020);}
