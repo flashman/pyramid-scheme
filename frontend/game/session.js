@@ -23,6 +23,7 @@ import { gameSocket }          from './ws.js';
 import { RealmManager }        from '../engine/realm.js';
 import { loadConfig }          from './config.js';
 import { addRecruit, restoreRecruits } from './recruits.js';
+import { RecruitPresence }     from './recruit-presence.js';
 import { renderPayoutTable }   from '../ui/config-editor.js';
 import { updateStats, updateSlots, log, updateInvitePanel } from '../ui/panels.js';
 import { devPanelSetAuthMode } from '../ui/dev-panel.js';
@@ -114,6 +115,12 @@ export class GameSession {
         if (!Flags.get('first_scroll_sent')) Flags.set('first_scroll_sent', true);
       }
     }
+
+    // Seed direct-recruit online dots from the presence endpoint. Best-effort:
+    // a failure just leaves dots in their default (offline) state.
+    Api.get('/api/astral/downline')
+      .then(data => RecruitPresence.seed(data?.downline || []))
+      .catch(() => {});
   }
 
   // ── State sync ───────────────────────────────────────────
@@ -160,7 +167,8 @@ export class GameSession {
       const parentRec = evt.parent_name
         ? G.recruits.find(r => r.name === evt.parent_name)
         : null;
-      addRecruit(evt.name, evt.depth, parentRec, { dbId: evt.db_recruit_id });
+      addRecruit(evt.name, evt.depth, parentRec, { dbId: evt.db_recruit_id, userId: evt.user_id });
+      if (evt.user_id != null) RecruitPresence.set(evt.user_id, !!evt.online);
 
       const simLog = document.getElementById('dev-sim-log');
       if (simLog) {
@@ -194,6 +202,11 @@ export class GameSession {
       Api.getInvites()
         .then(data => { if (data.invites) updateInvitePanel(data.invites); })
         .catch(() => {});
+    });
+
+    // A direct recruit came online / went offline — flip their card dot.
+    Events.on('ws:recruit_presence', (evt) => {
+      RecruitPresence.set(evt.user_id, evt.online);
     });
 
     // Peer presence events are handled in game/astral.js so they can be
