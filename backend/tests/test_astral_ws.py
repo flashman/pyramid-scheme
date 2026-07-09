@@ -199,7 +199,8 @@ async def test_disconnect_during_projection_notifies_host():
     expiry_task.cancel = MagicMock()
 
     with patch("app.routers.ws.channels", reg), \
-         patch("app.routers.ws.manager") as mock_mgr:
+         patch("app.routers.ws.manager") as mock_mgr, \
+         patch("app.presence.manager", mock_mgr):
 
         mock_mgr.get_meta.return_value = {
             "username": "alice", "channel_key": (bob_id, "world"),
@@ -208,6 +209,7 @@ async def test_disconnect_during_projection_notifies_host():
         }
         mock_mgr.set_meta   = MagicMock()
         mock_mgr.disconnect = MagicMock()
+        mock_mgr.is_connected = MagicMock(return_value=False)
         mock_mgr.send_to_user = AsyncMock()
 
         from app.routers.ws import _handle_disconnect
