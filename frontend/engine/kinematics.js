@@ -35,10 +35,16 @@ export function stepRun(vx, dir, { grounded = true, run = false } = {}, T = TUNI
     const accel = !grounded                            ? T.airAccel
                 : (vx !== 0 && Math.sign(vx) !== dir)  ? T.skidDecel
                 : (run ? T.runAccel : T.walkAccel);
+    const before = Math.abs(vx);
     vx += dir * accel;
     if (Math.sign(vx) === dir && Math.abs(vx) > max) {
-      // Over the cap: clamp to max (friction bleed happens on release, not during accel)
-      vx = Math.sign(vx) * max;
+      if (before <= max) {
+        vx = Math.sign(vx) * max;                      // normal cap
+      } else {
+        // Over the cap (run released mid-stride): bleed down, don't snap.
+        // Airborne: momentum is conserved — never gain past the cap, never lose.
+        vx = Math.sign(vx) * Math.max(max, grounded ? before - T.friction : before);
+      }
     }
   } else if (grounded) {
     vx = Math.sign(vx) * Math.max(0, Math.abs(vx) - T.friction);

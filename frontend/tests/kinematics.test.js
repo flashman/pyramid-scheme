@@ -67,3 +67,17 @@ test('held jump reaches a much higher apex than a tap', () => {
 test('running jump takes off faster than standing jump', () => {
   assert.ok(jumpVelocity(TUNING.runMax) < jumpVelocity(0));  // more negative
 });
+
+test('over-cap speed bleeds down gradually to walkMax (run released mid-stride)', () => {
+  let vx = TUNING.runMax;
+  const first = stepRun(vx, 1, { grounded: true, run: false });
+  assert.ok(first < TUNING.runMax);                 // decaying
+  assert.ok(first > TUNING.walkMax);                // not snapped
+  for (let i = 0; i < 200; i++) vx = stepRun(vx, 1, { grounded: true, run: false });
+  assert.ok(Math.abs(vx - TUNING.walkMax) < 1e-9);
+});
+
+test('airborne over-cap speed is conserved, not clamped (run-jump momentum)', () => {
+  const vx = stepRun(TUNING.runMax, 1, { grounded: false, run: false });
+  assert.equal(vx, TUNING.runMax);
+});
