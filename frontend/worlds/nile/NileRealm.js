@@ -112,7 +112,7 @@ export class NileRealm extends SolidRealm {
         setTimeout(() => log('✦ ' + msg.split('\n')[0], 'hi'), 300);
       },
       onRespawn: () => {
-        G.px = NILE_ENTRY_X; G.py = BANK_Y; G.pvy = 0;
+        G.px = NILE_ENTRY_X; G.py = BANK_Y; G.pvx = 0; G.pvy = 0;
         G.camX = Math.max(0, G.px - CW / 2); G.shake = 8;
         log('✦ You wash up on the entry bank. The river returned you. It returns everything, eventually.', 'hi');
       },

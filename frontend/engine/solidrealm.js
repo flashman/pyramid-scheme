@@ -69,6 +69,9 @@ export class SolidRealm extends Realm {
     if (dir !== 0) G.facing = dir;
     G.pmoving = dir !== 0;
 
+    // Note: the first physicsStep after resetMotion() (realm entry) starts
+    // ungrounded-to-grounded on frame one, so this can fire a "landing" with
+    // no actual fall — subscribers that care should gate on impactVy.
     if (!wasGrounded && b.grounded) Events.emit('physics:land', { realm: this.id, impactVy });
     if (b.headBonk)                 Events.emit('physics:bonk', { realm: this.id });
 
