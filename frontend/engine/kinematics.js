@@ -43,6 +43,8 @@ export function stepRun(vx, dir, { grounded = true, run = false } = {}, T = TUNI
       } else {
         // Over the cap (run released mid-stride): bleed down, don't snap.
         // Airborne: momentum is conserved — never gain past the cap, never lose.
+        // Note: `accel` computed above is deliberately unused here — the bleed
+        // rate is `friction`, not `accel`.
         vx = Math.sign(vx) * Math.max(max, grounded ? before - T.friction : before);
       }
     }
