@@ -74,10 +74,7 @@ pyramid-scheme/
 │   ├── colors.js           # Central color palette (COL)
 │   ├── events.js           # Lightweight pub/sub event bus (Events)
 │   ├── flags.js            # Named boolean/value flags + quest manager
-│   ├── realm.js            # Realm, RealmManager with transition animations
-│   ├── solidrealm.js       # SolidRealm — Mario-style physics base (solid-list AABB collision + velocity-driven kinematics)
-│   ├── physics2d.js        # SolidSet, resolveMove — static rects + provider-based solid collision
-│   ├── kinematics.js       # TUNING, stepRun/stepFall/jumpVelocity — velocity-driven movement math
+│   ├── realm.js            # Realm, PhysicsRealm, RealmManager with transition animations
 │   ├── entity.js           # Entity, NPC, Enemy (patrol AI), Collectible, FreeRoamEnemy (2D underwater AI)
 │   ├── freemove.js          # FreeMoveRealm — 2D swim physics + camera-Y (base for Atlantis and future underwater worlds)
 │   ├── health.js           # HealthSystem — kill / death-screen / respawn / immunity (standalone, any realm can use)
@@ -112,9 +109,9 @@ pyramid-scheme/
     ├── WORLD_TEMPLATE.md   # Guide for adding new worlds
     │
     ├── earth/              # The desert world (default starting realm)
-    │   ├── WorldRealm.js   # Extends SolidRealm; pyramid layers registered as solids each frame
+    │   ├── WorldRealm.js   # Extends PhysicsRealm; overrides surfaceAt/canStepTo with pyramid terrain
     │   ├── constants.js    # World width, ground Y, Z-layer parallax data, slots
-    │   ├── terrain.js      # Pyramid geometry + surface queries (lyrRect, surfAt, pyrUnderPlayer, …)
+    │   ├── terrain.js      # Pyramid geometry + surface queries (lyrRect, surfAt, canStep, …)
     │   └── draw/
     │       ├── background.js   # Sky gradient, stars, desert ground
     │       ├── celestial.js    # Sun, moon, clouds
@@ -134,7 +131,7 @@ pyramid-scheme/
     │       └── council.js  # Space station interior: stars, columns, cosmic FX
     │
     ├── oasis/              # The Oasis — east of the desert (sphinx realm)
-    │   ├── OasisRealm.js   # SolidRealm: scrolling world, pool wading, passage entry
+    │   ├── OasisRealm.js   # PhysicsRealm: scrolling world, pool wading, passage entry
     │   ├── constants.js    # OASIS_FLOOR, POOL_WX/WIDTH/FLOOR, SPHINX_WX, PASSAGE_WX
     │   ├── riddles.js      # RiddleManager: 12 riddles, typewriter, bottom-bar panel UI
     │   └── draw/
@@ -152,7 +149,7 @@ pyramid-scheme/
 ### Realms (scene management)
 Each scene is a `Realm` subclass registered with `RealmManager`. Switching scenes calls `onExit()` on the current realm and `onEnter(fromId)` on the next.
 
-Side-scrolling realms with walkable terrain should extend **`SolidRealm`** (`engine/solidrealm.js`) instead of `Realm` directly. `SolidRealm` is configured with `{ worldW, maxStepUp, tuning }`; a realm registers its geometry on `this.solids` (static rects + providers, `engine/physics2d.js`) and calls `physicsStep(ts)` from `update()` and `tryJump()` from `onKeyDown('z')`. Movement itself is velocity-driven via `engine/kinematics.js` (`TUNING`, `stepRun`/`stepFall`/`jumpVelocity`), eliminating copy-pasted physics math.
+Realms with walkable terrain should extend **`PhysicsRealm`** instead of `Realm` directly. `PhysicsRealm` is configured with `{ gravity, worldW, floor, maxFallSpeed }` and exposes `_gravityStep()`, `_clampX()`, and `_trackCameraX()` helpers, eliminating copy-pasted physics math.
 
 Fixed-camera realms (chamber, council, vault) extend **`FlatRealm`**, which adds `_walkStep(ts)` (movement + animation + G-sync in one call) and `getPlayerPose()`.
 
@@ -175,14 +172,15 @@ class MyOceanRealm extends FreeMoveRealm {
 }
 ```
 
-**Terrain interface.** `SolidRealm` has no virtual surface methods — terrain is data, not code. A realm populates `this.solids` (a `SolidSet` from `engine/physics2d.js`) with static rects and/or providers in its constructor, then lets `physicsStep(ts)` (from `engine/solidrealm.js`) resolve collision against them each frame:
+**Terrain interface.** `PhysicsRealm` declares two virtual methods with flat-floor defaults. Override them to give your realm its own surface shape:
 
 ```js
-this.solids.addStatic([{ x: 0, y: floorY, w: worldW, h: 40 }]); // flat floor
-this.solids.addProvider(() => G.pyramids.flatMap(pyrToRects));  // dynamic geometry
-```
+// Returns highest surface Y at world-x x (default: flat floor).
+surfaceAt(x) { return this.floor; }
 
-Then in `update()`: `this.physicsStep(ts)`; on jump input: `this.tryJump()`.
+// Returns true if the player at feetY can step to x (default: always passable).
+canStepTo(feetY, x) { return true; }
+```
 
 **Transition animations** are first-class. Instead of managing a local `_launch` flag, realms call:
 ```js
@@ -195,16 +193,13 @@ RealmManager.scheduleTransition('target-realm', {
 
 **Player pose.** Every realm overrides `getPlayerPose()` → `{ px, py, camX, pZ, facing, frame }`. This lets `drawRealmPharaoh(realm)` work correctly in any realm without realm-specific pharaoh draw variants. `FlatRealm` and `OasisRealm` provide their implementations; `WorldRealm` still passes the pose directly since it draws the pharaoh inline.
 
-**G sync.** `FlatRealm._walkStep()` writes local player state back to G each frame; `SolidRealm.physicsStep()` does the same for side-scrollers (`WorldRealm`, `OasisRealm`, `NileRealm`) as its last step. This ensures the HUD, minimap, and any G-reading system sees the current player position regardless of which realm is active.
+**G sync.** `FlatRealm._walkStep()` and `OasisRealm._syncToG()` write local player state back to G each frame. This ensures the HUD, minimap, and any G-reading system sees the current player position regardless of which realm is active.
 
-**Movement input.** `SolidRealm.readInput()` reads `ArrowLeft/ArrowRight` for direction and `Shift` for run, sets `G.facing`/`G.pmoving` as side-effects inside `physicsStep()` — realms don't hand-roll this block:
+**Movement input.** Use `inputDx(baseSpeed)` from `worlds/constants.js` instead of repeating the `ArrowLeft/Right/WASD/Shift` block:
 ```js
-readInput() {
-  let dir = 0;
-  if (G.keys['ArrowLeft'])  dir = -1;
-  if (G.keys['ArrowRight']) dir =  1;
-  return { dir, run: !!G.keys['Shift'], jumpHeld: !!(G.keys['z'] || G.keys['Z']) };
-}
+import { inputDx, SPEED, SPDHALF } from '../constants.js';
+const dx = inputDx(SPEED);  // sets G.facing + G.pmoving as side-effects
+if (dx !== 0) G.px = this._clampX(G.px + dx, SPDHALF);
 ```
 
 ### TriggerZones (area gates and hints)
@@ -354,7 +349,7 @@ const wx = myLayout.nextX(depth);
 See `worlds/WORLD_TEMPLATE.md` for a step-by-step guide. In short:
 
 1. Create `worlds/<n>/` with `<n>Realm.js` and `constants.js`.
-2. Extend `SolidRealm` (side-scrollers) or `Realm` (fixed-camera scenes) and implement `update(ts)`, `render()`, and `onKeyDown(key)`.
+2. Extend `PhysicsRealm` (or `Realm` for fixed-camera scenes) and implement `update(ts)`, `render()`, and `onKeyDown(key)`.
 3. Register it in `main.js`: `RealmManager.register(new YourRealm())`.
 4. Transition to it via `RealmManager.scheduleTransition('your-realm-id', { ... })`.
 5. Create a `PyramidLayout` for your slot arrays if the realm has friend pyramids.

@@ -10,9 +10,7 @@
 // Moon realm, which is gone.
 //
 // Imported by:
-//   worlds/earth/WorldRealm.js  — pyramid surface queries (descend-phase,
-//                                 standing checks); collision itself is
-//                                 handled by SolidRealm/physics2d.js
+//   worlds/earth/WorldRealm.js  — physics loop
 //   worlds/earth/draw/pyramids.js — rendering (lyrRect only)
 //   draw/hud.js                 — surface-check for depth-switch hint
 
@@ -44,6 +42,35 @@ export function surfAt(wx) {
     }
   }
   return sy;
+}
+
+/**
+ * surfAt but skipping one pyramid by id.
+ * Used during phase-through descent so the player can fall past
+ * the pyramid they initiated a ↓-descent on.
+ */
+export function surfAtExcluding(wx, excludeId) {
+  let sy = GND;
+  for (const p of G.pyramids) {
+    if (!p.layers || (p.zLayer || 0) > 0 || p.id === excludeId) continue;
+    for (let i = 0; i < p.layers; i++) {
+      const r = lyrRect(p, i);
+      if (wx >= r.x && wx <= r.x + r.w) sy = Math.min(sy, r.y);
+    }
+  }
+  return sy;
+}
+
+/**
+ * Returns true if the player at feetY can walk one step to toWX without
+ * stepping up more than one layer height (i.e. not hitting a wall).
+ * Respects G.descendId for phase-through descent.
+ */
+export function canStep(feetY, toWX) {
+  const s = G.descendId
+    ? surfAtExcluding(toWX, G.descendId)
+    : surfAt(toWX);
+  return (feetY - s) <= LH + 1;
 }
 
 // ── Player-pyramid relationship queries ───────────────────

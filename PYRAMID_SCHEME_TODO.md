@@ -113,7 +113,7 @@
 
 ### Mobile
 - [ ] **On-screen controls** — add a virtual D-pad (left/right arrows + jump button) and an action button (Space equivalent). Inject them into `index.html` and drive through the same `G.keys` mechanism so realm logic doesn't change. Show on touch devices, hide on desktop.
-- [ ] **Touch event handling** — add `touchstart` / `touchend` handlers in `main.js` alongside `keydown`/`keyup`. The `SolidRealm` architecture (`readInput()` reading `G.keys`) is already clean enough for this without touching any realm code.
+- [ ] **Touch event handling** — add `touchstart` / `touchend` handlers in `main.js` alongside `keydown`/`keyup`. The `PhysicsRealm` architecture is already clean enough for this without touching any realm code.
 
 ### Leaderboard
 - [ ] **`GET /api/leaderboard`** — top N players by `GameState.earned`, `recruits_made count`, or composite score. Cache aggressively (60s Redis TTL). Render in a sidebar panel. This is one of the strongest retention mechanics for the core loop.
@@ -163,7 +163,7 @@
 - [x] `drawRealmPharaoh(realm)` — single pharaoh draw fn for any realm
 - [x] `FlatRealm._walkStep()` syncs G — fixes stale HUD position in crypt/council/vault
 - [x] `OasisRealm._syncToG()` — fixes stale G position in oasis
-- [x] Shared movement-key-reading helper — deduplicated `ArrowLeft`/`ArrowRight` ± `Shift`-run handling (later superseded by `SolidRealm.readInput()` in the Mario-physics migration; see `engine/solidrealm.js`)
+- [x] `inputDx(baseSpeed)` — deduplicated movement key reading
 - [x] `_hydrateState()` + `_wireWsEvents()` — extracted from init() monolith
 
 ### Still to do

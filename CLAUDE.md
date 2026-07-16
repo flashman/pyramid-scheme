@@ -97,8 +97,8 @@ The `Inventory` store mirrors the server inventory — hydrated from `/api/me` a
 
 ### Realm system (`engine/realm.js`)
 - `Realm` — minimal base: `onEnter`, `onExit`, `update(ts)`, `render()`, `onKeyDown(key)`, `getPlayerPose()`.
-- `SolidRealm` (`engine/solidrealm.js`) — Mario-style physics base for side-scrollers: velocity-driven kinematics (`engine/kinematics.js`, `TUNING` is the single source of movement feel) + solid-list AABB collision (`engine/physics2d.js`: walls, ceilings, bonkable blocks via `onBonk`, one-way + moving platforms, `contactDirection` for future stomp enemies). Realms declare geometry as static rects + providers; zones (pool/water) pass per-frame tuning overrides to `physicsStep()`.
-- `FlatRealm` (`worlds/FlatRealm.js`) — fixed-camera realms (crypt chamber, council, vault). Provides `_walkStep(ts)` and `getPlayerPose()`. Extend this instead of SolidRealm for indoor/chamber areas.
+- `PhysicsRealm` — adds gravity (`_gravityStep`), camera follow (`_trackCameraX`), world clamp (`_clampX`), and terrain interface (`surfaceAt`, `canStepTo`).
+- `FlatRealm` (`worlds/FlatRealm.js`) — fixed-camera realms (crypt chamber, council, vault). Provides `_walkStep(ts)` and `getPlayerPose()`. Extend this instead of PhysicsRealm for indoor/chamber areas.
 - `RealmManager` — registers realms, handles transitions. Use `scheduleTransition(id, {duration, render})` for animated swaps; `transitionTo(id)` for immediate swaps. Check `RealmManager.isTransitioning` to block input/update during animations.
 
 ### Realm graph: `PortalRegistry` (`engine/portal.js`)

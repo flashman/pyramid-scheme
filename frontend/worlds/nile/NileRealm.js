@@ -13,9 +13,7 @@
 //     shallows always reaches a bank/reed, so you can never be trapped; death just
 //     washes you back to the entry bank.
 
-import { RealmManager }                   from '../../engine/realm.js';
-import { SolidRealm }                     from '../../engine/solidrealm.js';
-import { TUNING }                         from '../../engine/kinematics.js';
+import { PhysicsRealm, RealmManager }     from '../../engine/realm.js';
 import { TriggerZone, TriggerRegistry }   from '../../engine/trigger.js';
 import { InteractableRegistry }           from '../../engine/interactables.js';
 import { DialogueManager }                from '../../engine/dialogue.js';
@@ -24,13 +22,13 @@ import { Flags }                          from '../../engine/flags.js';
 import { Events }                         from '../../engine/events.js';
 import { StallOverlay }                   from './shop/StallOverlay.js';
 import { G }                              from '../../game/state.js';
-import { SPDHALF }                        from '../constants.js';
+import { inputDx, SPEED, SPDHALF }        from '../constants.js';
 import { CW }                             from '../../engine/canvas.js';
 import { log }                            from '../../ui/panels.js';
 import { cityTransRender,
          desertTransRender }              from '../transitions.js';
 import {
-  NILE_W, BANK_Y, WATER_Y, RIVERBED_Y, WATER_BOTTOM, REED_TOP, CROC_BACK,
+  NILE_W, BANK_Y, WATER_Y, RIVERBED_Y, REED_TOP, CROC_BACK,
   CURRENT_SPD, SWIM_SPD, JUMP_VY,
   NILE_ENTRY_X, NILE_RETURN_X,
   BANK_SEGMENTS, REEDS,
@@ -60,40 +58,14 @@ const _CROC_DEATH = [
   'THE RIVER BALANCES ITS LEDGER.\nYOU WERE A LINE ITEM.',
 ];
 
-// In-water tuning: reduced, quick-saturating control; no run; flat jump
-// (JUMP_VY, no speed bonus). The current is externalVx, not tuning.
-const SWIM_TUNING = {
-  ...TUNING,
-  walkAccel: 0.8, walkMax: SWIM_SPD, runAccel: 0.8, runMax: SWIM_SPD,
-  friction: 0.6, airAccel: 0.8,
-  jumpVy: JUMP_VY, jumpVyPerVx: 0,
-};
-
-export class NileRealm extends SolidRealm {
+export class NileRealm extends PhysicsRealm {
   constructor() {
     super('nile', 'THE NILE', {
-      worldW:    NILE_W,
-      maxStepUp: 0,          // quay walls must stay walls — climb out from above
+      gravity:      0.5,
+      worldW:       NILE_W,
+      floor:        BANK_Y,
+      maxFallSpeed: 14,
     });
-
-    // ── Geometry ──────────────────────────────────────────
-    // Riverbed: standable everywhere (wading — the soft-lock guarantee).
-    this.solids.addStatic([{ x: -100, y: RIVERBED_Y, w: NILE_W + 200, h: 80 }]);
-    // Dry banks: deep solid slabs — their tops are the towpath, their sides
-    // are the quay walls that stop you walking ashore from the water.
-    this.solids.addStatic(BANK_SEGMENTS.map(s => ({
-      x: s.x1, y: BANK_Y, w: s.x2 - s.x1, h: WATER_BOTTOM - BANK_Y + 40,
-    })));
-    // Reeds: one-way platforms above the waterline.
-    this.solids.addStatic(REEDS.map(r => ({
-      x: r.x - r.w / 2, y: REED_TOP, w: r.w, h: 6, oneWay: true,
-    })));
-    // Croc-backs: one-way platforms that FOLLOW the patrolling crocs.
-    // Provider rects move each frame but carry no rider — the croc swims out
-    // from under you exactly as today.
-    this.solids.addProvider(() => this.crocs.map(c => ({
-      x: c.worldX - CROC_BACK_HW, y: CROC_BACK, w: CROC_BACK_HW * 2, h: 6, oneWay: true,
-    })));
 
     this.registry = new InteractableRegistry();
     this._deltaSeen = false;
@@ -112,7 +84,7 @@ export class NileRealm extends SolidRealm {
         setTimeout(() => log('✦ ' + msg.split('\n')[0], 'hi'), 300);
       },
       onRespawn: () => {
-        G.px = NILE_ENTRY_X; G.py = BANK_Y; G.pvx = 0; G.pvy = 0;
+        G.px = NILE_ENTRY_X; G.py = BANK_Y; G.pvy = 0;
         G.camX = Math.max(0, G.px - CW / 2); G.shake = 8;
         log('✦ You wash up on the entry bank. The river returned you. It returns everything, eventually.', 'hi');
       },
@@ -207,13 +179,35 @@ export class NileRealm extends SolidRealm {
     return false;
   }
 
+  /**
+   * The standable surface Y under the player. Dry bank = solid BANK_Y. In a water
+   * gap the riverbed is always standable (wading); reeds and croc-backs are
+   * one-way platforms — they only catch you when you come down onto them from
+   * at/above their top (pyPrev).
+   */
+  _groundUnder(px, pyPrev) {
+    if (this._onBank(px)) return BANK_Y;
+    let best = RIVERBED_Y;
+    for (const r of REEDS) {
+      if (px >= r.x - r.w / 2 && px <= r.x + r.w / 2 && pyPrev <= REED_TOP + 1)
+        best = Math.min(best, REED_TOP);
+    }
+    for (const c of this.crocs) {
+      if (px >= c.worldX - CROC_BACK_HW && px <= c.worldX + CROC_BACK_HW && pyPrev <= CROC_BACK + 1)
+        best = Math.min(best, CROC_BACK);
+    }
+    return best;
+  }
+
+  /** A dry bank presents a quay wall to anyone in the water — climb out from above. */
+  _bankWall(x, py) { return this._onBank(x) && py >= WATER_Y; }
+
   // Required by drawRealmPharaoh(). pZ 0 → normal feet-at-py rendering.
   getPlayerPose() {
     return { px: G.px, py: G.py, camX: G.camX, pZ: 0, facing: G.facing, frame: G.pframe };
   }
 
   onEnter(fromId) {
-    this.resetMotion();
     if (fromId === 'world') {
       G.px = NILE_ENTRY_X; G.py = BANK_Y; G.pvy = 0;
       G.camX = Math.max(0, G.px - CW / 2);
@@ -233,19 +227,34 @@ export class NileRealm extends SolidRealm {
     if (this.health.update()) { G.camX = this._trackCameraX(G.camX, G.px); return; }
     if (DialogueManager.isActive()) return;
 
-    const pyPrev      = G.py;
+    const pyPrev     = G.py;
     const feetInWater = pyPrev >= WATER_Y - 0.5;
 
-    // ── Player physics ────────────────────────────────────
+    // ── Horizontal movement ───────────────────────────────
     if (feetInWater) {
+      // Swim: reduced control, no sprint; the current dominates.
+      let sdx = 0;
+      if (G.keys['ArrowLeft'])  { sdx = -SWIM_SPD; G.facing = -1; }
+      if (G.keys['ArrowRight']) { sdx =  SWIM_SPD; G.facing =  1; }
+      G.pmoving = sdx !== 0;
       // Firm current everywhere except the Delta, where the river spreads and
       // slows so you can wade freely toward the boat. Also no push mid-jump-launch.
       const inDelta = G.px < DELTA_START_X;
       const cur = (G.pvy >= -0.5 && !inDelta) ? CURRENT_SPD : 0;
-      this.physicsStep(ts, { tuning: SWIM_TUNING, run: false, externalVx: -cur, edgeMargin: SPDHALF });
+      const tryX = G.px + sdx - cur;
+      G.px = this._bankWall(tryX, G.py) ? G.px : this._clampX(tryX, SPDHALF);
     } else {
-      this.physicsStep(ts, { edgeMargin: SPDHALF });
+      const dx = inputDx(SPEED);
+      if (dx !== 0) {
+        const tryX = G.px + dx;
+        if (!this._bankWall(tryX, G.py)) G.px = this._clampX(tryX, SPDHALF);
+      }
     }
+
+    // ── Vertical: gravity against the surface under us ─────
+    const surf = this._groundUnder(G.px, pyPrev);
+    const r = this._gravityStep(G.py, G.pvy, surf);
+    G.py = r.py; G.pvy = r.pvy;
 
     // splash when the player breaks the surface (falling/wading in)
     if (pyPrev < WATER_Y && G.py >= WATER_Y && G.pvy > 1.2) {
@@ -253,7 +262,8 @@ export class NileRealm extends SolidRealm {
     }
 
     // ── Walk / wade animation ─────────────────────────────
-    this.stepWalkAnim(ts);
+    if (G.pmoving && ts - G.legT > 120) { G.legT = ts; G.pframe = 1 - G.pframe; }
+    else if (!G.pmoving) G.pframe = 0;
 
     G.camX = this._trackCameraX(G.camX, G.px);
     G.camY = 0;
@@ -309,10 +319,10 @@ export class NileRealm extends SolidRealm {
       if (PortalRegistry.handleKey('ArrowUp', 'nile', this.triggers)) return true;
     }
 
-    // Z : jump / lunge — off the bank, a reed, a croc-back, or the shallows.
+    // Z : jump / lunge — works off the bank, a reed, a croc-back, or out of the shallows.
     if (key === 'z' || key === 'Z') {
-      const inWater = G.py >= WATER_Y - 0.5;
-      if (this.tryJump(inWater ? SWIM_TUNING : this.tuning)) return true;
+      const surf = this._groundUnder(G.px, G.py);
+      if (G.py >= surf - 1) { G.pvy = JUMP_VY; return true; }
     }
 
     if (key === ' ') return this.registry.interact();

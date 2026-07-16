@@ -4,12 +4,10 @@
 // player walks past the east edge of the pyramid world.
 
 import { G }                         from '../../game/state.js';
-import { RealmManager }               from '../../engine/realm.js';
-import { SolidRealm }                 from '../../engine/solidrealm.js';
-import { TUNING }                     from '../../engine/kinematics.js';
+import { PhysicsRealm, RealmManager } from '../../engine/realm.js';
 import { Flags }                     from '../../engine/flags.js';
 import { TriggerZone, TriggerRegistry } from '../../engine/trigger.js';
-import { SPDHALF }                   from '../constants.js';
+import { SPEED, SPDHALF }            from '../constants.js';
 import { CW, CH, X }                 from '../../engine/canvas.js';
 import { OASIS_FLOOR, OASIS_WORLD_W,
          POOL_FLOOR,
@@ -41,26 +39,21 @@ function _spawnSplash(wx, wy) {
 }
 
 
-// Pool wading: same 0.55 speed factor as the old realm; flat −6 hop.
-const POOL_TUNING = {
-  ...TUNING,
-  walkMax: TUNING.walkMax * 0.55, runMax: TUNING.runMax * 0.55,
-  jumpVy: -6, jumpVyPerVx: 0,
-};
-
-export class OasisRealm extends SolidRealm {
+export class OasisRealm extends PhysicsRealm {
   constructor() {
     super('oasis', 'THE OASIS', {
-      worldW:    OASIS_WORLD_W,
-      maxStepUp: 30,          // pool floor is 28px below the banks — walk out freely
+      gravity:      0.5,
+      worldW:       OASIS_WORLD_W,
+      floor:        OASIS_FLOOR,
+      maxFallSpeed: 14,
     });
-
-    // ── Geometry: dry floor either side of the sunken pool floor ──
-    this.solids.addStatic([
-      { x: -100,                   y: OASIS_FLOOR, w: POOL_WX + 100,                         h: 300 },
-      { x: POOL_WX,                y: POOL_FLOOR,  w: POOL_WIDTH,                            h: 300 },
-      { x: POOL_WX + POOL_WIDTH,   y: OASIS_FLOOR, w: OASIS_WORLD_W - POOL_WX - POOL_WIDTH + 100, h: 300 },
-    ]);
+    this.px       = 60;
+    this.py       = OASIS_FLOOR;
+    this.pvy      = 0;
+    this.camX     = 0;
+    this.facing   = 1;
+    this.frame    = 0;
+    this.moving   = false;
     this._wasInPool = false;
 
     // ── Atlantis gate state ──────────────────────────────
@@ -117,38 +110,48 @@ export class OasisRealm extends SolidRealm {
     PortalRegistry.register({ from: 'oasis', to: 'world', key: null });
   }
 
-  // ── Draw-file compat: state lives in G now ────────────
-  get px()     { return G.px; }
-  get py()     { return G.py; }
-  get camX()   { return G.camX; }
-  get facing() { return G.facing; }
-  get frame()  { return G.pframe; }
-
   // ── Player pose ───────────────────────────────────────
 
   getPlayerPose() {
-    return { px: G.px, py: G.py, camX: G.camX, pZ: 0, facing: G.facing, frame: G.pframe };
+    return {
+      px:     this.px,
+      py:     this.py,
+      camX:   this.camX,
+      pZ:     0,
+      facing: this.facing,
+      frame:  this.frame,
+    };
+  }
+
+  _syncToG() {
+    G.px      = this.px;
+    G.py      = this.py;
+    G.pvy     = this.pvy;
+    G.camX    = this.camX;
+    G.facing  = this.facing;
+    G.pframe  = this.frame;
+    G.pmoving = this.moving;
   }
 
   // ── Lifecycle ─────────────────────────────────────────
 
   onEnter(fromId) {
-    this.resetMotion();
     const fromVault    = fromId === 'vault';
     const fromAtlantis = fromId === 'atlantis';
 
-    G.px   = fromVault    ? PASSAGE_WX + 20
-           : fromAtlantis ? POOL_CENTER_WX
-           : 60;
-    G.py   = OASIS_FLOOR;
-    G.camX = fromVault
+    this.px   = fromVault    ? PASSAGE_WX + 20
+              : fromAtlantis ? POOL_CENTER_WX
+              : 60;
+    this.py   = OASIS_FLOOR;
+    this.pvy  = 0;
+    this.camX = fromVault
       ? Math.max(0, Math.min(OASIS_WORLD_W - 800, PASSAGE_WX - 400))
       : fromAtlantis
         ? Math.max(0, Math.min(OASIS_WORLD_W - 800, POOL_CENTER_WX - 400))
         : 0;
-    G.facing   = (fromVault || fromAtlantis) ? -1 : 1;
-    G.pmoving  = false;
-    G.pframe   = 0;
+    this.facing   = (fromVault || fromAtlantis) ? -1 : 1;
+    this.moving   = false;
+    this.frame    = 0;
     this._wasInPool = false;
 
     // Restore statue state from flags
@@ -199,11 +202,19 @@ export class OasisRealm extends SolidRealm {
 
     // ── Pool state ────────────────────────────────────────
     const inPool = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
+    const activeFloor = inPool ? POOL_FLOOR : OASIS_FLOOR;
 
     this.triggers.update(this.px);
 
-    // ── Player physics (pool zone slows and softens the jump) ──
-    this.physicsStep(ts, { tuning: inPool ? POOL_TUNING : this.tuning, edgeMargin: SPDHALF });
+    // ── Horizontal movement ───────────────────────────────
+    let dx = 0;
+    const baseSpeed = inPool ? SPEED * 0.55 : SPEED;
+    const speed = G.keys['Shift'] ? baseSpeed * 2 : baseSpeed;
+    if (G.keys['ArrowLeft'])  { dx = -speed; this.facing = -1; }
+    if (G.keys['ArrowRight']) { dx =  speed; this.facing =  1; }
+    this.moving = dx !== 0;
+
+    if (dx !== 0) this.px = this._clampX(this.px + dx, SPDHALF);
 
     // ── Statue rise animation ─────────────────────────────
     // Triggered by the vault altar being opened (atlantis_vault_opened flag).
@@ -232,11 +243,19 @@ export class OasisRealm extends SolidRealm {
       return;
     }
 
+    // ── Gravity + jump ────────────────────────────────────
+    const result = this._gravityStep(this.py, this.pvy, activeFloor);
+    this.py  = result.py;
+    this.pvy = result.pvy;
+
     // ── Walk animation ────────────────────────────────────
-    this.stepWalkAnim(ts);
+    if (this.moving && ts - G.legT > 120) { G.legT = ts; this.frame = 1 - this.frame; }
+    else if (!this.moving) this.frame = 0;
 
     // ── Camera ───────────────────────────────────────────
-    G.camX = this._trackCameraX(G.camX, G.px);
+    this.camX = this._trackCameraX(this.camX, this.px);
+
+    this._syncToG();
   }
 
   render() {
@@ -249,9 +268,11 @@ export class OasisRealm extends SolidRealm {
 
     // Jump — not a portal.
     if (key === 'z' || key === 'Z') {
-      const inPool = G.px >= POOL_WX && G.px <= POOL_WX + POOL_WIDTH;
-      if (this.tryJump(inPool ? POOL_TUNING : this.tuning)) {
-        if (inPool) _spawnSplash(G.px, OASIS_FLOOR - 2);
+      const inPool  = this.px >= POOL_WX && this.px <= POOL_WX + POOL_WIDTH;
+      const jumpPow = inPool ? -6 : -9;
+      if (this.py >= (inPool ? POOL_FLOOR : OASIS_FLOOR) - 1) {
+        this.pvy = jumpPow;
+        if (inPool) _spawnSplash(this.px, OASIS_FLOOR - 2);
         return true;
       }
     }

@@ -442,8 +442,6 @@ class _AstralSession {
     G.px       = this._saved.px;
     G.py       = this._saved.py;
     G.camX     = this._saved.camX;
-    G.pvx      = 0;
-    G.pvy      = 0;
     this._saved = null;
   }
 

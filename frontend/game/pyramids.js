@@ -8,7 +8,7 @@
 //   pyrEarnings    — computes total payout a pyramid has generated for the player
 //
 // What is NOT here:
-//   Geometry / surface queries (lyrRect, surfAt, …) → worlds/earth/terrain.js
+//   Geometry / physics (lyrRect, surfAt, canStep, …) → worlds/earth/terrain.js
 //   Visual effects (particles, shake)                → handled in main.js via
 //                                                       the 'pyramid:layer_added' event
 //
