@@ -1,8 +1,7 @@
 // ── FILE: engine/realm.js ────────────────────────────────
-// Base Realm + PhysicsRealm classes, and RealmManager with
-// built-in transition animation support.
+// Base Realm class, and RealmManager with built-in transition
+// animation support.
 
-import { CW }     from './canvas.js';
 import { Events } from './events.js';
 
 // ─────────────────────────────────────────────────────────
@@ -32,88 +31,6 @@ export class Realm {
    * @returns {{ px, py, camX, pZ, facing, frame } | null}
    */
   getPlayerPose() { return null; }
-}
-
-// ─────────────────────────────────────────────────────────
-// PhysicsRealm — base class for realms with a walkable
-// ground plane, gravity, and a horizontally scrolling camera.
-//
-// Concrete realms extend this and call its helpers instead
-// of re-implementing the physics math each time.
-//
-// Constructor opts:
-//   gravity      – pixels/frame² acceleration (default 0.5 ≈ Earth)
-//   worldW       – total world width in pixels
-//   floor        – ground-plane Y coordinate
-//   maxFallSpeed – terminal velocity (pixels/frame, default 14)
-//
-// Terrain interface (override in subclasses):
-//   surfaceAt(x)        – highest surface Y at world-x x  (default: flat floor)
-//   canStepTo(feetY, x) – can the player step to x?        (default: always true)
-//
-// These two methods let the physics loop stay in one place while different
-// worlds plug in their own terrain shape. A future ruins realm just overrides
-// surfaceAt() to return platform heights — no changes to the physics code.
-// ─────────────────────────────────────────────────────────
-
-export class PhysicsRealm extends Realm {
-  constructor(id, name, {
-    gravity      = 0.5,
-    worldW       = 800,
-    floor        = 440,
-    maxFallSpeed = 14,
-  } = {}) {
-    super(id, name);
-    this.gravity      = gravity;
-    this.worldW       = worldW;
-    this.floor        = floor;
-    this.maxFallSpeed = maxFallSpeed;
-  }
-
-  // ── Terrain interface — override per realm ────────────
-
-  /**
-   * Returns the highest surface Y at world-x x (lowest numeric Y = highest
-   * point the player can stand on).  Default: flat ground plane.
-   * WorldRealm overrides this to query pyramid geometry.
-   */
-  surfaceAt(x) { return this.floor; }           // eslint-disable-line no-unused-vars
-
-  /**
-   * Returns true if the player at feetY can walk one step to world-x x.
-   * Default: always passable (flat terrain has no walls).
-   * WorldRealm overrides this to reject steps up sheer pyramid faces.
-   */
-  canStepTo(feetY, x) { return true; }          // eslint-disable-line no-unused-vars
-
-  // ── Physics helpers ───────────────────────────────────
-
-  // Apply one frame of gravity to py/pvy against a surface.
-  // Returns the updated { py, pvy }.
-  _gravityStep(py, pvy, surfY) {
-    // Always apply gravity first (this decelerates jumps and accelerates falls).
-    // Only snap to the surface and zero velocity on landing — never on the same
-    // frame a jump was initiated (which would cancel pvy = -9 before it moves).
-    pvy = Math.min(pvy + this.gravity, this.maxFallSpeed);
-    py  = py + pvy;
-    if (py >= surfY) {
-      py  = surfY;
-      pvy = 0;
-    }
-    return { py, pvy };
-  }
-
-  // Clamp world-x to [margin … worldW - margin].
-  _clampX(x, margin = 14) {
-    return Math.max(margin, Math.min(this.worldW - margin, x));
-  }
-
-  // Smooth-follow camera: lerp camX toward player, stay within world bounds.
-  // Returns new camX.
-  _trackCameraX(camX, px, lerpK = 0.1) {
-    const target = Math.max(0, Math.min(this.worldW - CW, px - CW / 2));
-    return camX + (target - camX) * lerpK;
-  }
 }
 
 // ─────────────────────────────────────────────────────────
