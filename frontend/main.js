@@ -28,7 +28,6 @@ import { SoundManager }           from './audio/sound.js';
 import { AstralSession }          from './game/astral.js';
 import { gameSocket }             from './game/ws.js';
 import { initInventoryPanel }     from './ui/inventory-panel.js';
-import { PerfHUD }                 from './engine/perfhud.js';   // TEMP: slowdown hunt (remove before merge)
 
 // ── Realms ────────────────────────────────────────────────
 // Realm instances are created in worlds/manifest.js.
@@ -127,7 +126,6 @@ function _toggleHelp() {
   document.getElementById('help-panel')?.classList.toggle('open');
 }
 document.addEventListener('keydown', e => {
-  if (e.key === '\\') { e.preventDefault(); PerfHUD.toggle(); return; }  // TEMP: slowdown hunt
   if (e.key === '`') { e.preventDefault(); _toggleHelp(); return; }
   if (e.key === 'Escape') {
     const hp = document.getElementById('help-panel');
@@ -170,9 +168,6 @@ window.addEventListener('resize', _alignHdrActions);
 
 // ── Game loop ─────────────────────────────────────────────
 function gameLoop(ts) {
-  PerfHUD.frame(ts);            // TEMP: slowdown hunt (remove before merge)
-  PerfHUD.workBegin();
-
   // Only update the current realm when no transition animation is playing
   // (RealmManager swaps, or the astral warp wipe).
   if (!RealmManager.isTransitioning && !AstralSession.isWarping) {
@@ -195,12 +190,6 @@ function gameLoop(ts) {
   RealmManager.renderTransition();
 
   X.restore();
-
-  // TEMP: slowdown hunt (remove before merge). workEnd before draw so the HUD's
-  // own cost isn't counted; solids come from the current realm's SolidSet.
-  PerfHUD.workEnd();
-  PerfHUD.setSolids(RealmManager.current.solids ? RealmManager.current.solids.all().length : 0);
-  PerfHUD.draw();
 
   requestAnimationFrame(gameLoop);
 }
