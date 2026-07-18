@@ -231,7 +231,11 @@ export function drawBG(camY) {
     const SCALE = 0.35;
     X.save();
     // Blur more when far away (low alpha = low camX = early approach)
-    if (fuzz > 0.05) X.filter = `blur(${(fuzz * 2.2).toFixed(1)}px)`;
+    // TEMP (slowdown hunt): sphinx heat-haze blur() is a per-frame GPU Gaussian —
+    // prime suspect for the near-pyramid fps drop. Disabled to confirm; if fps
+    // holds near the pyramid, the real fix is a cached offscreen blur. Restore or
+    // replace before merge.
+    // if (fuzz > 0.05) X.filter = `blur(${(fuzz * 2.2).toFixed(1)}px)`;
     // Scale around the sphinx base point so it grows from the ground up
     X.translate(sphinxScreenX, sphinxBase);
     X.scale(SCALE, SCALE);
