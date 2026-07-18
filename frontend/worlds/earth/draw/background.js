@@ -223,25 +223,20 @@ export function drawBG(camY) {
   const sphinxScreenX = Math.round(1050 - G.camX * 0.08);
   if (sphinxScreenX < CW + 200 && sphinxScreenX > -400) {
     const sphinxAlpha = Math.max(0, Math.min(0.82, (G.camX - 2000) / 3000 * 0.82));
-    // Fuzzy heat-haze shimmer — more prominent at low alpha (far away)
-    const fuzz = Math.max(0, 1 - sphinxAlpha / 0.4);  // 0=close/sharp, 1=far/blurry
+    // Heat-haze shimmer via a subtle alpha pulse (cheap). We deliberately do NOT
+    // canvas-blur() the sphinx: a per-frame Gaussian is a heavy GPU cost that
+    // tanked fps to ~20 whenever the sphinx was on-screen (i.e. right at the home
+    // pyramid), and a blur also fights the game's pixel-art look. Keep it crisp.
     const shimmer = sphinxAlpha * (0.88 + 0.12 * Math.sin(Date.now() / 1200));
     // Sit on the sand horizon line, not floating above it
     const sphinxBase = Math.round(desertTop + 72);
     const SCALE = 0.35;
     X.save();
-    // Blur more when far away (low alpha = low camX = early approach)
-    // TEMP (slowdown hunt): sphinx heat-haze blur() is a per-frame GPU Gaussian —
-    // prime suspect for the near-pyramid fps drop. Disabled to confirm; if fps
-    // holds near the pyramid, the real fix is a cached offscreen blur. Restore or
-    // replace before merge.
-    // if (fuzz > 0.05) X.filter = `blur(${(fuzz * 2.2).toFixed(1)}px)`;
     // Scale around the sphinx base point so it grows from the ground up
     X.translate(sphinxScreenX, sphinxBase);
     X.scale(SCALE, SCALE);
     X.translate(-sphinxScreenX, -sphinxBase);
     _drawDistantSphinx(sphinxScreenX, sphinxBase, shimmer);
     X.restore();
-    X.filter = 'none';
   }
 }
