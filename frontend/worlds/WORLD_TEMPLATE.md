@@ -18,25 +18,28 @@ export const UNDERWORLD_W     = 1600;
 
 ## 2. Create `worlds/my-world/terrain.js` (if the world has non-flat terrain)
 
-If your world has platforms or slopes, put geometry queries here.
-For a **flat-floor world** skip this file — `PhysicsRealm` provides flat defaults.
+`SolidRealm` has no heightfield — terrain is a list of AABB solids. Define
+your terrain as solids in the constructor:
+
+- `this.solids.addStatic([...])` for fixed rects (ground plane, platforms,
+  walls) — pass an array of `{ x, y, w, h }` (`onBonk` optional per-rect for
+  bonkable blocks).
+- `this.solids.addProvider(fn)` for anything that moves or grows each frame
+  (a herd of crocs, pyramid layers a recruit just bought) — `fn` returns a
+  fresh array of rects every call.
+
+For a **flat-floor world**, a single `addStatic` rect spanning the world
+width is enough — skip a dedicated `terrain.js` file. For non-flat terrain,
+put the rect-building logic in `worlds/my-world/terrain.js` and call it from
+the constructor and from any `addProvider` callback:
 
 ```js
 // worlds/underworld/terrain.js
-import { G }                from '../../game/state.js';
-import { UNDERWORLD_FLOOR } from './constants.js';
-import { LH }               from '../constants.js';
+import { G } from '../../game/state.js';
 
-export function surfAt(wx) {
-  let sy = UNDERWORLD_FLOOR;
-  for (const plat of G.platforms) {
-    if (wx >= plat.x && wx <= plat.x + plat.w) sy = Math.min(sy, plat.y);
-  }
-  return sy;
-}
-
-export function canStep(feetY, toWX) {
-  return (feetY - surfAt(toWX)) <= LH + 1;
+// Static platform rects, built once and passed to this.solids.addStatic().
+export function platformRects() {
+  return G.platforms.map(p => ({ x: p.x, y: p.y, w: p.w, h: 20 }));
 }
 ```
 
@@ -63,20 +66,21 @@ export function drawUnderworld(realm) {
 ### Scrolling world (most common — flat or with terrain)
 
 ```js
-import { PhysicsRealm, RealmManager }   from '../../engine/realm.js';
+import { SolidRealm }                   from '../../engine/solidrealm.js';
+import { RealmManager }                 from '../../engine/realm.js';
 import { InteractableRegistry }          from '../../engine/interactables.js';
 import { TriggerZone, TriggerRegistry }  from '../../engine/trigger.js';
 import { DialogueManager }               from '../../engine/dialogue.js';
 import { G }                             from '../../game/state.js';
-import { inputDx, SPEED, SPDHALF }       from '../constants.js';
 import { UNDERWORLD_W, UNDERWORLD_FLOOR } from './constants.js';
 import { drawUnderworld }                from './draw/underworld.js';
 
-export class UnderworldRealm extends PhysicsRealm {
+export class UnderworldRealm extends SolidRealm {
   constructor() {
-    super('underworld', 'THE UNDERWORLD', {
-      gravity: 0.3, worldW: UNDERWORLD_W, floor: UNDERWORLD_FLOOR, maxFallSpeed: 10,
-    });
+    super('underworld', 'THE UNDERWORLD', { worldW: UNDERWORLD_W, maxStepUp: 0 });
+    // Flat ground plane spanning the world, plus 100px of off-screen padding.
+    this.solids.addStatic([{ x: -100, y: UNDERWORLD_FLOOR, w: UNDERWORLD_W + 200, h: 300 }]);
+
     this.registry = new InteractableRegistry();
 
     this.triggers = new TriggerRegistry();
@@ -92,21 +96,17 @@ export class UnderworldRealm extends PhysicsRealm {
     return { px: G.px, py: G.py, camX: G.camX, pZ: 0, facing: G.facing, frame: G.pframe };
   }
 
-  onEnter(fromId) { G.px = 100; G.py = UNDERWORLD_FLOOR; G.pvy = 0; G.camX = 0; G.shake = 6; }
-  onExit()        { G.shake = 4; }
+  onEnter(fromId) {
+    G.px = 100; G.py = UNDERWORLD_FLOOR; G.camX = 0; G.shake = 6;
+    this.resetMotion();
+  }
+  onExit() { G.shake = 4; }
 
   update(ts) {
     if (RealmManager.isTransitioning || DialogueManager.isActive()) return;
 
-    const dx = inputDx(SPEED);   // reads keys, sets G.facing + G.pmoving
-    if (dx !== 0) G.px = this._clampX(G.px + dx, SPDHALF);
-
-    const surf = this.surfaceAt(G.px);
-    const r = this._gravityStep(G.py, G.pvy, surf);
-    G.py = r.py; G.pvy = r.pvy;
-
-    if (G.pmoving && ts - G.legT > 120) { G.legT = ts; G.pframe = 1 - G.pframe; }
-    else if (!G.pmoving) G.pframe = 0;
+    this.physicsStep(ts);   // input → kinematics → solid collision → G writeback
+    this.stepWalkAnim(ts);  // leg-flip cadence, gated on G.pmoving
 
     G.camX = this._trackCameraX(G.camX, G.px);
     this.registry.updateEntities(ts);
@@ -122,6 +122,7 @@ export class UnderworldRealm extends PhysicsRealm {
   onKeyDown(key) {
     if (RealmManager.isTransitioning) return false;
     if (DialogueManager.isActive()) return DialogueManager.onKeyDown(key);
+    if ((key === 'z' || key === 'Z') && this.tryJump()) return true;
     if (key === 'ArrowUp' && this.triggers.isInside('exit-gate')) {
       RealmManager.transitionTo('world'); return true;
     }
@@ -131,20 +132,18 @@ export class UnderworldRealm extends PhysicsRealm {
 }
 ```
 
-For **non-flat terrain**, add:
+For **non-flat terrain**, build the rect list in `terrain.js` and pass it to
+`addStatic`/`addProvider` instead of a single flat rect:
+
 ```js
-import { surfAt, canStep } from './terrain.js';
-// in class:
-surfaceAt(x)        { return surfAt(x); }
-canStepTo(feetY, x) { return canStep(feetY, x); }
-// in update(), replace simple clamp with:
-if (dx !== 0) {
-  const edgeX = G.px + dx + (dx > 0 ? SPDHALF : -SPDHALF);
-  if (this.canStepTo(G.py, edgeX)) G.px = this._clampX(G.px + dx, SPDHALF);
-  const ns = this.surfaceAt(G.px);
-  if (ns < G.py) { G.py = ns; G.pvy = 0; }
-}
+import { platformRects } from './terrain.js';
+// in constructor, after the base ground-plane addStatic():
+this.solids.addProvider(platformRects);   // platforms G.platforms can add/remove at runtime
 ```
+
+`resolveMove()` (called inside `physicsStep()`) handles step-up onto low
+ledges via `maxStepUp` — pass it in the `super()` opts if the world has
+stairs (e.g. pyramid layers) the player should walk up without jumping.
 
 ### Fixed-camera world (chamber / council style)
 
@@ -291,13 +290,18 @@ export const underworldLayout = new PyramidLayout({
 
 | Task | How |
 |---|---|
-| Movement input | `inputDx(baseSpeed)` from `worlds/constants.js` |
-| Gravity | `this._gravityStep(py, pvy, surfY)` → `{ py, pvy }` |
+| Terrain / geometry | `this.solids.addStatic([{x,y,w,h}, …])` (fixed) or `this.solids.addProvider(fn)` (moving/growing) |
+| One physics frame | `this.physicsStep(ts, opts?)` — input → kinematics → collision → G writeback |
+| Jump | `this.tryJump(T?)` from `onKeyDown('z')` — grounded-only, running gives a takeoff bonus |
+| Movement feel | `TUNING` in `engine/kinematics.js` (single source of truth); pass `opts.tuning` for zone overrides (pool, swim) |
+| Walk animation | `this.stepWalkAnim(ts)` — leg-flip cadence gated on `G.pmoving` |
+| Reset velocity on entry | `this.resetMotion()` — call at the top of `onEnter()` |
 | Camera follow | `this._trackCameraX(camX, px)` |
 | World clamp | `this._clampX(x, margin)` |
 | Draw player | `drawRealmPharaoh(realm)` (reads `realm.getPlayerPose()`) |
 | Player pose | Override `getPlayerPose()` → `{ px, py, camX, pZ, facing, frame }` |
 | Gate/door hint | `TriggerZone` + `TriggerRegistry` |
+| Bonkable block | Pass `onBonk(body)` on a solid rect passed to `addStatic`/`addProvider` |
 | Patrol enemy | `new Enemy(id, x, y, { patrol, speed, hurtRange, surfaceFn })` |
 | Auto-pickup | `new Collectible(id, x, y, { type, value, onCollect })` |
 | Particles | Write to `G.particles[]`; `drawParts()` handles them |

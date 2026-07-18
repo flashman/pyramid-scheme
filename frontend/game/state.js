@@ -15,7 +15,7 @@ export const G = {
 
   // ── Player world-space position & animation ────────────
   px: 2450, py: GND,
-  pvy: 0,
+  pvx: 0, pvy: 0,
   facing: 1,
   pframe: 0, pmoving: false,
 
