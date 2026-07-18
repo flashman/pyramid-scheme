@@ -53,19 +53,24 @@ class PerfHud {
     if (!this.on) return;
     const dt   = this._avg(this._dtRing),   dtMax   = this._max(this._dtRing);
     const work = this._avg(this._workRing), workMax = this._max(this._workRing);
+    const dtNow   = this._dtRing[this._dtRing.length - 1]     || 0;   // this frame
+    const workNow = this._workRing[this._workRing.length - 1] || 0;
+    const gap  = Math.max(0, dtNow - workNow);   // off-JS time: GPU/composite/idle/vsync
     const fps  = dt ? 1000 / dt : 0;
+    const parts = G.particles ? G.particles.length : 0;
 
     const lines = [
-      `PERF  fps ${fps.toFixed(0).padStart(3)}   \\ = toggle`,
+      `PERF  fps ${fps.toFixed(0).padStart(3)}  now ${(dtNow ? 1000 / dtNow : 0).toFixed(0)}   \\ = toggle`,
       `dt    ${dt.toFixed(1)}ms  max ${dtMax.toFixed(1)}`,
-      `work  ${work.toFixed(1)}ms  max ${workMax.toFixed(1)}`,
-      `solids ${this._solids}   camY ${Math.round(G.camY)}   vy ${G.pvy.toFixed(1)}`,
+      `work  ${work.toFixed(1)}ms  max ${workMax.toFixed(1)}  (JS only)`,
+      `gap   ${gap.toFixed(1)}ms  <- GPU/composite/idle (NOT js)`,
+      `parts ${parts}   solids ${this._solids}   vy ${G.pvy.toFixed(1)}`,
     ];
 
     X.save();
     X.font = '11px monospace';
     X.textBaseline = 'top';
-    const w = 210, h = 8 + lines.length * 14;
+    const w = 320, h = 8 + lines.length * 14;
     X.globalAlpha = 0.82;
     X.fillStyle = '#000';
     X.fillRect(6, 6, w, h);
