@@ -86,6 +86,76 @@ One table — the realm registry itself is code, not DB (matches the `shop.py`/`
 - End-to-end against the live dev stack (**done**): forging all six gate + step flags through `PUT /api/state` left only the unreserved flag; evaluate granted nothing; both out-of-order steps 403'd; the real riddle → vault, stele → atlantis + deep, 7 gods → chamber, chief → council.
 - Manual: console-forge `Flags.set('cosmic_upline_done', true)` → does not persist across reload, WS refuses `realm_enter council`. Full dev-compose playthrough (scroll→nile/oasis, riddle→vault, stele+altar→atlantis, tablet→deep, gods→crypt, chief→council) plays identically to today.
 
+### Pre-deploy gate: verify the backfill against prod (NOT YET DONE)
+
+`alembic upgrade head` ran only against an empty dev DB, so the backfill
+SELECTs matched nothing — they are **untested against real data**. A wrong
+WHERE clause here silently locks existing players out of realms they have
+already reached, and is only fixable with another migration.
+
+Run these read-only queries against prod *before* deploying and sanity-check
+each count against how many players actually hold the matching flag. Note the
+JSONB checks: the migration compares `flags->>'x' = 'true'` (text extraction),
+which is correct for a stored JSON boolean but **not** for a stored string
+`"True"` or a number — query 2 confirms what is actually stored.
+
+```sql
+-- 1. How many players each realm would be granted to.
+SELECT 'nile/oasis' AS realm, count(*) FROM users u
+WHERE EXISTS (SELECT 1 FROM invites i  WHERE i.inviter_id   = u.id)
+   OR EXISTS (SELECT 1 FROM recruits r WHERE r.recruiter_id = u.id)
+   OR EXISTS (SELECT 1 FROM game_states gs WHERE gs.user_id = u.id
+              AND gs.flags->>'first_scroll_sent' = 'true')
+UNION ALL
+SELECT 'vault', count(*) FROM game_states gs
+WHERE COALESCE(gs.flags->>'sphinx_riddles_solved','0') NOT IN ('0','false','null','')
+   OR gs.flags->>'stele_read' = 'true'
+UNION ALL SELECT 'chamber',  count(*) FROM game_states WHERE flags->>'crypt_open'             = 'true'
+UNION ALL SELECT 'council',  count(*) FROM game_states WHERE flags->>'cosmic_upline_done'     = 'true'
+UNION ALL SELECT 'atlantis', count(*) FROM game_states WHERE flags->>'atlantis_vault_opened'  = 'true'
+                                                          OR flags->>'atlantis_statue_risen' = 'true'
+UNION ALL SELECT 'deep',     count(*) FROM game_states WHERE flags->>'atlantis_crack_visible' = 'true';
+
+-- 2. What these flags are ACTUALLY stored as (the comparison above assumes
+--    JSON booleans / numbers, not strings). Any 'string' row is a red flag.
+SELECT k, jsonb_typeof(flags->k) AS stored_type, count(*)
+FROM game_states, unnest(ARRAY[
+  'first_scroll_sent','sphinx_riddles_solved','stele_read','crypt_open',
+  'cosmic_upline_done','atlantis_vault_opened','atlantis_statue_risen',
+  'atlantis_crack_visible','gods_met','upline_accepted'
+]) AS k
+WHERE flags ? k
+GROUP BY k, stored_type ORDER BY k;
+
+-- 3. Anyone who reached a realm but whose gate flag is missing (would regress).
+--    Expect 0 rows; each row is a player who'd lose access.
+SELECT user_id, flags->>'gods_met' AS gods, flags->>'crypt_open' AS crypt
+FROM game_states
+WHERE (flags->>'gods_met')::int >= 7 AND COALESCE(flags->>'crypt_open','') <> 'true';
+```
+
+If `flags` is stored as `json` rather than `jsonb`, swap `?` for
+`flags::jsonb ? k` in query 2.
+
+### Portal-condition audit (done — no divergence found)
+
+Checked for the dangerous direction: a client portal *more permissive* than
+its server rule, which would offer a transition the WS then refuses.
+
+| Edge | Client gate | Server rule | Aligned? |
+|---|---|---|---|
+| world→nile / world→oasis | `first_scroll_sent` | granted on `POST /api/invites` | ✓ same action |
+| world→chamber | trigger `crypt-door` requires `crypt_open` (the portal's own `G.bought` is not the real gate — `handleKey` also requires the trigger zone) | 7 gods + bought + 15 D1 | ✓ `crypt_open` is only mirrored on grant |
+| world→council | trigger `capstone-tip` requires `cosmic_upline_done` | chamber + `upline_accepted` | ✓ mirrored on grant |
+| oasis→vault | `sphinx_riddles_solved >= 1` | same counter, server-owned | ✓ |
+| oasis→atlantis | `atlantis_statue_risen`, and the statue only rises once `atlantis_vault_opened` | vault + `stele_read` | ✓ altar needs `stele_read` to fire |
+| atlantis→deep | `atlantis_crack_visible` | requires atlantis | ✓ mirrored on grant |
+
+Every client gate keys on a flag the server *only* writes when it grants the
+realm, so the client cannot be ahead of the server. The one residual drift
+path: a `POST /api/progress` that fails on the network leaves the client
+locally ahead until `evaluateUnlocks()` on next session start reconciles.
+
 ---
 
 ## Phase 2 — Lazy realm loading (files remain public; no gating)
