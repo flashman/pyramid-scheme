@@ -77,27 +77,31 @@ async def test_evaluate_opens_a_dependency_chain_in_one_call(client):
     assert set(body["newly_unlocked"]) == {"vault", "atlantis", "deep"}
 
 
-async def test_evaluate_accepts_a_flag_snapshot_and_uses_it(client):
-    """The pushed flag must count in the same call — that's the whole point
-    of the optional body (no waiting on the client's sync debounce)."""
-    uid = await make_user(flags={"sphinx_riddles_solved": 1})
-    async with client as c:
-        body = (await c.post("/api/unlocks/evaluate",
-                             json={"flags": {"stele_read": True}},
-                             headers=auth_headers(uid))).json()
-    assert "atlantis" in body["newly_unlocked"]
-
-
-async def test_evaluate_strips_reserved_flags_from_the_snapshot(client):
-    """A forged gate flag in the snapshot must not open its realm."""
+async def test_evaluate_ignores_any_client_supplied_body(client):
+    """Evaluate takes no arguments: every rule input is server-owned, so
+    there is nothing a caller could say that changes the outcome. A body
+    full of forged progression must be inert."""
     uid = await make_user()
     async with client as c:
         body = (await c.post("/api/unlocks/evaluate",
                              json={"flags": {"cosmic_upline_done": True,
-                                             "sphinx_riddles_solved": 99}},
+                                             "sphinx_riddles_solved": 99,
+                                             "gods_met": 7,
+                                             "stele_read": True,
+                                             "upline_accepted": True}},
                              headers=auth_headers(uid))).json()
     assert body["newly_unlocked"] == []
     assert await _unlocked_ids(uid) == set()
+
+
+async def test_evaluate_reconciles_state_written_by_the_step_routes(client):
+    """Grants happen inline, but evaluate must still reconcile a client that
+    drifted (fresh login, missed WS event)."""
+    uid = await make_user(flags={"sphinx_riddles_solved": 1})
+    async with client as c:
+        first = (await c.post("/api/unlocks/evaluate",
+                              headers=auth_headers(uid))).json()
+    assert "vault" in first["newly_unlocked"]
 
 
 async def test_evaluate_never_grants_server_event_only_realms(client):
@@ -146,6 +150,110 @@ async def test_chamber_stays_shut_below_the_god_count(client):
         body = (await c.post("/api/unlocks/evaluate", json={},
                              headers=auth_headers(uid))).json()
     assert "chamber" not in body["newly_unlocked"]
+
+
+# ── /api/progress ─────────────────────────────────────────
+
+async def test_progress_records_a_step_and_unlocks(client):
+    uid = await make_user(flags={"sphinx_riddles_solved": 1})
+    async with client as c:
+        await c.post("/api/unlocks/evaluate", json={}, headers=auth_headers(uid))
+        body = (await c.post("/api/progress", json={"step_id": "stele_read"},
+                             headers=auth_headers(uid))).json()
+    assert "atlantis" in body["newly_unlocked"]
+
+
+async def test_progress_refuses_a_step_out_of_order(client):
+    """stele_read needs the vault — which needs a real riddle answer. This is
+    what stops the console from skipping straight to Atlantis."""
+    uid = await make_user()
+    async with client as c:
+        res = await c.post("/api/progress", json={"step_id": "stele_read"},
+                           headers=auth_headers(uid))
+    assert res.status_code == 403
+    assert await _unlocked_ids(uid) == set()
+
+
+async def test_progress_counts_each_god_once(client):
+    uid = await make_user()
+    async with client as c:
+        for _ in range(3):
+            body = (await c.post("/api/progress",
+                                 json={"step_id": "god_met", "item_id": "0"},
+                                 headers=auth_headers(uid))).json()
+    assert body["count"] == 1
+
+
+async def test_meeting_all_seven_gods_opens_the_crypt(client):
+    uid = await make_user()
+    async with client as c:
+        for i in range(7):
+            body = (await c.post("/api/progress",
+                                 json={"step_id": "god_met", "item_id": str(i)},
+                                 headers=auth_headers(uid))).json()
+    assert body["count"] == 7
+    assert "chamber" in body["newly_unlocked"]
+
+
+async def test_god_step_requires_buy_in(client):
+    uid = await make_user(username="broke")
+    async with TestingSessionLocal() as db:
+        state = (await db.execute(
+            select(GameState).where(GameState.user_id == uid)
+        )).scalar_one()
+        state.bought = False
+        await db.commit()
+
+    async with client as c:
+        res = await c.post("/api/progress",
+                           json={"step_id": "god_met", "item_id": "0"},
+                           headers=auth_headers(uid))
+    assert res.status_code == 403
+
+
+async def test_progress_rejects_unknown_step_and_item(client):
+    uid = await make_user()
+    async with client as c:
+        bad_step = await c.post("/api/progress", json={"step_id": "nope"},
+                                headers=auth_headers(uid))
+        bad_item = await c.post("/api/progress",
+                                json={"step_id": "god_met", "item_id": "99"},
+                                headers=auth_headers(uid))
+    assert bad_step.status_code == 404
+    assert bad_item.status_code == 404
+
+
+async def test_progress_requires_auth(client):
+    async with client as c:
+        res = await c.post("/api/progress", json={"step_id": "stele_read"})
+    assert res.status_code == 401
+
+
+async def test_full_chain_cannot_be_short_circuited(client):
+    """The end-to-end integrity claim: with no forged state, a fresh player
+    can only reach the Council by walking every gate in order."""
+    uid = await make_user()
+    async with client as c:
+        h = auth_headers(uid)
+        # Forging everything at once achieves nothing.
+        forged = await c.post("/api/unlocks/evaluate",
+                              json={"flags": {"gods_met": 7, "stele_read": True,
+                                              "upline_accepted": True,
+                                              "sphinx_riddles_solved": 12}},
+                              headers=h)
+        assert forged.json()["newly_unlocked"] == []
+
+        # The council step is refused until the crypt is genuinely open.
+        assert (await c.post("/api/progress", json={"step_id": "upline_accepted"},
+                             headers=h)).status_code == 403
+
+        # Walk it properly: seven gods → crypt, then the chief's offer.
+        for i in range(7):
+            await c.post("/api/progress",
+                         json={"step_id": "god_met", "item_id": str(i)}, headers=h)
+        body = (await c.post("/api/progress", json={"step_id": "upline_accepted"},
+                             headers=h)).json()
+    assert "council" in body["newly_unlocked"]
 
 
 # ── /api/challenge ────────────────────────────────────────

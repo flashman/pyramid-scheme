@@ -40,13 +40,20 @@ async def test_state_strips_reserved_realm_gate_flags(client):
         "challenge_solved_sphinx_map":  True,
         "challenge_attempts_sphinx_map": 0,
         "unlock_anything":        True,
+        # Quest-step inputs the unlock rules read. Reserving the gates but
+        # leaving these writable would make the gates decorative.
+        "gods_met":               7,
+        "god_3_met":              True,
+        "stele_read":             True,
+        "upline_accepted":        True,
     }
     uid = await make_user()
     async with client as c:
-        res = await c.put("/api/state", json={"flags": {**forged, "gods_met": 3}},
+        res = await c.put("/api/state",
+                          json={"flags": {**forged, "nile_baby": "adopted"}},
                           headers=auth_headers(uid))
         me = (await c.get("/api/me", headers=auth_headers(uid))).json()
     assert res.status_code == 200                 # stripped silently, never rejected
     for name in forged:
         assert name not in me["flags"], f"{name} must be server-owned"
-    assert me["flags"]["gods_met"] == 3            # ordinary flags still sync
+    assert me["flags"]["nile_baby"] == "adopted"   # ordinary flags still sync

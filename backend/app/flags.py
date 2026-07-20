@@ -17,14 +17,22 @@ RESERVED_FLAG_PREFIXES: tuple[str, ...] = (
     "challenge_attempts_",  # per-item wrong-attempt counters
 )
 
-RESERVED_FLAG_NAMES: frozenset[str] = frozenset({
+from app.steps import owned_flag_names
+
+# Realm gate flags, mirrored by realms.grant_realm().
+_GATE_FLAGS = {
     "first_scroll_sent",
     "crypt_open",
     "cosmic_upline_done",
     "atlantis_vault_opened",
     "atlantis_crack_visible",
     "sphinx_riddles_solved",
-})
+}
+
+# Gate flags plus every flag the step catalogue writes. Derived rather than
+# hand-listed: reserving a gate but leaving the input it reads client-settable
+# would make the gate decorative, so the two must not drift apart.
+RESERVED_FLAG_NAMES: frozenset[str] = frozenset(_GATE_FLAGS | owned_flag_names())
 
 
 def sanitize_flags(incoming: dict) -> dict:
