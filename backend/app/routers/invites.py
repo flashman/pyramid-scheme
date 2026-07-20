@@ -10,6 +10,7 @@ from app.schemas import SendInviteRequest, InviteResponse, InviteListResponse
 from app.auth import get_current_user
 from app.email import send_invite_email
 from app.config import settings
+from app.realms import grant_realm
 
 router = APIRouter()
 
@@ -57,6 +58,11 @@ async def send_invite(
     state.invites_left -= 1
     await db.commit()
     await db.refresh(invite)
+
+    # Sending the first scroll is the key action that opens the east/west
+    # lands — grant server-side (idempotent; mirrors first_scroll_sent).
+    await grant_realm(db, current_user.id, "nile",  source="first_scroll")
+    await grant_realm(db, current_user.id, "oasis", source="first_scroll")
 
     # Send email after the response is returned, so a slow/failed mail
     # provider never blocks the client (prod: Resend API; dev: Mailhog).

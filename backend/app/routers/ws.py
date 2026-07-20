@@ -23,6 +23,7 @@ from app.models import Recruit, Inventory, User
 from app.ws import manager
 from app.presence import on_socket_connect, on_socket_disconnect
 from app.channels import channels
+from app.realms import DEFAULT_UNLOCKED, REALM_CATALOGUE, unlocked_realm_ids
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -91,6 +92,23 @@ async def _dispatch(ws: WebSocket, user_id: int, username: str, text: str):
     # unknown types silently dropped
 
 
+async def _realm_allowed(realm: str, occupant_id: int) -> bool:
+    """Is `occupant_id` entitled to be in `realm`?
+
+    For an own-channel join that's the player themselves. For a projection
+    join it's the **host**, not the projector — projecting into a downline
+    member is sanctioned scouting and must work in realms the projector has
+    never unlocked (see the astral rule in the realm-gating plan)."""
+    if realm not in REALM_CATALOGUE:
+        return False
+    # The Desert needs no grant — skip the DB entirely for the realm that
+    # every session enters on connect.
+    if realm in DEFAULT_UNLOCKED:
+        return True
+    async with AsyncSessionLocal() as db:
+        return realm in await unlocked_realm_ids(db, occupant_id)
+
+
 async def _on_realm_enter(ws: WebSocket, user_id: int, username: str, msg: dict):
     realm    = msg.get("realm", "world")
     owner_id = msg.get("owner_id")
@@ -104,6 +122,12 @@ async def _on_realm_enter(ws: WebSocket, user_id: int, username: str, msg: dict)
         new_key = (owner_id, realm)
     else:
         return  # unauthorized — stay in current channel
+
+    # Gate on the channel *owner's* unlocks: the player for an own-channel
+    # join, the host for a projection join.
+    if not await _realm_allowed(realm, owner_id):
+        await ws.send_json({"type": "realm_denied", "realm": realm})
+        return  # stay in current channel
 
     old_key = channels.channel_of(ws)
 

@@ -10,6 +10,7 @@ from app.routers import astral as astral_router
 from app.routers import invites as invites_router
 from app.routers import ws as ws_router
 from app.routers import profile as profile_router
+from app.routers import unlocks as unlocks_router
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ app.include_router(profile_router.router, prefix="/api",      tags=["profile"])
 app.include_router(shop.router,           prefix="/api",      tags=["shop"])
 app.include_router(admin_router.router,   prefix="/api",      tags=["admin"])
 app.include_router(astral_router.router, prefix="/api",      tags=["astral"])
+app.include_router(unlocks_router.router, prefix="/api",     tags=["unlocks"])
 
 # ── WebSocket ─────────────────────────────────────────────
 app.include_router(ws_router.router, tags=["websocket"])

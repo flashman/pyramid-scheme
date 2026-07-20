@@ -26,6 +26,7 @@ from app.auth import get_current_user
 from app.database import get_db, AsyncSessionLocal
 from app.models import User, Recruit
 from app.chain import run_buyin_chain
+from app.realms import REALM_CATALOGUE, grant_realm
 from app.ws import manager
 
 router = APIRouter()
@@ -137,6 +138,24 @@ async def sim_recruit(
         delay_seconds=body.delay_seconds,
         message=f"Simulating {description} recruit '{sim_name}' in {body.delay_seconds:.0f}s…",
     )
+
+
+class UnlockRealmRequest(BaseModel):
+    realm_id: str
+
+
+@router.post("/dev/unlock-realm")
+async def dev_unlock_realm(
+    body: UnlockRealmRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dev-panel shortcut: grant a realm unlock without playing the quest.
+    Mounted only when DEBUG=true (like every /api/dev/* route)."""
+    if body.realm_id not in REALM_CATALOGUE:
+        raise HTTPException(status_code=404, detail="Unknown realm.")
+    granted = await grant_realm(db, current_user.id, body.realm_id, source="dev")
+    return {"ok": True, "granted": granted}
 
 
 @router.delete("/dev/sim-users", status_code=200)
