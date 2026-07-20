@@ -38,7 +38,7 @@ from app.challenges import CHALLENGE_CONFIG
 from app.database import get_db
 from app.models import User, GameState
 from app.realms import (
-    REALM_CATALOGUE, grant_realm, invalidate_unlock_cache,
+    REALM_CATALOGUE, d1_recruit_count, grant_realm, invalidate_unlock_cache,
     rule_satisfied, unlocked_realm_ids,
 )
 from app.steps import STEP_CONFIG
@@ -68,6 +68,7 @@ async def _evaluate_all(db: AsyncSession, user_id: int, *, bought: bool,
     on the session's expire_on_commit setting."""
     invalidate_unlock_cache(user_id)
     unlocked = set(await unlocked_realm_ids(db, user_id))
+    d1       = await d1_recruit_count(db, user_id)
     newly: list[str] = []
 
     changed = True
@@ -79,8 +80,8 @@ async def _evaluate_all(db: AsyncSession, user_id: int, *, bought: bool,
             # (nile/oasis on first invite) — never by evaluation.
             if realm_id in unlocked or rule.get("server_event_only"):
                 continue
-            if rule_satisfied(rule, unlocked=unlocked,
-                              bought=bought, flags=flags):
+            if rule_satisfied(rule, unlocked=unlocked, bought=bought,
+                              flags=flags, d1_recruits=d1):
                 if await grant_realm(db, user_id, realm_id, source=source):
                     newly.append(realm_id)
                 unlocked.add(realm_id)
@@ -131,7 +132,8 @@ async def record_step(
     # The server can't watch the player walk to the stele, but it can refuse
     # a step whose prerequisites aren't met — which forces the chain in order.
     if not rule_satisfied(cfg.get("requires", {}), unlocked=unlocked,
-                          bought=bought, flags=flags):
+                          bought=bought, flags=flags,
+                          d1_recruits=await d1_recruit_count(db, current_user.id)):
         raise HTTPException(status_code=403)
 
     if items is not None:
@@ -170,16 +172,20 @@ async def submit_challenge(
     cfg = CHALLENGE_CONFIG.get(body.challenge_id)
     if cfg is None:
         raise HTTPException(status_code=404, detail="Unknown challenge.")
-    answers = cfg["answers"].get(body.item_id)
-    if answers is None:
+    item = cfg["items"].get(body.item_id)
+    if item is None:
         raise HTTPException(status_code=404, detail="Unknown item.")
 
+    answers = item["answers"]
     correct = body.answer.strip().lower() in answers
     counter = cfg["counter"]
 
     # ── Guest: validate only, persist nothing ─────────────
     if current_user is None:
-        return {"correct": correct, "solved_count": 0, "attempts": 0}
+        resp = {"correct": correct, "solved_count": 0, "attempts": 0}
+        if correct:
+            resp["response"] = item["response"]
+        return resp
 
     state = await _get_or_create_state(db, current_user.id)
     flags = dict(state.flags or {})
@@ -198,7 +204,7 @@ async def submit_challenge(
         newly = await _evaluate_all(db, current_user.id, bought=bought,
                                     flags=flags, source="challenge")
         return {"correct": True, "solved_count": int(flags.get(counter) or 0),
-                "newly_unlocked": newly}
+                "response": item["response"], "newly_unlocked": newly}
 
     attempts = int(flags.get(attempts_key) or 0) + 1
     flags[attempts_key] = attempts
@@ -206,6 +212,9 @@ async def submit_challenge(
     await db.commit()
     resp = {"correct": False, "attempts": attempts,
             "solved_count": int(flags.get(counter) or 0)}
+    # The sphinx's mercy: after enough failures it just tells you, and the
+    # lore response comes with it.
     if attempts >= cfg["hint_after_attempts"]:
-        resp["hint"] = answers[0].upper()
+        resp["hint"]     = answers[0].upper()
+        resp["response"] = item["response"]
     return resp

@@ -201,6 +201,7 @@ const REALMS = [
       if (!G.bought) _grantBuyIn();
       Flags.set('seven_heavens_done', true);
       Flags.set('crypt_entered', true);
+      _devUnlock('chamber');
       _ensurePlayerPyramid();
     },
   },
@@ -233,6 +234,7 @@ const REALMS = [
     id: 'nile', label: '🐊 NILE',
     setup() {
       if (!G.bought) _grantBuyIn();
+      _devUnlock('nile', 'oasis');
       _ensurePlayerPyramid();
     },
   },
@@ -299,6 +301,30 @@ const FLAG_GROUPS = [
   },
 ];
 
+// ── Server-side unlocks for dev cheats ────────────────────
+// Progression is server-authoritative now: setting a gate flag locally is
+// no longer enough, because /api/state strips these names and the WS gate
+// refuses realm_enter for a realm the server hasn't granted. Dev shortcuts
+// therefore call the DEBUG-only grant endpoint alongside their Flags.set.
+
+const GATE_FLAG_REALMS = {
+  first_scroll_sent:      ['nile', 'oasis'],
+  sphinx_riddles_solved:  ['vault'],
+  stele_read:             ['vault', 'atlantis'],
+  atlantis_vault_opened:  ['atlantis'],
+  atlantis_crack_visible: ['deep'],
+  crypt_open:             ['chamber'],
+  upline_accepted:        ['chamber', 'council'],
+  cosmic_upline_done:     ['chamber', 'council'],
+};
+
+function _devUnlock(...realmIds) {
+  if (!Api.hasToken()) return;   // guest mode is local-only anyway
+  for (const realm_id of realmIds) {
+    Api.post('/api/dev/unlock-realm', { realm_id }).catch(() => {});
+  }
+}
+
 function _sideEffectSH() {
   if (G.pyramids.length === 0) _ensurePlayerPyramid();
 }
@@ -313,6 +339,7 @@ function _unlockOasis() {
   Flags.set('atlantis_vault_opened', true);
   Flags.set('stele_read', true);
   for (let i = 0; i < 3; i++) Flags.inc('sphinx_riddles_solved');
+  _devUnlock('nile', 'oasis', 'vault');
   log('[DEV] Oasis unlocked — vault opened, all riddles solved.', '');
 }
 
@@ -331,6 +358,7 @@ function _unlockAtlantis() {
   Flags.set('atlantis_archive_read', 3);
   Flags.set('atlantis_deepest_tablet', true);
   Flags.set('atlantis_crack_visible', true);
+  _devUnlock('atlantis');
   log('[DEV] Atlantis fully unlocked — crack visible.', '');
 }
 
@@ -338,6 +366,7 @@ function _unlockDeep() {
   // Everything above + deep flags
   _unlockAtlantis();
   Flags.set('deep_visited', true);
+  _devUnlock('deep');
   log('[DEV] The Deep unlocked.', '');
 }
 
@@ -365,6 +394,7 @@ function _unlockCouncil() {
   Flags.set('upline_accepted', true);
   Flags.set('chief_spoken', true);
   Flags.set('crypt_entered', true);
+  _devUnlock('chamber', 'council');
 }
 
 function _grantWealth() {
@@ -606,6 +636,9 @@ export function initDevPanel() {
       btn.onclick = () => {
         const newVal = !Flags.get(f.key);
         Flags.set(f.key, newVal);
+        // Gate flags are server-owned — grant the realm too, or the toggle
+        // looks like it worked until the WS refuses the transition.
+        if (newVal && GATE_FLAG_REALMS[f.key]) _devUnlock(...GATE_FLAG_REALMS[f.key]);
         if (newVal && f.side) f.side();
         refreshPanel();
         log(`[DEV] ${f.key} → ${newVal}`, '');

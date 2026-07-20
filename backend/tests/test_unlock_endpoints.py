@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from sqlalchemy import select
 
-from app.models import GameState, UserRealmUnlock
+from app.models import GameState, Recruit, UserRealmUnlock
 from app.realms import invalidate_unlock_cache
 from tests.conftest import TestingSessionLocal, make_user, auth_headers
 
@@ -24,6 +24,16 @@ def _silence_ws():
     with patch("app.realms.manager") as mgr:
         mgr.send_to_user = AsyncMock()
         yield mgr
+
+
+async def _give_d1_recruits(uid, n):
+    """PHARAOH tier is 15 direct recruits (frontend game/tiers.js) — the
+    crypt rule expresses that as requires_d1_recruits."""
+    async with TestingSessionLocal() as db:
+        for i in range(n):
+            db.add(Recruit(recruiter_id=uid, recruit_name=f"REC_{i}",
+                           depth=1, payout=4.0))
+        await db.commit()
 
 
 async def _unlocked_ids(uid):
@@ -120,8 +130,9 @@ async def test_evaluate_requires_auth(client):
     assert res.status_code == 401
 
 
-async def test_chamber_opens_for_a_bought_player_who_met_the_gods(client):
+async def test_chamber_opens_for_a_bought_pharaoh_who_met_the_gods(client):
     uid = await make_user(flags={"gods_met": 7})   # make_user is bought=True
+    await _give_d1_recruits(uid, 15)
     async with client as c:
         body = (await c.post("/api/unlocks/evaluate", json={},
                              headers=auth_headers(uid))).json()
@@ -131,6 +142,7 @@ async def test_chamber_opens_for_a_bought_player_who_met_the_gods(client):
 async def test_chamber_stays_shut_without_the_buy_in(client):
     """Both halves of the rule are required — meeting the gods isn't enough."""
     uid = await make_user(username="notbought", flags={"gods_met": 7})
+    await _give_d1_recruits(uid, 15)
     async with TestingSessionLocal() as db:
         state = (await db.execute(
             select(GameState).where(GameState.user_id == uid)
@@ -146,6 +158,7 @@ async def test_chamber_stays_shut_without_the_buy_in(client):
 
 async def test_chamber_stays_shut_below_the_god_count(client):
     uid = await make_user(flags={"gods_met": 6})
+    await _give_d1_recruits(uid, 15)
     async with client as c:
         body = (await c.post("/api/unlocks/evaluate", json={},
                              headers=auth_headers(uid))).json()
@@ -186,6 +199,7 @@ async def test_progress_counts_each_god_once(client):
 
 async def test_meeting_all_seven_gods_opens_the_crypt(client):
     uid = await make_user()
+    await _give_d1_recruits(uid, 15)
     async with client as c:
         for i in range(7):
             body = (await c.post("/api/progress",
@@ -233,6 +247,7 @@ async def test_full_chain_cannot_be_short_circuited(client):
     """The end-to-end integrity claim: with no forged state, a fresh player
     can only reach the Council by walking every gate in order."""
     uid = await make_user()
+    await _give_d1_recruits(uid, 15)
     async with client as c:
         h = auth_headers(uid)
         # Forging everything at once achieves nothing.

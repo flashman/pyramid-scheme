@@ -35,39 +35,55 @@ One table — the realm registry itself is code, not DB (matches the `shop.py`/`
 
 **Backfill grants from existing `game_states.flags`** so no player regresses: invites/recruits/`first_scroll_sent` → nile+oasis; `sphinx_riddles_solved>=1` or `stele_read` → vault; `crypt_open` → chamber; `cosmic_upline_done` → council; `atlantis_vault_opened` or `atlantis_statue_risen` → atlantis; `atlantis_crack_visible` → deep. Test the backfill against a read-only copy of prod flags (Supabase console) before deploying.
 
-### New backend modules — rules as data, two generic endpoints (scales without new routes)
+### New backend modules — rules as data, generic endpoints (scales without new routes)
+
+> **AS BUILT (2026-07-19).** Two deviations from the original sketch, both
+> decided mid-implementation and both reflected below:
+> 1. **No realm id ever appears in a URL path** (user requirement). The claim
+>    route became argument-free, and the challenge route names its challenge
+>    in the body.
+> 2. **A third route, `POST /api/progress`, was added.** Reserving only the
+>    gate flags left the gates decorative: the rules read `gods_met`,
+>    `stele_read` and `upline_accepted`, which the client could still forge,
+>    so 4 of 8 realms stayed console-openable. Quest steps are now
+>    server-owned data too.
+
 - `backend/app/realms.py`:
   - `REALM_CATALOGUE` — single source of truth, one entry per realm:
     ```python
     "atlantis": {
         "dir": "atlantis", "module": "/worlds/atlantis/AtlantisRealm.js",
-        "export": "AtlantisRealm", "sort": 5,
+        "export": "AtlantisRealm", "sort": 4,
         "unlock_rule": {"requires_realms": ["vault"], "requires_flags": ["stele_read"]},
         "legacy_flag": "atlantis_vault_opened",   # mirrored on grant
     },
     ```
-    Rule primitives (one generic evaluator covers all 8 realms): `default_unlocked`, `requires_realms`, `requires_flags` / `requires_flags_any`, `requires_bought`, `requires_counters` (e.g. `{"sphinx_riddles_solved": 1}`), `server_event_only` (nile/oasis — claim endpoint refuses; only backend hooks grant).
-  - `unlocked_realm_ids(db, user_id)` with ~30s in-process TTL cache; `grant_realm(db, user_id, realm_id, source)` — idempotent upsert, mirrors `legacy_flag` into `GameState.flags` (so existing client draw/quest code hydrates unchanged from `/api/me`), invalidates cache, pushes WS `realm_unlocked` via `manager`.
-- `backend/app/challenges.py`: `CHALLENGE_CONFIG` — answer-carrying actions as data. First entry: sphinx (12 riddle answers moved from riddles.js, `increments: "sphinx_riddles_solved"`, `hint_after_attempts: 13`). Future puzzle realms add entries, not endpoints.
-- `backend/app/routers/unlocks.py` — exactly **two generic routes**, both authed + idempotent:
-  - `POST /api/unlock/{realm_id}` — look up `REALM_CATALOGUE[realm_id].unlock_rule`, evaluate against server-visible state (unlock set, `state.bought`, flags, counters); grant on pass, 403 with no detail on fail. Covers chamber, council, atlantis, deep today — and every future rule-based realm with zero new code.
-  - `POST /api/challenge/{challenge_id}` `{item_id?, answer}` — validate against `CHALLENGE_CONFIG` (normalized answer match, per-user attempt counter in flags); on success increment the configured server-owned counter and auto-evaluate/grant any realm whose rule is now satisfied (vault). Response `{correct, solved_count, hint?}` — hint only at attempts ≥ threshold.
+    Rule primitives (one generic evaluator covers all 8 realms): `default_unlocked`, `requires_realms`, `requires_flags` / `requires_flags_any`, `requires_bought`, `requires_counters` (e.g. `{"sphinx_riddles_solved": 1}`), `requires_d1_recruits` (how the client's PHARAOH-tier gate — 15 direct recruits — is expressed server-side, since recruit rows can't be forged), `server_event_only` (nile/oasis — evaluation never grants; only backend hooks do).
+  - `unlocked_realm_ids(db, user_id)` with ~30s in-process TTL cache; `grant_realm(db, user_id, realm_id, source)` — idempotent upsert, mirrors `legacy_flag` into `GameState.flags` (so existing client draw/quest code hydrates unchanged from `/api/me`), invalidates cache, pushes WS `realm_unlocked` (carrying `legacy_flag` so the client mirrors it immediately).
+- `backend/app/challenges.py`: `CHALLENGE_CONFIG` — answer-carrying actions as data. First entry: sphinx (12 riddles moved from riddles.js, `counter: "sphinx_riddles_solved"`, `hint_after_attempts: 13`). **The responses moved server-side too, not just the answers** — every sphinx response opens by naming the solution ("A MAP.", "A HOLE."), so leaving them in the client would have leaked all 12 answers anyway. The client holds the questions; the server returns the response text once answered.
+- `backend/app/steps.py`: `STEP_CONFIG` — quest steps as data (`god_met` per-item ×7 → `gods_met`; `stele_read`; `upline_accepted`), each with preconditions evaluated by the same `rule_satisfied`. `owned_flag_names()` derives the reserved set so flags and steps can't drift apart.
+- `backend/app/flags.py`: the namespace-lock policy in one place, shared by `PUT /api/state`. Prefixes `shop_owned_`, `unlock_`, `challenge_solved_`, `challenge_attempts_`; names = gate flags ∪ `steps.owned_flag_names()`. **Strip silently** like `shop_owned_` (the client legitimately syncs its whole Flags store; rejecting would break every honest sync).
+- `backend/app/routers/unlocks.py` — three generic routes, all idempotent:
+  - `POST /api/unlocks/evaluate` — **no arguments.** Re-evaluates every rule against server-visible state and grants what passes, looping to a fixpoint so a dependency chain (vault → atlantis → deep) opens in one call. Every rule input is server-owned, so there is nothing a caller could usefully supply. Grants also happen inline on the earning action; this is the reconcile net for a drifted client.
+  - `POST /api/progress` `{step_id, item_id?}` — records a step after checking its preconditions (403 otherwise), then evaluates. The server can't watch a player walk to the stele, but refusing an out-of-order step forces the chain to be walked: `stele_read` needs the vault, and the vault only opens on a real riddle answer.
+  - `POST /api/challenge` `{challenge_id, item_id, answer}` — validates against `CHALLENGE_CONFIG`, counts each item once (so re-answering a solved riddle can't farm the counter), then evaluates. Response `{correct, solved_count, response?, hint?, newly_unlocked}` — hint only at attempts ≥ threshold. Auth optional: guests get validation, nothing persists.
 
-  nile+oasis: hook `grant_realm(..., "first_scroll")` into `POST /api/invites` (the key action already goes through the server).
-- `routers/dev.py`: DEBUG-only `POST /api/dev/unlock-realm` so dev-panel shortcuts keep working (panel calls it alongside its `Flags.set`).
-- `routers/game.py`: extend the lock — `RESERVED_FLAG_PREFIXES += ("unlock_",)`; add `RESERVED_FLAG_NAMES = {crypt_open, cosmic_upline_done, atlantis_vault_opened, atlantis_crack_visible, sphinx_riddles_solved, first_scroll_sent}`. **Strip silently** like `shop_owned_` (client legitimately syncs its whole Flags store; rejecting would break every honest sync and the beacon).
-- `routers/ws.py _on_realm_enter`: own-channel joins require realm ∈ `unlocked_realm_ids` (cached); **projection joins validate against the target host's unlocks, not the projector's** (astral scouting rule). Deny → send `{"type":"realm_denied"}`, socket stays put.
+  nile+oasis: `grant_realm(..., "first_scroll")` hooked into `POST /api/invites` (the key action already goes through the server).
+- `routers/dev.py`: DEBUG-only `POST /api/dev/unlock-realm` `{realm_id}` so dev-panel shortcuts keep working (the panel calls it alongside its `Flags.set`, or the toggle looks like it worked until the WS refuses the transition).
+- `routers/ws.py _on_realm_enter`: joins are gated on the **channel owner's** unlocks — the player for an own-channel join, the **host** for a projection join (astral scouting rule). `world` short-circuits without a DB read. Deny → send `{"type":"realm_denied"}`, socket stays put.
 
 ### Frontend key-action call sites (eager loading untouched)
-- `worlds/oasis/riddles.js _submit()` → async `POST /api/challenge/sphinx {item_id, answer}`; drive correct/wrong/hint phases from the response; **delete the answers arrays**; set local `sphinx_riddles_solved` from `solved_count` for instant portal/draw feedback.
-- `game/recruits.js unlockCrypt()` → `POST /api/unlock/chamber` (keep the local `Flags.set` for instant UX; server is authority).
-- `worlds/crypt/ChamberRealm.js` chief-accept → `POST /api/unlock/council`.
-- `worlds/oasis/VaultRealm.js` altar → `POST /api/unlock/atlantis`.
-- `worlds/atlantis/AtlantisRealm.js` deepest tablet → `POST /api/unlock/deep`.
-- `game/session.js`: handle `ws:realm_unlocked` (log/refresh) and `ws:realm_denied` ("The way is barred." via game log).
+- `worlds/oasis/riddles.js _submit()` → async `POST /api/challenge {challenge_id:'sphinx', item_id, answer}`; new `waiting` phase covers the round trip and blocks double-submits; **answers and responses deleted**; local `sphinx_riddles_solved` set from `solved_count` for instant portal/draw feedback.
+- `worlds/earth/draw/gods.js onNear()` → `POST /api/progress {step_id:'god_met', item_id:idx}`.
+- `worlds/oasis/VaultRealm.js` stele → `POST /api/progress {step_id:'stele_read'}`; altar → `evaluateUnlocks()`.
+- `worlds/crypt/ChamberRealm.js` chief-accept → `POST /api/progress {step_id:'upline_accepted'}`.
+- `game/recruits.js unlockCrypt()` and `worlds/atlantis/AtlantisRealm.js` crack → `evaluateUnlocks()` (reconcile net; the steps are what actually earn these).
+- All keep their local `Flags.set` for instant UX — the server is the authority, and `/api/state` strips the name on the next sync.
+- `game/session.js`: `evaluateUnlocks()` on start; handles `ws:realm_unlocked` (mirrors `legacy_flag`, logs) and `ws:realm_denied` ("The way is barred.").
 
 ### Verify Phase 1
-- Backend: `test_realm_unlocks.py` (grant idempotency, flag mirroring, rule-evaluator unit tests per primitive), `test_unlock_endpoints.py` (generic claim: pass/403 per realm rule, chain order; challenge: sphinx correct/wrong/hint-at-13, `server_event_only` refusal for nile), extend `test_state_namespace_lock.py` for new reserved names, WS `realm_enter` rejection test. `docker compose exec backend pytest`.
+- Backend (**done — 126 passing**): `test_realm_unlocks.py` (grant idempotency, flag mirroring, rule-evaluator unit tests per primitive), `test_unlock_endpoints.py` (evaluate: fixpoint chain, forged-body inertness, `server_event_only` refusal; progress: out-of-order 403, per-item counting, tier gate; challenge: correct/wrong/hint-at-13/guest), `test_ws_realm_gate.py` (own-channel deny, host-not-projector projection rule), `test_state_namespace_lock.py` extended to gate flags **and** step inputs. `docker compose exec backend pytest`.
+- End-to-end against the live dev stack (**done**): forging all six gate + step flags through `PUT /api/state` left only the unreserved flag; evaluate granted nothing; both out-of-order steps 403'd; the real riddle → vault, stele → atlantis + deep, 7 gods → chamber, chief → council.
 - Manual: console-forge `Flags.set('cosmic_upline_done', true)` → does not persist across reload, WS refuses `realm_enter council`. Full dev-compose playthrough (scroll→nile/oasis, riddle→vault, stele+altar→atlantis, tablet→deep, gods→crypt, chief→council) plays identically to today.
 
 ---

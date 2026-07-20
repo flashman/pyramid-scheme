@@ -11,6 +11,7 @@ import { Dialogue, DialogueManager } from '../../../engine/dialogue.js';
 import { NPC }                  from '../../../engine/entity.js';
 import { spawnParts }           from '../../../draw/utils.js';
 import { unlockCrypt }          from '../../../game/recruits.js';
+import { Api }                  from '../../../game/api.js';
 
 // ── Raw data (position, visual, personality) ────────────
 export const SKY_GOD_DATA = [
@@ -305,8 +306,11 @@ export class SkyGodEntity extends NPC {
   onNear() {
     const key = `god_${this.idx}_met`;
     if (!Flags.get(key)) {
+      // Server counts the gods — the total gates the crypt, so both this
+      // flag and gods_met are server-owned. Local sets are instant UX only.
       Flags.set(key, true);
       Flags.inc('gods_met');
+      Api.recordStep('god_met', String(this.idx)).catch(() => {});
       Events.emit('god:first_meet', { idx: this.idx, name: this.data.name });
       spawnParts(this.worldX, this.worldY + 22, this.data.glowCol, 40);
       G.shake = 6;
