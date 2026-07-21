@@ -277,7 +277,7 @@ async def test_challenge_correct_answer_increments_counter(client):
     uid = await make_user()
     async with client as c:
         body = (await c.post("/api/challenge",
-                             json={"challenge_id": "sphinx", "item_id": "map",
+                             json={"challenge_id": "sphinx", "item_id": "r1",
                                    "answer": "MAP"},
                              headers=auth_headers(uid))).json()
     assert body["correct"] is True
@@ -288,7 +288,7 @@ async def test_challenge_correct_answer_unlocks_the_vault(client):
     uid = await make_user()
     async with client as c:
         body = (await c.post("/api/challenge",
-                             json={"challenge_id": "sphinx", "item_id": "hole",
+                             json={"challenge_id": "sphinx", "item_id": "r2",
                                    "answer": "hole"},
                              headers=auth_headers(uid))).json()
     assert "vault" in body["newly_unlocked"]
@@ -299,7 +299,7 @@ async def test_challenge_accepts_any_configured_synonym(client):
     uid = await make_user()
     async with client as c:
         body = (await c.post("/api/challenge",
-                             json={"challenge_id": "sphinx", "item_id": "clock",
+                             json={"challenge_id": "sphinx", "item_id": "r6",
                                    "answer": "  Time  "},
                              headers=auth_headers(uid))).json()
     assert body["correct"] is True
@@ -310,7 +310,7 @@ async def test_challenge_resolving_the_same_riddle_does_not_farm_the_counter(cli
     async with client as c:
         for _ in range(3):
             body = (await c.post("/api/challenge",
-                                 json={"challenge_id": "sphinx", "item_id": "map",
+                                 json={"challenge_id": "sphinx", "item_id": "r1",
                                        "answer": "map"},
                                  headers=auth_headers(uid))).json()
     assert body["solved_count"] == 1
@@ -320,7 +320,7 @@ async def test_challenge_wrong_answer_counts_attempts_without_hint(client):
     uid = await make_user()
     async with client as c:
         body = (await c.post("/api/challenge",
-                             json={"challenge_id": "sphinx", "item_id": "map",
+                             json={"challenge_id": "sphinx", "item_id": "r1",
                                    "answer": "wrong"},
                              headers=auth_headers(uid))).json()
     assert body["correct"] is False
@@ -333,7 +333,7 @@ async def test_challenge_reveals_the_hint_at_the_configured_threshold(client):
     async with client as c:
         for i in range(13):
             body = (await c.post("/api/challenge",
-                                 json={"challenge_id": "sphinx", "item_id": "map",
+                                 json={"challenge_id": "sphinx", "item_id": "r1",
                                        "answer": "nope"},
                                  headers=auth_headers(uid))).json()
             if i < 12:
@@ -345,7 +345,7 @@ async def test_challenge_reveals_the_hint_at_the_configured_threshold(client):
 async def test_challenge_guest_gets_validation_but_nothing_persists(client):
     async with client as c:
         body = (await c.post("/api/challenge",
-                             json={"challenge_id": "sphinx", "item_id": "map",
+                             json={"challenge_id": "sphinx", "item_id": "r1",
                                    "answer": "map"})).json()
     assert body["correct"] is True
     assert body["solved_count"] == 0
@@ -358,7 +358,7 @@ async def test_challenge_unknown_ids_404(client):
     uid = await make_user()
     async with client as c:
         bad_challenge = await c.post("/api/challenge",
-                                     json={"challenge_id": "nope", "item_id": "map",
+                                     json={"challenge_id": "nope", "item_id": "r1",
                                            "answer": "map"},
                                      headers=auth_headers(uid))
         bad_item = await c.post("/api/challenge",

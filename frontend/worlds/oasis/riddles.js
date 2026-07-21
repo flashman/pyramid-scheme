@@ -12,57 +12,60 @@ import { Api }              from '../../game/api.js';
 
 // ── Riddle pool ───────────────────────────────────────────
 // Questions only. The answers AND the responses live server-side in
-// backend/app/challenges.py — every response opens by naming the solution
-// ("A MAP.", "A HOLE."), so shipping them here would leak all 12 answers.
-// POST /api/challenge validates and hands back the response text.
-// Keep these ids in sync with CHALLENGE_CONFIG['sphinx'].items.
+// backend/app/challenges.py — every response opens by naming its solution,
+// so shipping responses here would leak all 12 answers even with the answer
+// arrays removed. POST /api/challenge validates and returns the response.
+//
+// The ids are deliberately opaque (r1, r2, …): they used to be the answer
+// word itself, which gave the whole pool away to anyone reading this file.
+// Keep them in sync with CHALLENGE_CONFIG['sphinx'].items.
 const RIDDLES = [
   {
-    id: 'map',
+    id: 'r1',
     question: 'I HAVE CITIES, YET NO HOUSES LIVE THERE.\nMOUNTAINS RISE WITHIN ME,\nYET NONE HAVE EVER CLIMBED THEM.\nWHAT AM I?',
   },
   {
-    id: 'hole',
+    id: 'r2',
     question: 'THE MORE YOU TAKE FROM ME,\nTHE LARGER I BECOME.\nWHAT AM I?',
   },
   {
-    id: 'echo',
+    id: 'r3',
     question: 'I SPEAK WITHOUT LIPS.\nI LINGER WITHOUT EARS.\nI HAVE NO BODY,\nYET THE DESERT STIRS WITH ME.',
   },
   {
-    id: 'coffin',
+    id: 'r4',
     question: 'THE MAN WHO MAKES ME\nDOES NOT NEED ME.\nHE WHO BUYS ME\nWILL NEVER USE ME HIMSELF.',
   },
   {
-    id: 'trust',
+    id: 'r5',
     question: 'I GROW WHEN YOU GIVE ME AWAY.\nI VANISH WHEN YOU HOARD ME.\nI AM WORTH NOTHING ON PAPER,\nYET EVERYTHING IN PRACTICE.',
   },
   {
-    id: 'clock',
+    id: 'r6',
     question: 'YOU SEE MY FACE EVERY DAY.\nYET YOU CANNOT TRULY SEE ME.\nI HAVE HANDS BUT CANNOT TOUCH.\nI COUNT WHAT CANNOT BE RETURNED.',
   },
   {
-    id: 'stamp',
+    id: 'r7',
     question: 'I TRAVEL THE ENTIRE WORLD\nWITHOUT EVER LEAVING MY CORNER.\nWHAT AM I?',
   },
   {
-    id: 'future',
+    id: 'r8',
     question: 'ALWAYS AHEAD.\nNEVER BEHIND.\nNEVER SEEN.\nNEVER REACHED.',
   },
   {
-    id: 'letter_e',
+    id: 'r9',
     question: 'I AM THE BEGINNING OF ETERNITY,\nTHE END OF TIME AND SPACE,\nTHE START OF EVERY END,\nAND THE END OF EVERY PLACE.',
   },
   {
-    id: 'profit',
+    id: 'r10',
     question: 'EVERY PHARAOH SEEKS ME AT THE TOP.\nEVERY RECRUIT SEEKS ME AT THE BOTTOM.\nI AM THE SAME IN BOTH PLACES.\nWHAT AM I?',
   },
   {
-    id: 'stone',
+    id: 'r11',
     question: 'I BUILT THESE PYRAMIDS.\nI WAS PAID NOTHING.\nI WILL OUTLAST THE PHARAOH,\nTHE SCHEME, AND THE DESERT ITSELF.',
   },
   {
-    id: 'truth',
+    id: 'r12',
     question: 'KINGS FEAR WHAT I REVEAL.\nFOOLS DENY WHAT I DEMAND.\nI AM NEITHER FRIEND NOR ENEMY.\nI AM SIMPLY WHAT IS.',
   },
 ];
