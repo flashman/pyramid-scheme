@@ -86,7 +86,18 @@ One table — the realm registry itself is code, not DB (matches the `shop.py`/`
 - End-to-end against the live dev stack (**done**): forging all six gate + step flags through `PUT /api/state` left only the unreserved flag; evaluate granted nothing; both out-of-order steps 403'd; the real riddle → vault, stele → atlantis + deep, 7 gods → chamber, chief → council.
 - Manual: console-forge `Flags.set('cosmic_upline_done', true)` → does not persist across reload, WS refuses `realm_enter council`. Full dev-compose playthrough (scroll→nile/oasis, riddle→vault, stele+altar→atlantis, tablet→deep, gods→crypt, chief→council) plays identically to today.
 
-### Pre-deploy gate: verify the backfill against prod (NOT YET DONE)
+### Pre-deploy gate: verify the backfill against prod (TYPE-CHECK PASSED 2026-07-25)
+
+**Result (query 2, run against prod):** every stored flag is the expected
+type — boolean gate flags stored as `boolean`, `sphinx_riddles_solved` as
+`number`. No string-typed flags, so the migration's `flags->>'x' = 'true'`
+comparisons all match. `crypt_open`, `cosmic_upline_done`,
+`atlantis_crack_visible`, `gods_met`, `upline_accepted` are absent on every
+player (nobody has reached the crypt/council/deep), so those backfills are
+correct no-ops. One tester backfills to nile+oasis+vault+atlantis, one more
+to nile+oasis; no regressions. Backfill is safe to deploy. The remaining
+Phase 1 gate is the manual playthrough.
+
 
 `alembic upgrade head` ran only against an empty dev DB, so the backfill
 SELECTs matched nothing — they are **untested against real data**. A wrong
@@ -118,13 +129,15 @@ UNION ALL SELECT 'deep',     count(*) FROM game_states WHERE flags->>'atlantis_c
 
 -- 2. What these flags are ACTUALLY stored as (the comparison above assumes
 --    JSON booleans / numbers, not strings). Any 'string' row is a red flag.
-SELECT k, jsonb_typeof(flags->k) AS stored_type, count(*)
+--    NB: the flags column is `json`, not `jsonb`, so this uses json_typeof
+--    and `flags->k IS NOT NULL` (the `?` key-exists operator is jsonb-only).
+SELECT k, json_typeof(flags->k) AS stored_type, count(*)
 FROM game_states, unnest(ARRAY[
   'first_scroll_sent','sphinx_riddles_solved','stele_read','crypt_open',
   'cosmic_upline_done','atlantis_vault_opened','atlantis_statue_risen',
   'atlantis_crack_visible','gods_met','upline_accepted'
 ]) AS k
-WHERE flags ? k
+WHERE flags->k IS NOT NULL
 GROUP BY k, stored_type ORDER BY k;
 
 -- 3. Anyone who reached a realm but whose gate flag is missing (would regress).
@@ -134,8 +147,8 @@ FROM game_states
 WHERE (flags->>'gods_met')::int >= 7 AND COALESCE(flags->>'crypt_open','') <> 'true';
 ```
 
-If `flags` is stored as `json` rather than `jsonb`, swap `?` for
-`flags::jsonb ? k` in query 2.
+(Confirmed 2026-07-25: `flags` is `json`, not `jsonb` — query 2 already
+uses the `json`-compatible form.)
 
 ### Portal-condition audit (done — no divergence found)
 
