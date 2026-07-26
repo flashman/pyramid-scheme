@@ -13,6 +13,7 @@ import { Dialogue, DialogueManager } from '../../engine/dialogue.js';
 import { Flags, QuestManager }       from '../../engine/flags.js';
 import { vaultTransRender }          from '../transitions.js';
 import { PortalRegistry }            from '../../engine/portal.js';
+import { Api }                       from '../../game/api.js';
 import { VAULT_FLOOR, STELE_X,
          ALTAR_X }                   from './constants.js';
 import { drawVault }                 from './draw/vault.js';
@@ -106,7 +107,10 @@ function _buildSteleDialogue() {
       speaker: 'BENEATH THE INSCRIPTION  ✦  ~10,500 BC',
       text: 'YOU ARE STANDING IN\nTHEIR BUILDING.\nTHE ALTAR HAS WAITED\nTEN THOUSAND YEARS\nFOR SOMEONE WHO HAS\nREAD THIS FAR.',
       onEnter: () => {
+        // Server owns this step — it gates Atlantis. The local Flags.set is
+        // for instant UX only; /api/state strips the name on sync.
         Flags.set('stele_read', true);
+        Api.recordStep('stele_read').catch(() => {});
         log('✦ The inscription settles in your chest like cold water.', 'hi');
         setTimeout(() => {
           log('The altar stone has shifted. Just slightly.', '');
@@ -153,7 +157,11 @@ export class VaultRealm extends FlatRealm {
         return;
       }
       // ── Open the passage ─────────────────────────────
+      // atlantis_vault_opened is the realm gate flag: server-owned, mirrored
+      // back by grant_realm. Set locally for instant feedback, then ask the
+      // server to re-evaluate (the stele step is what actually earns it).
       Flags.set('atlantis_vault_opened', true);
+      Api.evaluateUnlocks().catch(() => {});
       G.shake = 18;
       log('✦ THE ALTAR STONE GRINDS ASIDE.', 'hi');
       setTimeout(() => log('Water rises from below. Cold. Pre-diluvian.', ''), 700);

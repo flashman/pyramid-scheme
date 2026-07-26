@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -64,6 +64,31 @@ async def get_current_user(
     user   = result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise credentials_exc
+    return user
+
+
+async def get_optional_user(
+    authorization: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Like get_current_user but returns None instead of raising 401.
+
+    For endpoints that serve both guests and authenticated players
+    (e.g. sphinx riddle validation — guests get answers checked, only
+    authed users get counters/unlocks persisted)."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    payload = decode_token(authorization.split(" ", 1)[1])
+    if not payload:
+        return None
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        return None
+    result = await db.execute(select(User).where(User.id == user_id))
+    user   = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        return None
     return user
 
 

@@ -75,7 +75,10 @@ Key files:
 - `app/shop.py` — `SHOP_CATALOGUE` is the **single source of truth** for bazaar ware ids/prices (mirrors `payout.py`); served via `GET /api/config`. Never hardcode ware prices in JS. `app/inventory.py` has the inventory helpers; ownership lives in the `inventory` table (**keepsakes only**, qty 1 — consumables are effect-only, never inventoried), and every buy writes a `shop_buy` row to `Transaction` (the DB ledger). **Namespace lock:** `PUT /api/state` strips reserved flag prefixes (`shop_owned_*`) so clients can't forge ownership — keep server-owned state out of the client-settable `flags`.
 - `app/ws.py` — `manager` singleton (`ConnectionManager`). Supports multiple tabs per user. Import `manager` wherever you need to push real-time events. `manager.realm_of(user_id)` resolves a user's current realm from socket metadata (used by astral presence) — don't reach into `manager._conns`/`_meta` directly.
 - `app/channels.py` — `channels` singleton (`ChannelRegistry`). Maps `(owner_id | None, realm_id) → set[WebSocket]` so co-presence (ghost peers, chat, astral projection) is scoped to one realm instance. `(None, realm)` keys are reserved for future shared "system" realms (cantina/ocean).
-- `app/models.py` — `User`, `GameState`, `Invite`, `Recruit`, `Transaction`, `GameEvent`, `Inventory`. `Recruit.meta` (JSON) is patched by the frontend after slot assignment via `PATCH /api/recruits/{id}/meta`.
+- `app/realms.py` — `REALM_CATALOGUE` is the **single source of truth for realms and their unlock rules** (same pattern as `payout.py`/`shop.py`). Progression is server-authoritative: `grant_realm()` writes `user_realm_unlocks`, mirrors the entry's `legacy_flag` into `GameState.flags` (so client draw/quest code hydrates unchanged), and pushes a `realm_unlocked` WS event. `unlocked_realm_ids()` has a ~30s in-process TTL cache — safe only because of the single-instance invariant below.
+- `app/steps.py` / `app/challenges.py` — quest steps and puzzle answers as data. **Riddle answers and their responses live here, never in JS** (each response opens by naming its answer, so shipping responses would leak them). Adding a puzzle or step means a catalogue entry, not an endpoint.
+- `app/flags.py` — the namespace lock. `sanitize_flags()` strips server-owned names from client syncs; the reserved set is *derived* from `steps.owned_flag_names()` so a new step can't silently become forgeable. **Reserving a realm's gate flag is pointless unless the inputs its rule reads are reserved too** — that was the bug that made 4 realms console-openable.
+- `app/models.py` — `User`, `GameState`, `Invite`, `Recruit`, `Transaction`, `GameEvent`, `Inventory`, `UserRealmUnlock`. `Recruit.meta` (JSON) is patched by the frontend after slot assignment via `PATCH /api/recruits/{id}/meta`.
 
 > **⚠️ Single-instance invariant.** `manager` and `channels` hold all WebSocket / co-presence state in **process memory**. The backend therefore runs as **exactly one web instance** — there is no cross-process fan-out. Consequences: (1) never enable horizontal autoscaling on Render — two instances = split-brain co-presence (users on different instances can't see each other, and a rolling deploy briefly runs two); (2) every deploy / idle spin-down wipes live channels and in-flight projection sessions (clients reconnect and re-`realm_enter`, but an active projection is lost). Scaling past one instance, or building a many-occupant shared realm, requires a pub/sub backplane (Render Key Value / Redis) behind `channels.broadcast` + interest management — see `PYRAMID_SCHEME_TODO.md`.
 
@@ -100,6 +103,19 @@ The `Inventory` store mirrors the server inventory — hydrated from `/api/me` a
 - `SolidRealm` (`engine/solidrealm.js`) — Mario-style physics base for side-scrollers: velocity-driven kinematics (`engine/kinematics.js`, `TUNING` is the single source of movement feel) + solid-list AABB collision (`engine/physics2d.js`: walls, ceilings, bonkable blocks via `onBonk`, one-way + moving platforms, `contactDirection` for future stomp enemies). Realms declare geometry as static rects + providers; zones (pool/water) pass per-frame tuning overrides to `physicsStep()`.
 - `FlatRealm` (`worlds/FlatRealm.js`) — fixed-camera realms (crypt chamber, council, vault). Provides `_walkStep(ts)` and `getPlayerPose()`. Extend this instead of SolidRealm for indoor/chamber areas.
 - `RealmManager` — registers realms, handles transitions. Use `scheduleTransition(id, {duration, render})` for animated swaps; `transitionTo(id)` for immediate swaps. Check `RealmManager.isTransitioning` to block input/update during animations.
+
+### Realm unlocks are server-owned
+Portal conditions still read `Flags`, but the client is no longer the authority. A realm opens only when the server grants it, and there are exactly three ways that happens — all generic, and **no API path ever contains a realm id**:
+
+| Route | Body | Use |
+|---|---|---|
+| `POST /api/unlocks/evaluate` | *(none)* | Re-evaluate all rules; grants what passes. Reconcile net. |
+| `POST /api/progress` | `{step_id, item_id?}` | Record a quest step (403 if its preconditions aren't met). |
+| `POST /api/challenge` | `{challenge_id, item_id, answer}` | Submit a puzzle answer for server validation. |
+
+Call sites keep their local `Flags.set` for instant UX, then fire the matching request — `/api/state` strips the name on the next sync, so the local value is presentation only. **Never add a realm-specific endpoint**; add a `REALM_CATALOGUE` / `STEP_CONFIG` entry instead. Adding a realm gate also means asking what flag its rule reads, and reserving that flag in `app/flags.py`.
+
+WS `realm_enter` is gated on the **channel owner's** unlocks — the host's, not the projector's, so astral projection into a downline member works in realms the projector has never reached.
 
 ### Realm graph: `PortalRegistry` (`engine/portal.js`)
 The directed graph of realm-to-realm connections. Each realm registers its **outgoing portals in its own constructor** so conditions can close over `this`:

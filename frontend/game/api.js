@@ -135,6 +135,36 @@ export const Api = {
     });
   },
 
+  // ── Realm unlock helpers ──────────────────────────────
+  // The server owns progression. These are the only ways client actions
+  // become unlocks — realm ids never appear in the path, and the flags
+  // these write are stripped from ordinary /api/state syncs.
+
+  /**
+   * Reconcile unlocks with server state. Takes no arguments: every input
+   * the rules read is server-owned. Returns { unlocked, newly_unlocked }.
+   */
+  evaluateUnlocks() { return Api.post('/api/unlocks/evaluate'); },
+
+  /**
+   * Record a quest step (app/steps.py STEP_CONFIG). 403 if its
+   * preconditions aren't met. Returns { newly_unlocked, count? }.
+   */
+  recordStep(stepId, itemId = null) {
+    return Api.post('/api/progress', { step_id: stepId, item_id: itemId });
+  },
+
+  /**
+   * Submit a challenge answer for validation. The answers live server-side
+   * (app/challenges.py) — never ship them to the client.
+   * Returns { correct, solved_count, attempts?, hint?, newly_unlocked? }.
+   */
+  submitChallenge(challengeId, itemId, answer) {
+    return Api.post('/api/challenge', {
+      challenge_id: challengeId, item_id: itemId, answer,
+    });
+  },
+
   // ── Invite helpers ────────────────────────────────────
 
   /** Send an invite scroll to an email address. */

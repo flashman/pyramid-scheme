@@ -289,7 +289,11 @@ export function inspectPyr(p) {
 
 export function unlockCrypt() {
   if (Flags.get('crypt_open')) return;
+  // crypt_open is a realm gate flag: server-owned, earned by meeting all
+  // seven gods at PHARAOH tier. The local set is instant feedback; the
+  // evaluate call is the reconcile net if a god step didn't reach the server.
   Flags.set('crypt_open', true);
+  Api.evaluateUnlocks().catch(() => {});
   G.shake = 10;
   const pp = G.pyramids.find(p => p.isPlayer);
   if (pp) spawnParts(pp.wx, GND-20, COL.NEON, 70);

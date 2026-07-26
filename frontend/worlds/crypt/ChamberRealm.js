@@ -8,6 +8,7 @@ import { Dialogue, DialogueManager }  from '../../engine/dialogue.js';
 import { Flags, QuestManager }        from '../../engine/flags.js';
 import { PortalRegistry }             from '../../engine/portal.js';
 import { Events }                     from '../../engine/events.js';
+import { Api }                        from '../../game/api.js';
 import { CHAMBER_FLOOR, CHIEF_X }    from './constants.js';
 import { drawChamber }                from './draw/chamber.js';
 import { log }                        from '../../ui/panels.js';
@@ -68,7 +69,10 @@ function _buildChiefDialogue() {
       speaker: 'SECTOR CHIEF  Ω-7',
       text: 'EXCELLENT. YOUR FRANCHISE\nIS APPROVED. RECRUIT WORLDS.\nALWAYS 4. ALWAYS MORE.\nWELCOME TO THE UPLINE.',
       onComplete: () => {
+        // Server owns this step — it gates the Council, and is only
+        // accepted from someone who genuinely reached the crypt.
         Flags.set('upline_accepted', true);
+        Api.recordStep('upline_accepted').catch(() => {});
         Events.emit('upline_accepted', {});
         QuestManager.check();
       },

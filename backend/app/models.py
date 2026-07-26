@@ -80,6 +80,22 @@ class Inventory(Base):
     user: Mapped[User] = relationship("User", back_populates="inventory")
 
 
+# ── UserRealmUnlock ───────────────────────────────────────
+
+class UserRealmUnlock(Base):
+    """One row per realm a user has unlocked. The realm registry itself is
+    code (app/realms.py REALM_CATALOGUE) — this table only records grants.
+    Realms with default_unlocked rules never get rows."""
+    __tablename__ = "user_realm_unlocks"
+
+    user_id:    Mapped[int]      = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    realm_id:   Mapped[str]      = mapped_column(String(32), primary_key=True)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    source:     Mapped[str]      = mapped_column(String(32), nullable=False, default="")
+
+
 # ── Invite ────────────────────────────────────────────────
 
 class Invite(Base):

@@ -9,12 +9,11 @@ from app.schemas import (
     RecruitResponse, RecruitListResponse, PatchRecruitMetaRequest,
 )
 from app.auth import get_current_user
+from app.flags import sanitize_flags
 from app.inventory import inventory_list
 from app.offering import offering_code
 
 router = APIRouter()
-
-RESERVED_FLAG_PREFIXES = ("shop_owned_",)   # server-owned; never client-settable
 
 
 # ── GET /api/me ───────────────────────────────────────────
@@ -63,12 +62,11 @@ async def save_state(
         state = GameState(user_id=current_user.id)
         db.add(state)
 
-    # Only flags are client-settable — and reserved (server-owned) namespaces
-    # are stripped so ownership can't be forged through this channel.
+    # Only flags are client-settable — and reserved (server-owned) names are
+    # stripped so ownership and realm gates can't be forged through this
+    # channel. See app/flags.py for the policy.
     if body.flags is not None:
-        incoming = {k: v for k, v in body.flags.items()
-                    if not k.startswith(RESERVED_FLAG_PREFIXES)}
-        state.flags = {**(state.flags or {}), **incoming}
+        state.flags = {**(state.flags or {}), **sanitize_flags(body.flags)}
 
     await db.commit()
     return {"ok": True}

@@ -52,6 +52,7 @@ import {
 import { drawAtlantis }        from './draw/atlantis.js';
 import { atlantisTransRender, deepTransRender } from '../transitions.js';
 import { PortalRegistry }     from '../../engine/portal.js';
+import { Api }                from '../../game/api.js';
 
 // ══════════════════════════════════════════════════════════
 // Death message system
@@ -704,7 +705,11 @@ export class AtlantisRealm extends FreeMoveRealm {
       setTimeout(() => log('THERE IS ALWAYS AN OCEAN.', ''), 8700);
       setTimeout(() => {
         G.shake = 12;
+        // Realm gate flag \u2014 server-owned, mirrored back by grant_realm.
+        // Local set is instant feedback; the Deep is earned by having
+        // reached Atlantis at all, so a re-evaluation is all the server needs.
         Flags.set('atlantis_crack_visible', true);
+        Api.evaluateUnlocks().catch(() => {});
         log('\u2726 The vault floor shifts.', 'hi');
         log('A crack. In the stone. Running east to west.', '');
         log('Light from below \u2014 not bioluminescent. Older.', '');

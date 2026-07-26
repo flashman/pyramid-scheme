@@ -58,6 +58,11 @@ export class GameSession {
     this._wireBeforeUnload();
     this._wireWsEvents();
 
+    // Reconcile unlocks with the server. Grants normally happen inline on
+    // the action that earns them; this catches a client that drifted (an
+    // action whose request failed, or a pre-gating account being backfilled).
+    Api.evaluateUnlocks().catch(() => {});
+
     // Non-critical: invite panel and dev-panel mode; don't await.
     Api.getInvites()
       .then(data => { if (data.invites) updateInvitePanel(data.invites); })
@@ -207,6 +212,21 @@ export class GameSession {
     // A direct recruit came online / went offline — flip their card dot.
     Events.on('ws:recruit_presence', (evt) => {
       RecruitPresence.set(evt.user_id, evt.online);
+    });
+
+    // The server granted a realm. Mirror the gate flag locally so portal
+    // conditions and draw code react without waiting for a reload — the
+    // server has already written the authoritative record.
+    Events.on('ws:realm_unlocked', (evt) => {
+      if (evt.legacy_flag) Flags._store[evt.legacy_flag] = true;
+      log(`✦ A way opens: ${evt.realm.toUpperCase()}`, 'hi');
+    });
+
+    // The server refused a realm entry. Shouldn't happen in normal play —
+    // the client only offers portals it believes are open — so this is
+    // either drift or someone poking at the socket.
+    Events.on('ws:realm_denied', () => {
+      log('The way is barred.', 'r');
     });
 
     // Peer presence events are handled in game/astral.js so they can be

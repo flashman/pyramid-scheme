@@ -8,80 +8,65 @@ import { Flags }           from '../../engine/flags.js';
 import { InAppKeyboard } from '../../ui/in-app-keyboard.js';
 import { Events }           from '../../engine/events.js';
 import { DialogueManager }  from '../../engine/dialogue.js';
+import { Api }              from '../../game/api.js';
 
 // ── Riddle pool ───────────────────────────────────────────
+// Questions only. The answers AND the responses live server-side in
+// backend/app/challenges.py — every response opens by naming its solution,
+// so shipping responses here would leak all 12 answers even with the answer
+// arrays removed. POST /api/challenge validates and returns the response.
+//
+// The ids are deliberately opaque (r1, r2, …): they used to be the answer
+// word itself, which gave the whole pool away to anyone reading this file.
+// Keep them in sync with CHALLENGE_CONFIG['sphinx'].items.
 const RIDDLES = [
   {
-    id: 'map',
+    id: 'r1',
     question: 'I HAVE CITIES, YET NO HOUSES LIVE THERE.\nMOUNTAINS RISE WITHIN ME,\nYET NONE HAVE EVER CLIMBED THEM.\nWHAT AM I?',
-    answers:  ['map'],
-    response: 'A MAP.\nTHE LAND IS NOT THE TERRITORY.\nYET EVERY PHARAOH MISTAKES\nTHE MAP FOR THE WORLD ITSELF.',
   },
   {
-    id: 'hole',
+    id: 'r2',
     question: 'THE MORE YOU TAKE FROM ME,\nTHE LARGER I BECOME.\nWHAT AM I?',
-    answers:  ['hole'],
-    response: 'A HOLE.\nLIKE DEBT.\nLIKE THE SPACE BETWEEN\nWHAT THE SCHEME PROMISES AND WHAT IT DELIVERS.',
   },
   {
-    id: 'echo',
+    id: 'r3',
     question: 'I SPEAK WITHOUT LIPS.\nI LINGER WITHOUT EARS.\nI HAVE NO BODY,\nYET THE DESERT STIRS WITH ME.',
-    answers:  ['echo'],
-    response: 'ECHO.\nYOUR RECRUITERS ECHO YOUR PITCH\nDOWN TWELVE LEVELS OF THE CHAIN.\nBY THEN, NOTHING OF THE ORIGINAL REMAINS.',
   },
   {
-    id: 'coffin',
+    id: 'r4',
     question: 'THE MAN WHO MAKES ME\nDOES NOT NEED ME.\nHE WHO BUYS ME\nWILL NEVER USE ME HIMSELF.',
-    answers:  ['coffin'],
-    response: 'A COFFIN.\nI HAVE WATCHED FOUR THOUSAND YEARS\nOF PHARAOHS WHO BELIEVED\nTHEY WERE THE EXCEPTION.',
   },
   {
-    id: 'trust',
+    id: 'r5',
     question: 'I GROW WHEN YOU GIVE ME AWAY.\nI VANISH WHEN YOU HOARD ME.\nI AM WORTH NOTHING ON PAPER,\nYET EVERYTHING IN PRACTICE.',
-    answers:  ['trust'],
-    response: 'TRUST.\nTHE ONLY CURRENCY THAT CANNOT BE PRINTED.\nEVERY PYRAMID SPENDS IT FIRST\nAND NOTICES LAST.',
   },
   {
-    id: 'clock',
+    id: 'r6',
     question: 'YOU SEE MY FACE EVERY DAY.\nYET YOU CANNOT TRULY SEE ME.\nI HAVE HANDS BUT CANNOT TOUCH.\nI COUNT WHAT CANNOT BE RETURNED.',
-    answers:  ['clock', 'time'],
-    response: 'THE CLOCK. TIME.\nYOUR PYRAMID TOOK WEEKS TO BUILD.\nFOUR THOUSAND YEARS FROM NOW\nNO ONE WILL REMEMBER THE PHARAOH.',
   },
   {
-    id: 'stamp',
+    id: 'r7',
     question: 'I TRAVEL THE ENTIRE WORLD\nWITHOUT EVER LEAVING MY CORNER.\nWHAT AM I?',
-    answers:  ['stamp'],
-    response: 'A STAMP.\nYOUR INVITATION SCROLLS\nALSO TRAVEL FAR\nWITHOUT EVER LEAVING YOUR HAND.',
   },
   {
-    id: 'future',
+    id: 'r8',
     question: 'ALWAYS AHEAD.\nNEVER BEHIND.\nNEVER SEEN.\nNEVER REACHED.',
-    answers:  ['future', 'horizon'],
-    response: 'THE FUTURE. OR THE HORIZON.\nBOTH ARE CORRECT.\nBOTH DESCRIBE THE SAME THING:\nWHAT EVERY SCHEME SELLS.',
   },
   {
-    id: 'letter_e',
+    id: 'r9',
     question: 'I AM THE BEGINNING OF ETERNITY,\nTHE END OF TIME AND SPACE,\nTHE START OF EVERY END,\nAND THE END OF EVERY PLACE.',
-    answers:  ['e'],
-    response: 'THE LETTER E.\nYOU DID NOT EXPECT THAT.\nNEITHER DID THE LAST\nFOUR THOUSAND PHARAOHS WHO STOOD HERE.',
   },
   {
-    id: 'profit',
+    id: 'r10',
     question: 'EVERY PHARAOH SEEKS ME AT THE TOP.\nEVERY RECRUIT SEEKS ME AT THE BOTTOM.\nI AM THE SAME IN BOTH PLACES.\nWHAT AM I?',
-    answers:  ['gold', 'profit', 'wealth', 'money'],
-    response: 'GOLD. PROFIT. WEALTH.\nALL CORRECT.\nAND AT THE TOP OF YOUR UPLINE?\nSOMETHING ELSE PROFITS FROM YOURS.',
   },
   {
-    id: 'stone',
+    id: 'r11',
     question: 'I BUILT THESE PYRAMIDS.\nI WAS PAID NOTHING.\nI WILL OUTLAST THE PHARAOH,\nTHE SCHEME, AND THE DESERT ITSELF.',
-    answers:  ['stone', 'sand', 'time', 'worker', 'labor'],
-    response: 'STONE. SAND. TIME. WORKER.\nALL ACCEPTED.\nTHE BUILDERS HAVE ALWAYS\nOUTLASTED THE SCHEME.',
   },
   {
-    id: 'truth',
+    id: 'r12',
     question: 'KINGS FEAR WHAT I REVEAL.\nFOOLS DENY WHAT I DEMAND.\nI AM NEITHER FRIEND NOR ENEMY.\nI AM SIMPLY WHAT IS.',
-    answers:  ['truth', 'reality', 'facts'],
-    response: 'TRUTH.\nOR REALITY.\nYOU HAVE ANSWERED WELL, PHARAOH.\nNOW WATCH CAREFULLY WHAT YOU HAVE BUILT.',
   },
 ];
 
@@ -213,27 +198,48 @@ export const RiddleManager = (() => {
     }
   }
 
-  function _submit() {
-    const answer = _input.trim().toLowerCase();
+  function _beginPhase(phase, text) {
+    _phase     = phase;
+    _respText  = text;
+    _typeLen   = 0;
+    _typeStart = Date.now();
+  }
+
+  // The sphinx now asks the server. Answers, responses and the solved
+  // counter are all server-owned (backend/app/challenges.py), so a correct
+  // answer is the only thing that can open the vault.
+  async function _submit() {
+    const answer = _input.trim();
     InAppKeyboard.close();
-    if (_riddle.answers.includes(answer)) {
-      _phase     = 'correct';
-      _respText  = _riddle.response;
-      _typeLen   = 0;
-      _typeStart = Date.now();
-      Flags.inc('sphinx_riddles_solved');
+    _beginPhase('waiting', '');
+
+    let res;
+    try {
+      res = await Api.submitChallenge('sphinx', _riddle.id, answer);
+    } catch {
+      res = null;
+    }
+    // A dismissed riddle must not be resurrected by a late response.
+    if (!_active || _phase !== 'waiting') return;
+
+    if (!res || res.error || res.detail) {
+      _beginPhase('wrong', 'THE SPHINX DOES NOT ANSWER.\nSAND IN THE WIRES.\nTRY AGAIN.');
+      return;
+    }
+
+    if (res.correct) {
+      // Local, for instant portal/draw feedback. The server owns the real
+      // count and strips this name from state syncs.
+      if (res.solved_count != null) Flags.set('sphinx_riddles_solved', res.solved_count);
+      _beginPhase('correct', res.response || '');
+      return;
+    }
+
+    _attempts = res.attempts ?? _attempts + 1;
+    if (res.hint) {
+      _beginPhase('correct', `THE ANSWER IS: ${res.hint}.\n${res.response || ''}`);
     } else {
-      _attempts++;
-      if (_attempts >= 13) {
-        const hint = _riddle.answers[0].toUpperCase();
-        _phase    = 'correct';
-        _respText = `THE ANSWER IS: ${hint}.\n${_riddle.response}`;
-      } else {
-        _phase    = 'wrong';
-        _respText = 'INCORRECT.\nTHE SPHINX REGARDS YOU\nIN SILENCE.';
-      }
-      _typeLen   = 0;
-      _typeStart = Date.now();
+      _beginPhase('wrong', 'INCORRECT.\nTHE SPHINX REGARDS YOU\nIN SILENCE.');
     }
   }
 
@@ -270,6 +276,9 @@ export const RiddleManager = (() => {
         if (key === ' ' || key === 'Enter') { _skipOrAdvance(); }
         return true;
       }
+
+      // ── Waiting phase: the sphinx is consulting the server ─
+      if (_phase === 'waiting') return true;   // swallow input, no double-submit
 
       // ── Typing phase: free-text input ─────────────────────
       if (_phase === 'typing') {
@@ -349,8 +358,9 @@ export const RiddleManager = (() => {
 
       // Main text — typewriter slice.
       // In typing phase we keep showing the full question so the player
-      // can refer back to it while composing their answer.
-      const displayText = _phase === 'typing'
+      // can refer back to it while composing their answer. Waiting holds
+      // the question too, so a fast round trip reads as no pause at all.
+      const displayText = (_phase === 'typing' || _phase === 'waiting')
         ? _riddle.question
         : _currentText().substring(0, _typeLen);
       textEl.textContent = displayText;
@@ -363,6 +373,9 @@ export const RiddleManager = (() => {
           _answerAfterEl.textContent  = _input.slice(_cursorPos);
         }
         hintEl.textContent = '[ENTER] SUBMIT     [ESC] LEAVE';
+      } else if (_phase === 'waiting') {
+        if (_answerBeforeEl) _destroyAnswerRow();
+        hintEl.textContent = 'THE SPHINX CONSIDERS…';
       } else {
         if (_answerBeforeEl) _destroyAnswerRow();
         const done = _typewriterDone();
