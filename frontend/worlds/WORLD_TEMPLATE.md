@@ -231,7 +231,7 @@ onKeyDown(key) {
 }
 ```
 
-**Adding a portal from an existing realm to your new realm** does not require editing the existing realm. Register the portal in your new realm's constructor with `from: 'existing-realm'` — `PortalRegistry.handleKey()` is already called inside that realm's `onKeyDown()` and will pick up the new portal automatically.
+**Adding a portal from an existing realm to your new realm** means registering it in the *existing (source)* realm's constructor, next to its other exits (e.g. `world → nile` lives in `WorldRealm`). Don't register it in your new realm with `from: 'existing-realm'` — once realms load lazily, your realm isn't constructed until the player enters it, so an entrance registered there would never exist.
 
 ---
 

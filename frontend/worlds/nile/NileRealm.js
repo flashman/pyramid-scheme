@@ -27,8 +27,7 @@ import { G }                              from '../../game/state.js';
 import { SPDHALF }                        from '../constants.js';
 import { CW }                             from '../../engine/canvas.js';
 import { log }                            from '../../ui/panels.js';
-import { cityTransRender,
-         desertTransRender }              from '../transitions.js';
+import { desertTransRender }              from '../transitions.js';
 import {
   NILE_W, BANK_Y, WATER_Y, RIVERBED_Y, WATER_BOTTOM, REED_TOP, CROC_BACK,
   CURRENT_SPD, SWIM_SPD, JUMP_VY,
@@ -171,17 +170,6 @@ export class NileRealm extends SolidRealm {
       hint: '[↑] BACK TO THE DESERT',
       hintY: BANK_Y - 56,
     }));
-
-    // ── Inbound portal from the Desert (graph edge owned here). ──
-    PortalRegistry.register({
-      from: 'world', to: 'nile',
-      key: 'ArrowUp', trigger: 'nile-gate',
-      // Locked until the first scroll is sent — set once at the send site in
-      // recruits.js (monotonic; immune to invite-count accumulation).
-      condition:  () => Flags.get('first_scroll_sent'),
-      onUse:      () => { G.shake = 6; },
-      transition: cityTransRender, duration: 3000,
-    });
 
     // ── Outbound portal back to the Desert (from the bank). ──
     PortalRegistry.register({

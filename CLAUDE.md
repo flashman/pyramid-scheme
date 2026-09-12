@@ -144,7 +144,7 @@ onKeyDown(key) {
 
 Movement is arrow-keys only (WASD was dropped as redundant; `S` is the astral-chat "speak" key). Portals with `key: null` are for graph completeness only (boundary exits handled in `update()`).
 
-**To add a portal from an existing realm to a new one**: register it in the new realm's constructor with `from: 'existing-realm'` — no edit to the existing realm file required.
+**To add a portal from an existing realm to a new one**: register it in the *existing (source)* realm's constructor — e.g. `world → nile` lives in `WorldRealm`. Never register an edge in its destination: once realms load lazily, an unloaded destination's registrations don't exist, so its entrance would silently vanish.
 
 ### Realm manifest (`worlds/manifest.js`)
 Single file for realm instantiation. `main.js` imports `ALL_REALMS` and registers them — `main.js` never needs to change when adding realms. Add new realms here only.

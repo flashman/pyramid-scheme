@@ -13,7 +13,7 @@ import { GND, WORLD_W }                   from './constants.js';
 import { LH }                             from '../constants.js';
 import { OASIS_ENTRY_X }                  from '../oasis/constants.js';
 import { NILE_GATE_X }                    from '../nile/constants.js';
-import { oasisTransRender, launchTransRender } from '../transitions.js';
+import { oasisTransRender, launchTransRender, cityTransRender } from '../transitions.js';
 import { PortalRegistry }                      from '../../engine/portal.js';
 import { spawnParts }                     from '../../draw/utils.js';
 import {
@@ -91,9 +91,9 @@ export class WorldRealm extends SolidRealm {
 
     // ── Portal exits ──────────────────────────────────────
     // These are the outgoing edges of this realm in the graph.
-    // onKeyDown() delegates to PortalRegistry.handleKey() — adding a
-    // new realm that branches off the world only requires a new portal
-    // registration; WorldRealm.js does not need to change.
+    // onKeyDown() delegates to PortalRegistry.handleKey(). Every edge is
+    // registered by its SOURCE realm, so a destination never has to be
+    // loaded for its entrance to work (required for lazy realm loading).
     PortalRegistry.register({
       from: 'world', to: 'oasis',
       key: 'ArrowUp', trigger: 'oasis-gate',
@@ -120,6 +120,14 @@ export class WorldRealm extends SolidRealm {
         say('TO THE STARS!', 300);
       },
       transition: launchTransRender, duration: 2600,
+    });
+    PortalRegistry.register({
+      from: 'world', to: 'nile',
+      key: 'ArrowUp', trigger: 'nile-gate',
+      // Same gate as the oasis: locked until the first scroll is sent.
+      condition:  () => Flags.get('first_scroll_sent'),
+      onUse:      () => { G.shake = 6; },
+      transition: cityTransRender, duration: 3000,
     });
   }
 
