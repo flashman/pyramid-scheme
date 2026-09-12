@@ -11,11 +11,6 @@ export const SPHINX_WX      = 1800;  // world-x center of sphinx body
 export const PASSAGE_WX     = 1680;  // center of the staircase between the sphinx paws
 export const OASIS_ENTRY_X  = 7400;  // world-x in the main world that triggers gate prompt
 
-// Vault (chamber beneath the sphinx)
-export const VAULT_FLOOR    = 436;
-export const STELE_X        = 390;   // world-x of the Dream Stele
-export const ALTAR_X        = 310;   // world-x of the sacrificial altar (STELE_X - 80)
-
 // Atlantis gate — statue rises from the pool centre after vault ritual
 export const POOL_CENTER_WX = 800;   // world-x of the dive point (POOL_WX + POOL_WIDTH/2)
 export const POOL_DIVE_RANGE = 110;  // proximity range to trigger the dive prompt

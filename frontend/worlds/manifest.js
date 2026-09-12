@@ -14,7 +14,7 @@
 import { WorldRealm }    from './earth/WorldRealm.js';
 import { NileRealm }     from './nile/NileRealm.js';
 import { OasisRealm }    from './oasis/OasisRealm.js';
-import { VaultRealm }    from './oasis/VaultRealm.js';
+import { VaultRealm }    from './vault/VaultRealm.js';
 import { AtlantisRealm } from './atlantis/AtlantisRealm.js';
 import { DeepRealm }     from './deep/DeepRealm.js';
 import { ChamberRealm }  from './crypt/ChamberRealm.js';

@@ -1,4 +1,4 @@
-// ── FILE: worlds/oasis/draw/vault.js ────────────────────
+// ── FILE: worlds/vault/draw/vault.js ────────────────────
 // The sealed chamber beneath the great sphinx.
 // Ritual circle. Mummy guardians. Sacrificial altar. Apophis on the ceiling.
 // This place has been used. Recently. And before that. And before that.
