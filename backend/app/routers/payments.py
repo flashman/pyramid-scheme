@@ -72,7 +72,9 @@ async def _apply_confirmed_buyin(
     or from the admin manual-confirm endpoint.
     """
     state.bought       = True
-    state.invested     = round((state.invested or 0) + fee, 2)
+    # Numeric column loads as Decimal — cast before adding the float fee
+    # (Decimal + float raises TypeError; same cast as chain.py's balance math).
+    state.invested     = round(float(state.invested or 0) + fee, 2)
     state.invites_left = (state.invites_left or 0) + INVITES_PER_BUYIN
 
     # Walk the upline FIRST, so the ledger + message reflect what was ACTUALLY

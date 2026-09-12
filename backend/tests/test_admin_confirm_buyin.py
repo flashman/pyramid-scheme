@@ -6,7 +6,8 @@ from app.auth import hash_password
 from tests.conftest import TestingSessionLocal, auth_headers
 
 
-async def _mk(username, *, is_admin=False, recruiter_id=None, bought=False, balance=0.0):
+async def _mk(username, *, is_admin=False, recruiter_id=None, bought=False, balance=0.0,
+              invested=0.0):
     """Insert a User (+ GameState) with explicit fields; return its id."""
     async with TestingSessionLocal() as db:
         u = User(
@@ -18,7 +19,8 @@ async def _mk(username, *, is_admin=False, recruiter_id=None, bought=False, bala
         )
         db.add(u)
         await db.flush()
-        db.add(GameState(user_id=u.id, bought=bought, earned=0.0, invites_left=0))
+        db.add(GameState(user_id=u.id, bought=bought, invested=invested,
+                         earned=0.0, invites_left=0))
         await db.commit()
         return u.id
 
@@ -148,6 +150,26 @@ async def test_confirm_buyin_already_bought_requires_allow_rebuy(client):
             headers=auth_headers(admin, "pharaoh"),
         )
         assert allowed.status_code == 200
+
+
+async def test_confirm_rebuy_adds_to_nonzero_invested(client):
+    # A real rebuy: the buyer already has money invested, so `invested` loads
+    # from Numeric as a non-zero Decimal. Adding the float fee to it raised
+    # TypeError → unhandled 500, which the browser reported as a CORS error.
+    admin = await _mk("pharaoh", is_admin=True)
+    buyer = await _mk("buyer", bought=True, invested=10.0)
+    async with client as c:
+        res = await c.post(
+            "/api/admin/confirm-buyin",
+            json={"username": "buyer", "allow_rebuy": True},
+            headers=auth_headers(admin, "pharaoh"),
+        )
+    assert res.status_code == 200, res.text
+
+    async with TestingSessionLocal() as db:
+        gs = (await db.execute(
+            select(GameState).where(GameState.user_id == buyer))).scalar_one()
+        assert float(gs.invested) == 20.0
 
 
 async def test_me_exposes_is_admin(client):
