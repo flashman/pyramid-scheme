@@ -12,7 +12,7 @@ import { Api }              from '../../../game/api.js';
 import { loadConfig, getShop, shopLoaded } from '../../../game/config.js';
 import { WARES, GENERIC_RETORTS, WARE_RETORTS, POOR_RETORTS, OWNED_RETORTS } from './catalogue.js';
 import { purchase, isOwned } from './buy.js';
-import { drawWareArt }      from './ware-art.js';
+import { drawWareArt }      from '../../../draw/ware-art.js';
 import { drawMerchant, drawMerchantTent, drawBalanceScale } from '../draw/nile.js';
 
 const SCALE   = 2.7;     // merchant + tent magnification ("life size" in frame)
