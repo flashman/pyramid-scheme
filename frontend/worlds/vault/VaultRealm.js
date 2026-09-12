@@ -1,4 +1,4 @@
-// ── FILE: worlds/oasis/VaultRealm.js ────────────────────
+// ── FILE: worlds/vault/VaultRealm.js ────────────────────
 // The sealed chamber beneath the great sphinx.
 // This place is wrong. Something has been happening here for a long time.
 // But there is something deeper wrong. The sphinx is not Egyptian.

@@ -1,4 +1,4 @@
-// ── FILE: worlds/nile/shop/ware-art.js ───────────────────
+// ── FILE: draw/ware-art.js ───────────────────
 // Procedural pixel icons for the bazaar wares, in the game's draw idiom.
 // drawWareArt(X, id, cx, cy, s, t) renders a centered icon (footprint ~s);
 // any missing id falls back to a generic crate so the grid never blanks.

@@ -5,16 +5,16 @@
 //   1. Import its class here
 //   2. Add `new MyRealm()` to ALL_REALMS
 //   3. Register portals in MyRealm's constructor (where `this` is available)
-//   4. If the new realm is reachable from an existing realm, also register
-//      the inbound portal in the existing realm's constructor, OR register
-//      it here after both realm instances exist (use PortalRegistry directly).
+//   4. If the new realm is reachable from an existing realm, register that
+//      inbound portal in the existing (source) realm's constructor — never
+//      in the new realm's (see engine/portal.js).
 //
 // main.js never needs to change for new realms.
 
 import { WorldRealm }    from './earth/WorldRealm.js';
 import { NileRealm }     from './nile/NileRealm.js';
 import { OasisRealm }    from './oasis/OasisRealm.js';
-import { VaultRealm }    from './oasis/VaultRealm.js';
+import { VaultRealm }    from './vault/VaultRealm.js';
 import { AtlantisRealm } from './atlantis/AtlantisRealm.js';
 import { DeepRealm }     from './deep/DeepRealm.js';
 import { ChamberRealm }  from './crypt/ChamberRealm.js';

@@ -6,9 +6,10 @@
 // call PortalRegistry.handleKey() from onKeyDown() instead of
 // directly calling RealmManager.scheduleTransition().
 //
-// This decouples the realm graph from individual realm files:
-// adding a portal from realm A to realm B no longer requires
-// editing realm A — just register a portal with from: 'a'.
+// Convention: every portal is registered by its SOURCE realm
+// (from: this realm). Never register an edge in its destination —
+// once realms load lazily, an unloaded destination's registrations
+// don't exist yet, so its entrance would silently vanish.
 //
 // Usage in realm constructors:
 //

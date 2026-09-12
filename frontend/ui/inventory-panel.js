@@ -5,7 +5,7 @@
 import { Events }     from '../engine/events.js';
 import { Inventory }  from '../game/inventory.js';
 import { getShop }   from '../game/config.js';
-import { drawWareArt } from '../worlds/nile/shop/ware-art.js';
+import { drawWareArt } from '../draw/ware-art.js';
 
 function makeIconSrc(itemId) {
   const cv = document.createElement('canvas');

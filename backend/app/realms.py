@@ -55,8 +55,7 @@ REALM_CATALOGUE: dict[str, dict] = {
         "legacy_flag": "first_scroll_sent",
     },
     "vault": {
-        # Lives in worlds/oasis/ until the Phase 2 module-graph hygiene move.
-        "dir": "oasis", "module": "/worlds/oasis/VaultRealm.js",
+        "dir": "vault", "module": "/worlds/vault/VaultRealm.js",
         "export": "VaultRealm", "sort": 3,
         "unlock_rule": {"requires_counters": {"sphinx_riddles_solved": 1}},
     },
