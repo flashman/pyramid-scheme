@@ -9,6 +9,8 @@ import { InAppKeyboard } from '../../ui/in-app-keyboard.js';
 import { Events }           from '../../engine/events.js';
 import { DialogueManager }  from '../../engine/dialogue.js';
 import { Api }              from '../../game/api.js';
+import { G }                from '../../game/state.js';
+import { solvedCountAfterCorrect } from './riddle-count.js';
 
 // ── Riddle pool ───────────────────────────────────────────
 // Questions only. The answers AND the responses live server-side in
@@ -228,9 +230,14 @@ export const RiddleManager = (() => {
     }
 
     if (res.correct) {
-      // Local, for instant portal/draw feedback. The server owns the real
-      // count and strips this name from state syncs.
-      if (res.solved_count != null) Flags.set('sphinx_riddles_solved', res.solved_count);
+      // Local, for instant portal/draw feedback. For a logged-in player the
+      // server owns the real count and strips this name from state syncs; a
+      // guest's count lives only here (the server persists nothing for guests).
+      Flags.set('sphinx_riddles_solved', solvedCountAfterCorrect({
+        isGuest:     G.isGuest,
+        serverCount: res.solved_count,
+        localCount:  Flags.get('sphinx_riddles_solved', 0),
+      }));
       _beginPhase('correct', res.response || '');
       return;
     }
