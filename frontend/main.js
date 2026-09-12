@@ -114,7 +114,7 @@ document.addEventListener('keyup', e => {
   G.keys[e.key] = false;
   // Single-char keys arrive case-swapped if Shift changed state while held
   // (Shift+Z down → 'Z', release Shift then Z → keyup 'z'): clear both cases.
-  if (e.key.length === 1) {
+  if (e.key?.length === 1) {
     G.keys[e.key.toLowerCase()] = false;
     G.keys[e.key.toUpperCase()] = false;
   }
