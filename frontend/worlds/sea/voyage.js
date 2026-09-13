@@ -5,18 +5,20 @@
 //
 // stepVoyage(v, input, dt) mutates `v` and returns this frame's events:
 //   { type: 'departure' | 'first_swell' | 'strayed' | 'in_irons'
-//         | 'crete_clearer' | 'arrived' (landed on Crete's beach) }
+//         | 'crete_clearer' | 'arrived' (landed on Crete's beach) | 'scrape' | 'sunk' }
+//   { type: 'wrecked', speed, id }   — a hard hit on rock; she sinks, then 'sunk'
 //   { type: 'storm_rising', level }    { type: 'landmark_near', id }
 //   { type: 'lightning', x, z, distance, power }
 // input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail), row: -1..1 (+1 rows harder) }
 
-import { resolveWaves, heightAt } from './waves.js';
+import { resolveWaves, heightAt, shelterAt } from './waves.js';
+import { COLLIDERS } from './coast.js';
 
 import {
   DEPARTURE, CRETE_BAY, COURSE_LEN, COURSE_HEADING,
   CORRIDOR_HALF, OUTER_LIMIT, BACK_LIMIT, FRONT_LIMIT, WALL_DRIFT, WALL_TURN,
-  BEACH,
-  WIND_VEER_MAX, CURRENT_SPEED, SAIL, ROW, RUDDER, SUBSTEP, MAX_DT, STORM,
+  BEACH, SHELTER,
+  WIND_VEER_MAX, CURRENT_SPEED, SAIL, ROW, WRECK, RUDDER, SUBSTEP, MAX_DT, STORM,
   LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse, HULL, WAKE,
 } from './constants.js';
 
@@ -45,12 +47,13 @@ export function polar(offWind) {
 
 /** Storm intensity the sea eases toward at the ship's position. */
 export function stormTarget(v) {
-  if (v.arrived) return STORM.moored;
   const { along, lateral } = worldToCourse(v.x, v.z);
   const p    = clamp(along / COURSE_LEN, 0, 1);
   const ramp = 0.1 + 0.25 * smoothstep(0, 0.25, p) + 0.4 * smoothstep(0.6, 0.95, p);
   const off  = STORM.offCourse * clamp((Math.abs(lateral) - CORRIDOR_HALF) / (OUTER_LIMIT - CORRIDOR_HALF), 0, 1);
-  return clamp(ramp + off, 0, 1);
+  const open = v.arrived ? STORM.moored : clamp(ramp + off, 0, 1);
+  const exposed = (shelterAt(SHELTER, v.x, v.z) - SHELTER.calm) / (1 - SHELTER.calm);   // 0 in the bay … 1 outside
+  return STORM.bay + (open - STORM.bay) * exposed;
 }
 
 export function createVoyage({ rng = Math.random, waveParams } = {}) {
@@ -60,10 +63,10 @@ export function createVoyage({ rng = Math.random, waveParams } = {}) {
     heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start, rowing: ROW.start,
     windAngle: COURSE_HEADING,              // direction the wind blows TOWARD
     sailDrive: 0, drive: 0,                 // last substep's sail drive and total drive (m/s²)
-    storm: 0.1, arrived: false, landed: false,
+    storm: 0.1, arrived: false, landed: false, sinking: false, sinkT: 0, sunk: false,
     hull: { y: 0, vy: 0, pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 },
     wake: [], wakeTimer: 0,
-    ironsTime: 0, nextFlash: 8,
+    ironsTime: 0, nextFlash: 8, scrapeTimer: 0,
     once: {},                               // one-shot event keys already emitted this voyage
     armed: { strayed: true, irons: true, bayExit: true },
   };
@@ -82,6 +85,14 @@ export function stepVoyage(v, input, dt) {
 
 function _substep(v, input, h, events) {
   v.t += h;
+  if (v.sinking) {                                  // holed: she fills and goes down
+    v.speed = 0; v.sailDrive = 0; v.drive = 0;
+    v.sinkT += h;
+    v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
+    _hull(v, h, 0);
+    if (!v.sunk && v.sinkT >= WRECK.sinkTime) { v.sunk = true; events.push({ type: 'sunk' }); }
+    return;
+  }
   if (v.landed) {                                   // beached: she stays on the sand
     v.speed = 0; v.sailDrive = 0; v.drive = 0;
     v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
@@ -127,6 +138,7 @@ function _substep(v, input, h, events) {
   v.x += vx * h;
   v.z += vz * h;
   _beach(v, h, events);
+  _collide(v, h, vx, vz, events);
 
   // ── Storm eases toward its target ──
   v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
@@ -153,6 +165,35 @@ function _walls(v, along, lateral, vx, vz) {
   return [vx, vz];
 }
 
+/** Rock is solid. The hull is a capsule — the keel line bow to stern, radius halfBeam —
+    tested against every collider in coast.js. A slow contact pushes the ship clear and
+    scrapes her speed off; one closing faster than WRECK.sinkSpeed holes the hull. */
+function _collide(v, h, vx, vz, events) {
+  v.scrapeTimer = Math.max(0, v.scrapeTimer - h);
+  const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
+  const reach = HULL.halfLen + HULL.halfBeam;
+  for (const c of COLLIDERS) {
+    const dx = c.x - v.x, dz = c.z - v.z;
+    if (dx * dx + dz * dz > (c.r + reach) ** 2) continue;
+    const t  = clamp(dx * fx + dz * fz, -HULL.halfLen, HULL.halfLen);     // nearest point on the keel line
+    const nx = v.x + fx * t - c.x, nz = v.z + fz * t - c.z;
+    const d = Math.hypot(nx, nz), min = c.r + HULL.halfBeam;
+    if (d >= min || d === 0) continue;
+    const ux = nx / d, uz = nz / d;
+    const closing = -(vx * ux + vz * uz);                                   // m/s she was driving into the rock
+    if (closing > WRECK.sinkSpeed) {
+      v.sinking = true;
+      v.speed = 0;
+      events.push({ type: 'wrecked', speed: closing, id: c.id });
+      return;
+    }
+    v.x += ux * (min - d);
+    v.z += uz * (min - d);
+    v.speed = Math.max(0, v.speed - Math.max(0, closing) * 1.5);
+    if (v.scrapeTimer === 0) { v.scrapeTimer = WRECK.scrapeCooldown; events.push({ type: 'scrape', id: c.id }); }
+  }
+}
+
 /** Crete's beach: inside the landing band the bow runs up the sand, the ship grinds
     to a stop, and she is landed — the arrival. */
 function _beach(v, h, events) {
@@ -174,7 +215,7 @@ function _hull(v, h, pol) {
   const comps = resolveWaves(v.storm, COURSE_HEADING, v.waveParams);
   const fx = Math.sin(v.heading),  fz = Math.cos(v.heading);
   const rx = -Math.cos(v.heading), rz = Math.sin(v.heading);
-  const at = (fwd, right) => heightAt(comps, v.x + fx * fwd + rx * right, v.z + fz * fwd + rz * right, v.t);
+  const at = (fwd, right) => heightAt(comps, v.x + fx * fwd + rx * right, v.z + fz * fwd + rz * right, v.t, SHELTER);
   // Driving into the waves the ship meets crests sooner, so the bow reads the water a little ahead of itself.
   const lead = Math.min(6, v.speed * 0.35);
   const bow  = at(HULL.halfLen + lead, 0),             stern  = at(-HULL.halfLen, 0);
@@ -183,19 +224,20 @@ function _hull(v, h, pol) {
   const samples = [bow, bowQ, mid, sternQ, stern, port, star];
   const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
   const heaveTarget = mean + HULL.crestLift * Math.max(0, Math.max(...samples) - mean);
+  const sunk = v.sinking ? Math.min(1, v.sinkT / WRECK.sinkTime) : 0;       // 0 afloat … 1 gone
   const hl = v.hull;
   const spring = (pos, vel, target, k, zeta) => vel + (k * (target - pos) - 2 * zeta * Math.sqrt(k) * vel) * h;
 
-  hl.vy = spring(hl.y, hl.vy, v.landed ? Math.max(heaveTarget, BEACH.restY) : heaveTarget, HULL.kHeave, HULL.zetaHeave);
+  hl.vy = spring(hl.y, hl.vy, (v.landed ? Math.max(heaveTarget, BEACH.restY) : heaveTarget) - WRECK.depth * sunk * sunk, HULL.kHeave, HULL.zetaHeave);
   hl.y += hl.vy * h;
 
   const pitchTarget = Math.atan2((bow + bowQ) / 2 - (stern + sternQ) / 2, 1.5 * HULL.halfLen + 0.75 * lead);
-  hl.pitchVel = spring(hl.pitch, hl.pitchVel, v.landed ? BEACH.restPitch : pitchTarget, HULL.kPitch, HULL.zetaPitch);
+  hl.pitchVel = spring(hl.pitch, hl.pitchVel, v.sinking ? WRECK.pitch * sunk : v.landed ? BEACH.restPitch : pitchTarget, HULL.kPitch, HULL.zetaPitch);
   hl.pitch += hl.pitchVel * h;
 
   // +roll leans to starboard; wind pushes the rig to leeward, so lean away from it.
   const heel = HULL.heelMax * v.sail * pol * Math.sin(wrapAngle(v.heading - v.windAngle));
-  hl.rollVel = spring(hl.roll, hl.rollVel, (v.landed ? BEACH.restRoll : Math.atan2(port - star, 2 * HULL.halfBeam) + heel), HULL.kRoll, HULL.zetaRoll);
+  hl.rollVel = spring(hl.roll, hl.rollVel, (v.sinking ? WRECK.roll * sunk : v.landed ? BEACH.restRoll : Math.atan2(port - star, 2 * HULL.halfBeam) + heel), HULL.kRoll, HULL.zetaRoll);
   hl.roll += hl.rollVel * h;
 }
 

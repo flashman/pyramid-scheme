@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { LANDMARKS, CRETE_ISLAND, COURSE_HEADING, courseToWorld } from '../constants.js';
 import { heightAt } from '../waves.js';
+import { CRETE_ROCKS } from '../coast.js';
 
 const stone = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.95, flatShading: true });
 const glow  = (color) => new THREE.MeshBasicMaterial({ color });
@@ -95,11 +96,8 @@ function hornsOfConsecration(x, y, z, m) {
 function crete() {
   const group = new THREE.Group();
   const { radius: r, height: h } = CRETE_ISLAND;
-  const rnd = rng32(1450);
   const landY  = (x, z) => Math.max(0, h * (1 - Math.hypot(x / (1.3 * r), z / (0.8 * r))) - 40);
   const slopeZ = (x, rho) => -Math.sqrt(Math.max(0, rho * rho - (x / (1.3 * r)) ** 2)) * 0.8 * r;
-  const rockMats = [stone(0x5a524a), stone(0x4a4540), stone(0x6a625a), stone(0x3e3a36)];
-  const pick = () => rockMats[Math.floor(rnd() * rockMats.length)];
 
   // ── The island and Mount Ida ──
   const land = new THREE.Mesh(roughen(new THREE.ConeGeometry(r, h, 48, 10), 30), stone(0x24211e));
@@ -109,40 +107,20 @@ function crete() {
   ida.position.set(r * 0.2, h * 0.9, -r * 0.1);
   group.add(land, ida);
 
-  // ── Two unequal headlands, and a mouth you only see from off to one side ──
-  // The eastern arm (local +x) runs long and hooks across in front of the cove; the western
-  // arm is short and low. The way in is past the western tip and behind the hook, so from
-  // straight offshore the cove is hidden. Rocks are spaced, sized and heightened unevenly.
-  const arm = (points, count, size, height) => {
-    const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, 0, z)));
-    for (let i = 0; i < count; i++) {
-      const t = Math.min(1, (i + rnd() * 0.8) / count);
-      const p = curve.getPoint(t);
-      const fall = 1 - 0.75 * t;                                      // big where it leaves the island, ragged at the tip
-      const sz = size * fall * (0.6 + rnd() * 0.8);
-      const ry = height * fall * (0.5 + rnd() * 0.9);
-      const rock = rockMass(rnd, sz * (0.8 + rnd() * 0.5), ry, sz * (0.7 + rnd() * 0.5), pick());
-      rock.position.set(p.x + (rnd() - 0.5) * sz, ry * 0.4 - 8, p.z + (rnd() - 0.5) * sz);
-      group.add(rock);
+  // ── The bay's rocks, drawn from coast.js — exactly the layout the voyage collides with ──
+  const rockMats = [stone(0x5a524a), stone(0x4a4540), stone(0x6a625a), stone(0x3e3a36)];
+  for (const rk of CRETE_ROCKS) {
+    let mesh;
+    if (rk.kind === 'stack') {
+      mesh = new THREE.Mesh(roughen(new THREE.ConeGeometry(rk.rad, rk.h, 7, 4), 3.5), rockMats[rk.mat]);
+      mesh.position.set(rk.x, rk.h / 2 - 6, rk.z);
+    } else {
+      mesh = new THREE.Mesh(roughen(new THREE.DodecahedronGeometry(1, 2), 0.18), rockMats[rk.mat]);
+      mesh.scale.set(rk.rx, rk.ry, rk.rz);
+      mesh.position.set(rk.x, rk.y, rk.z);
     }
-  };
-  arm([[380, -600], [480, -820], [370, -1030], [140, -1110], [-60, -1085]], 16, 95, 130);   // the long eastern hook
-  arm([[-420, -590], [-520, -760], [-470, -905]], 7, 80, 90);                               // the short western arm
-  // Stacks and reef rocks screening the mouth.
-  for (const [x, z, h, r] of [[-380, -1180, 75, 12], [-150, -1245, 48, 10], [270, -1205, 30, 9], [-560, -1010, 38, 11], [60, -1180, 22, 8]]) {
-    const stack = new THREE.Mesh(roughen(new THREE.ConeGeometry(r, h, 7, 4), 3.5), pick());
-    stack.position.set(x, h / 2 - 6, z);
-    stack.rotation.y = rnd() * Math.PI;
-    group.add(stack);
-  }
-
-  // ── Cliffs along the back of the cove, unevenly spaced, broken by the landing beach ──
-  for (let x = -440; x <= 440; x += 45 + rnd() * 50) {
-    if (Math.abs(x) < 120) continue;
-    const ry = 20 + rnd() * 40;
-    const cliff = rockMass(rnd, 35 + rnd() * 25, ry, 25 + rnd() * 20, pick());
-    cliff.position.set(x, ry * 0.4 - 8, slopeZ(x, 0.92 + rnd() * 0.03));
-    group.add(cliff);
+    mesh.rotation.y = rk.yaw;
+    group.add(mesh);
   }
 
   // The landing beach (its waterline is BEACH.along ≈ local z −700): dry sand, a darker wet
@@ -151,16 +129,16 @@ function crete() {
   const beach = new THREE.Group();
   const wet = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 40), stone(0x8a7a5a));
   wet.scale.set(114, 1, 48);
-  wet.position.set(0, -0.75, -668);
+  wet.position.set(0, -0.35, -668);
   const sand = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 40), stone(0xb8a67c));
   sand.scale.set(110, 1, 44);
-  sand.position.set(0, -0.6, -666);
+  sand.position.set(0, 0.0, -666);                                  // a metre proud of the calm bay
   beach.add(wet, sand);
   const timber = stone(0x5a3e22);
   for (let z = -712; z <= -684; z += 4) {
     const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 6, 8), timber);
     roller.rotation.z = Math.PI / 2;
-    roller.position.set(0, 0.55, z);
+    roller.position.set(0, 1.15, z);
     beach.add(roller);
   }
   const anchorStone = stone(0x6a6660), hole = new THREE.MeshBasicMaterial({ color: 0x1a1816 });
@@ -169,7 +147,7 @@ function crete() {
     const bore = new THREE.Mesh(new THREE.CircleGeometry(0.13, 10), hole);
     bore.position.set(0, 0.25, 0.18);
     anchor.add(bore);
-    anchor.position.set(x, 0.85, z);
+    anchor.position.set(x, 1.45, z);
     anchor.rotation.set(0, lean * 3, lean);
     beach.add(anchor);
   }
@@ -182,22 +160,11 @@ function crete() {
     mast.rotation.x = Math.PI / 2;
     mast.position.set(0.3, 0.3, 0.5);
     boat.add(hullMesh, mast);
-    boat.position.set(x, 1.1, z);
+    boat.position.set(x, 1.7, z);
     boat.rotation.set(0, yaw, tilt);
     beach.add(boat);
   }
   group.add(beach);
-
-  // ── Boulders at the waterline ──
-  for (let i = 0; i < 40; i++) {
-    const x = (rnd() - 0.5) * 1100;
-    if (Math.abs(x) < 130) continue;                                // keep the landing beach clear
-    const z = Math.abs(x) > 480 ? -620 - rnd() * 600 : slopeZ(x, 0.95) - rnd() * 40;
-    const s = 3 + rnd() * 7;
-    const boulder = rockMass(rnd, s, s * 0.7, s, pick());
-    boulder.position.set(x, -1, z);
-    group.add(boulder);
-  }
 
   // ── Knossos on the slope above the cove: a limestone platform, two tiers of red colonnades, a grand stair ──
   const palace = new THREE.Group();

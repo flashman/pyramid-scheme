@@ -45,6 +45,16 @@ export const ROW = {
   drive: 0.6,                                     // m/s² at full effort
 };
 
+// Rock is solid (coast.js lays it out). A contact closing faster than sinkSpeed wrecks the ship.
+export const WRECK = {
+  sinkSpeed:      3.1,                             // m/s (≈ 6 knots) closing speed that holes the hull; slower contacts scrape
+  sinkTime:       7,                               // seconds from the hit until she is gone
+  depth:          14,                              // metres she settles by the end
+  pitch:         -0.4,                             // bow-down as she fills
+  roll:           0.5,                             // and heeling over
+  scrapeCooldown: 4,                               // seconds between scrape events
+};
+
 export const RUDDER = {
   max:      0.6,                                  // rudder angle at full input (rad)
   tau:      0.35,                                 // seconds for the rudder to ease toward input
@@ -68,6 +78,7 @@ export const STORM = {
   tau:       6,                                   // seconds for intensity to ease toward target
   offCourse: 0.35,                                // extra intensity at OUTER_LIMIT
   moored:    0.2,                                 // target once arrived
+  bay:       0.08,                                // target inside the bay's shelter
   marks:     [0.3, 0.5, 0.7],                     // storm_rising narration thresholds
   flashFrom: 0.25,                                // lightning begins above this intensity
 };
@@ -79,6 +90,11 @@ export const LANDMARKS = [
   { id: 'wreck',       along:  500, lateral:  140 },
   { id: 'signal_rock', along: 1150, lateral: -190 },
 ];
+// The bay behind the hooked headland is sheltered: waves fall to `calm` inside `inner`
+// of the bay centre, back to full strength by `outer` (past the mouth). Shared by the
+// GPU wave shader and the ship's buoyancy (waves.js), and by the storm target.
+export const SHELTER = { x: CRETE_BAY.x, z: CRETE_BAY.z, inner: 260, outer: 520, calm: 0.15 };
+
 export const CRETE_ISLAND = { along: COURSE_LEN + 850, lateral: 0, radius: 900, height: 460 };   // puts the cove's waterline at BEACH.along
 
 // Course frame: `along` runs Delta → Crete; `lateral` is positive to the course's right.

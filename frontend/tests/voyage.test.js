@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createVoyage, stepVoyage, polar, stormTarget, wrapAngle } from '../worlds/sea/voyage.js';
 import {
-  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BEACH, FRONT_LIMIT, HULL,
+  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BEACH, FRONT_LIMIT, HULL, WRECK,
   courseToWorld, worldToCourse,
 } from '../worlds/sea/constants.js';
+import { COLLIDERS } from '../worlds/sea/coast.js';
 import { sail, steerToward } from './helpers/sea.js';
 
 const place = (v, along, lateral) => { const p = courseToWorld(along, lateral); v.x = p.x; v.z = p.z; };
@@ -83,16 +84,55 @@ test('a stopped ship cannot spin', () => {
   assert.ok(Math.abs(wrapAngle(v.heading - COURSE_HEADING)) < 1e-9);
 });
 
-test('sailing straight for Crete lands on the beach in 180–300 s', () => {
+test('sailing into the hidden bay mouth and up the beach lands in 180–300 s, untouched by rock', () => {
   const v = createVoyage();
-  const beach = courseToWorld(BEACH.along + 50, 0);
-  let t = 0;
-  while (!v.arrived && t < 400) {
-    stepVoyage(v, steerToward(Math.atan2(beach.x - v.x, beach.z - v.z))(v), 1 / 60);
+  const route = [courseToWorld(COURSE_LEN - 300, 300), courseToWorld(COURSE_LEN - 50, 230), courseToWorld(BEACH.along + 50, 0)];
+  let leg = 0, t = 0; const events = [];
+  while (!v.arrived && !v.sinking && t < 400) {
+    const w = route[leg];
+    if (leg < route.length - 1 && Math.hypot(w.x - v.x, w.z - v.z) < 60) leg++;
+    events.push(...stepVoyage(v, steerToward(Math.atan2(w.x - v.x, w.z - v.z))(v), 1 / 60));
     t += 1 / 60;
   }
+  const hit = events.find(e => e.type === 'wrecked' || e.type === 'scrape');
+  assert.equal(hit, undefined, `struck ${hit?.id}`);
   assert.ok(v.arrived, 'never arrived');
   assert.ok(t >= 180 && t <= 300, `arrived at ${t.toFixed(1)} s`);
+});
+
+/** Put the ship `gap` metres short of a collider's edge, heading straight at it. */
+function aimAt(v, id, gap) {
+  const c = COLLIDERS.find(k => k.id === id);
+  const at = worldToCourse(c.x, c.z);
+  place(v, at.along - c.r - HULL.halfLen - gap, at.lateral);
+  v.heading = COURSE_HEADING;
+}
+
+test('a hard hit on rock opens the hull and the ship sinks', () => {
+  const v = createVoyage();
+  aimAt(v, 'signal_rock', 20);
+  v.speed = 10; v.sail = 1;
+  const events = sail(v, 12, 60, () => ({ trim: 1 }));
+  const wreck = events.find(e => e.type === 'wrecked');
+  assert.ok(wreck && wreck.id === 'signal_rock' && wreck.speed > WRECK.sinkSpeed, JSON.stringify(wreck));
+  assert.equal(events.filter(e => e.type === 'sunk').length, 1);
+  assert.ok(v.sunk && v.hull.y < -5, `hull at ${v.hull.y}`);
+});
+
+test('a slow nudge only scrapes', () => {
+  const v = createVoyage();
+  aimAt(v, 'signal_rock', 1);
+  v.speed = 1; v.sail = 0; v.rowing = 0;
+  const events = sail(v, 4, 60, () => ({ trim: -1, row: -1 }));
+  assert.ok(events.some(e => e.type === 'scrape'), 'no scrape');
+  assert.ok(!v.sinking && !events.some(e => e.type === 'wrecked'));
+});
+
+test('no rock stands on the landing beach', () => {
+  for (const c of COLLIDERS) {
+    const { along, lateral } = worldToCourse(c.x, c.z);
+    if (along > BEACH.along - 250) assert.ok(Math.abs(lateral) - c.r > BEACH.halfWidth, `${c.id} at lateral ${lateral.toFixed(0)}`);
+  }
 });
 
 test('steering hard away from the course never escapes the outer limit', () => {
@@ -107,11 +147,12 @@ test('steering hard away from the course never escapes the outer limit', () => {
   assert.ok(events.some(e => e.type === 'strayed'));
 });
 
-test('storm target ramps with progress and rises off course', () => {
+test('storm target ramps with progress, rises off course, and falls calm in the bay', () => {
   const v = createVoyage();
   assert.ok(Math.abs(stormTarget(v) - 0.1) < 1e-9);
   place(v, COURSE_LEN / 2, 0);   assert.ok(Math.abs(stormTarget(v) - 0.35) < 1e-9);
-  place(v, COURSE_LEN, 0);       assert.ok(Math.abs(stormTarget(v) - 0.75) < 1e-9);
+  place(v, COURSE_LEN - 700, 0); const approach = stormTarget(v); assert.ok(approach > 0.4 && approach < 0.75, `approach ${approach}`);
+  place(v, COURSE_LEN, 0);       assert.ok(Math.abs(stormTarget(v) - STORM.bay) < 1e-9);
   place(v, 1200, OUTER_LIMIT);   assert.ok(Math.abs(stormTarget(v) - 0.70) < 1e-9);
   v.arrived = true;              assert.equal(stormTarget(v), STORM.moored);
 });
@@ -126,7 +167,7 @@ test('storm intensity converges to its target', () => {
 
 test('storm_rising fires once per threshold', () => {
   const v = createVoyage();
-  place(v, COURSE_LEN - 250, 0);          // storm target 0.75
+  place(v, 2000, OUTER_LIMIT - 10);       // late and far off course, outside the bay: target ≈ 1
   v.sail = 0; v.rowing = 0;
   const events = sail(v, 60, 60, () => ({ trim: -1 }));
   const levels = events.filter(e => e.type === 'storm_rising').map(e => e.level);
@@ -152,7 +193,7 @@ test('running up the beach lands the ship: she stops on the sand and stays put',
   const x = v.x, z = v.z;
   sail(v, 30, 60, () => ({ trim: 1, row: 1 }));
   assert.ok(Math.hypot(v.x - x, v.z - z) < 0.01, 'moved after landing');
-  assert.equal(stormTarget(v), STORM.moored);
+  assert.equal(stormTarget(v), STORM.bay);
 });
 
 test('the cliffs either side of the beach stop the ship short of the shore', () => {

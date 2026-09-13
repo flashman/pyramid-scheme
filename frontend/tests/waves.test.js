@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   WAVES, MAX_STEEPNESS, baseSteepness, resolveWaves, steepnessSum,
-  displace, heightAt, normalAt, glslWaves,
+  displace, heightAt, normalAt, glslWaves, shelterAt,
 } from '../worlds/sea/waves.js';
 
 const WIND = 0.6;
@@ -61,4 +61,31 @@ test('glslWaves emits every component and the shared steepness constant', () => 
     assert.ok(src.includes(c.dz.toFixed(6)), 'dz');
   }
   assert.equal((src.match(/th = /g) || []).length, WAVES.length);
+});
+
+const SH = { x: 0, z: 0, inner: 100, outer: 200, calm: 0.15 };
+
+test('shelter calms the bay and leaves the open sea alone', () => {
+  assert.equal(shelterAt(SH, 0, 0), 0.15);
+  assert.equal(shelterAt(SH, 500, 0), 1);
+  assert.equal(shelterAt(null, 0, 0), 1);
+  const comps = resolveWaves(0.9, WIND);
+  const open = displace(comps, 20, 30, 3.1), calm = displace(comps, 20, 30, 3.1, SH);
+  assert.ok(Math.abs(calm.y - 0.15 * open.y) < 1e-9);
+});
+
+test('heightAt agrees with the sheltered surface across the transition', () => {
+  const comps = resolveWaves(1, WIND);
+  for (const [x0, z0, t] of [[40, 10, 2.5], [150, -20, 9.1], [260, 0, 30]]) {
+    const p = displace(comps, x0, z0, t, SH);
+    assert.ok(Math.abs(heightAt(comps, p.x, p.z, t, SH) - p.y) < 0.01, `at ${x0},${z0}`);
+  }
+});
+
+test('glslWaves emits the same shelter', () => {
+  const src = glslWaves(WIND, WAVES, SH);
+  assert.match(src, /float shelterK\(vec2 p\)/);
+  assert.match(src, /atten \*= shelterK\(p\);/);
+  assert.ok(src.includes((0.15).toFixed(6)) && src.includes((100).toFixed(6)) && src.includes((200).toFixed(6)));
+  assert.match(glslWaves(WIND), /return 1\.0;/);
 });

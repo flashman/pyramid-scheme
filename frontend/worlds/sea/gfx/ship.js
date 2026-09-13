@@ -567,8 +567,8 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
       steering.rotation.y = -v.rudder * 0.9;
 
       // Rowers stroke at the effort you set; each slightly out of time.
-      if (v.landed) {
-        // Beached: the rowers stop, easing to rest at the top of the stroke with oars lifted clear.
+      if (v.landed || v.sinking) {
+        // Beached or going down: the rowers stop, easing to rest at the top of the stroke with oars lifted clear.
         const rest = Math.round(strokePhase / (Math.PI * 2)) * Math.PI * 2;
         strokePhase += (rest - strokePhase) * (1 - Math.exp(-dt / 0.8));
       } else {
@@ -604,7 +604,7 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
 
       // The overseer's whip: wind up, crack, recover — faster the harder they're driven.
       whipClock += dt;
-      if (!v.landed && whipClock > 5.2 - 3 * v.rowing) whipClock = 0;          // beached: the whip is lowered
+      if (!v.landed && !v.sinking && whipClock > 5.2 - 3 * v.rowing) whipClock = 0;          // beached: the whip is lowered
       const c = Math.min(1, whipClock / 0.7);
       let swing, bend;
       if (c < 0.45)     { const u = c / 0.45;          swing = 0.2 + 2.4 * u; bend = 1.2 * u; }

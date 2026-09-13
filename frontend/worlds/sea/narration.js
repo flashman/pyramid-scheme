@@ -32,6 +32,13 @@ export const NARRATION = {
   crete_clearer: { once: true, lines: [
     'The shape on the horizon sharpens into a mountain. An island. Something about it is waiting.',
   ]},
+  scrape: { cooldown: 15, lines: [
+    'The hull grinds along rock. The Shipmaster adds it to your bill.',
+    'Stone scrapes reed. The downline feels it through the benches, and rows on.',
+  ]},
+  wrecked: { once: true, lines: [
+    'The rock opens the hull like a ledger. The sea comes in to audit.',
+  ]},
   lightning: { once: true, lines: [
     'Lightning walks across the water ahead. The thunder takes its time. It knows you are coming to it.',
   ]},

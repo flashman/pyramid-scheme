@@ -16,7 +16,9 @@
   header { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
   h1 { font: 400 26px/1.1 var(--display); color: var(--brass); margin: 0; letter-spacing: .02em; text-wrap: balance; }
   header p { margin: 0; color: var(--muted); }
-  .stage { overflow-x: auto; max-width: 100%; }
+  .stage { overflow-x: auto; max-width: 100%; position: relative; }
+  #toast { position: absolute; inset: 0; display: grid; place-items: center; white-space: pre-line; text-align: center; color: var(--brass); font: 400 22px/1.4 var(--display); background: rgba(5, 8, 12, 0.5); pointer-events: none; }
+  #toast:empty { display: none; }
   #gl { display: block; border: 1px solid var(--line); background: #05080c; outline: none; touch-action: none; cursor: grab; }
   #gl:active { cursor: grabbing; }
   #gl:focus-visible { border-color: var(--brass); }
@@ -46,7 +48,7 @@
   </header>
 
   <div>
-    <div class="stage"><canvas id="gl" width="780" height="540" tabindex="0" aria-label="Sea view — click, then steer with arrow keys"></canvas></div>
+    <div class="stage"><canvas id="gl" width="780" height="540" tabindex="0" aria-label="Sea view — click, then steer with arrow keys"></canvas><div id="toast"></div></div>
     <div class="hint">Click the view, then ← → steer · ↑ ↓ trim sail · ⇧ ↑ ↓ rowing · drag to look around · double-click to reset the view</div>
     <div id="error"></div>
   </div>
@@ -133,7 +135,7 @@
 
   document.querySelectorAll('[data-along]').forEach(b => b.addEventListener('click', () => {
     const p = courseToWorld(Number(b.dataset.along), Number(b.dataset.lateral || 0));
-    Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false, landed: false });
+    Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false, landed: false, sinking: false, sinkT: 0, sunk: false });
     if (Number(b.dataset.along) === 0) sea.introView();             // the departure shot
     canvas.focus();
   }));
@@ -158,7 +160,14 @@
     };
     const events = stepVoyage(v, input, dt);
     if (auto.checked) storm.value = v.storm.toFixed(2); else v.storm = Number(storm.value);
-    for (const e of events) if (e.type === 'lightning') sea.flash(e);
+    for (const e of events) {
+      if (e.type === 'lightning') sea.flash(e);
+      if (e.type === 'wrecked') $('toast').textContent = 'THE HULL OPENS ON THE ROCK';
+      if (e.type === 'sunk') {
+        $('toast').textContent = 'THE SEA HAS ACCEPTED YOUR PASSAGE.\nIT IS NON-REFUNDABLE.';
+        setTimeout(() => { Object.assign(v, createVoyage()); sea.introView(); $('toast').textContent = ''; }, 3000);
+      }
+    }
     sea.render(v, dt);
 
     $('i-speed').textContent = (v.speed * 1.94384).toFixed(1) + ' kn';
@@ -166,7 +175,7 @@
     $('i-row').textContent = Math.round(v.rowing * 100) + '%';
     $('i-heading').textContent = Math.round(wrapAngle(v.heading - COURSE_HEADING) * 180 / Math.PI) + '°';
     const dist = $('i-dist');
-    dist.textContent = v.arrived ? 'Landed' : (Math.hypot(CRETE_BAY.x - v.x, CRETE_BAY.z - v.z) / 1000).toFixed(2) + ' km';
+    dist.textContent = v.sinking ? 'Sinking' : v.arrived ? 'Landed' : (Math.hypot(CRETE_BAY.x - v.x, CRETE_BAY.z - v.z) / 1000).toFixed(2) + ' km';
     dist.className = v.arrived ? 'arrived' : '';
     $('i-storm').textContent = v.storm.toFixed(2);
     $('i-time').textContent = Math.round(v.t) + ' s';
