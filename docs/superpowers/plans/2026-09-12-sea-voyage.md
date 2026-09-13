@@ -36,6 +36,9 @@
 - The look-dev spike publishes the **real** sea modules behind a throwaway harness page (`tools/sea-lookdev/index.html`, deleted in Task 15), so tuning edits the shipped code directly instead of porting params.
 - The ocean's reflections/fog use a cheap sky function (`skyColorCheap`) — the full cloud noise per ocean pixel is too heavy for integrated GPUs; the dome blends to the same cheap colour at the horizon so fog matches.
 - Dev panel label is `⛵ SEA` (`🌊` is already the Oasis button).
+- Camera (decided in Task 9 look-dev): the default is a three-quarter chase view; dragging orbits around the ship and the view holds where you leave it (double-click resets) — dead astern hid the ship (spec §3 said low & behind).
+- Crew (decided in Task 9 look-dev): the player's downline rows as chained galley slaves — one per recruit (max 24), four hired hands when there is no downline — stroke rate set by ship speed, driven by a whip-cracking overseer (more often the slower she goes); a hooded Shipmaster works a single steering oar at the stern; the pharaoh stands at true human scale (1.8 m), keeping his balance, gazing about and periodically raising his crook toward Crete.
+- Scenery (decided in Task 9 look-dev): the bull-horns landmark is dropped; Crete's bay is natural rock (headlands, sea stacks, cliff-backed cove) with a glowing cave mouth high on the mountain; the voyage opens on the Nile Delta (marsh, papyrus, palms) with the pyramids of Giza on the horizon, the camera starting on that view and swinging round to the chase.
 
 ## File map
 
@@ -2644,7 +2647,7 @@ git commit -m "feat(sea): reed ship with pharaoh, wreck, signal rock, bull horns
 - Modify: `frontend/ui/dev-panel.js`
 
 **Interfaces:**
-- Consumes: `createSeaScene(canvas, {windAngle}) → {render, flash}` (Tasks 7–9, via dynamic import only); `createVoyage, stepVoyage` (Tasks 2–3); `createNarrationMemory, narrate` (Task 4); `PortalRegistry.use` (Task 6); existing `DialogueManager`, `Dialogue`, `Flags`, `Events`, `G.keys`, `Api.hasToken/post`, `log`, `X/CW/CH`, `Inventory`.
+- Consumes: `createSeaScene(canvas, {windAngle, crew}) → {render, flash, orbit(dx, dy), releaseOrbit(), resetView(), introView(), setCrew(n)}` (Tasks 7–9, via dynamic import only); `createVoyage, stepVoyage` (Tasks 2–3); `createNarrationMemory, narrate` (Task 4); `PortalRegistry.use` (Task 6); existing `DialogueManager`, `Dialogue`, `Flags`, `Events`, `G.keys`, `Api.hasToken/post`, `log`, `X/CW/CH`, `Inventory`.
 - Produces:
   - `SeaRealm` (id `'sea'`) registered in the manifest; registers edge `sea → nile` (key-less, `seaTransRender`, 2200 ms); listens for `Events 'sea:preload'`.
   - `seaTransRender(progress)` exported from `worlds/transitions.js` (Task 13 uses it for `nile → sea`).
@@ -2685,7 +2688,7 @@ COPY vendor/     /usr/share/nginx/html/vendor/
 
 3. In the help panel's `▶ CONTROLS` section, after the `SPACE … interact` row, add:
 ```html
-      <div class="help-row"><span class="help-key">AT SEA</span><span class="help-val">← → steer · ↑ ↓ sail · SPACE shipmaster</span></div>
+      <div class="help-row"><span class="help-key">AT SEA</span><span class="help-val">← → steer · ↑ ↓ sail · drag to look (double-click resets) · SPACE shipmaster</span></div>
 ```
 
 - [ ] **Step 4: Stack the canvases in `style.css`**
@@ -2820,6 +2823,10 @@ import { createNarrationMemory, narrate } from './narration.js';
 import { buildSeaMenuDialogue, buildArrivalDialogue, buildBayExitDialogue } from './dialogue.js';
 
 const FADE_MS = 1200;
+const HIRED_HANDS = 4;
+
+/** Your downline rows: one rower per recruit (24 benches); with no downline, a few hands are hired. */
+const rowersFor = (g) => (g.recruits.length > 0 ? Math.min(24, g.recruits.length) : HIRED_HANDS);
 
 let _sceneModule = null;
 /** Start (or reuse) the lazy scene import; a failed import can be retried. */
@@ -2839,6 +2846,19 @@ export class SeaRealm extends Realm {
     this.voyage = null;
     this._narration = null;
 
+    // Dragging on the 2D canvas (which sits on top of #gl) orbits the camera;
+    // letting go eases it back to the chase view. Attached only while at sea.
+    this._c = null;
+    this._dragId = null;
+    const release = (e) => { if (e.pointerId !== this._dragId) return; this._dragId = null; this._scene?.releaseOrbit(); };
+    this._pointer = [
+      ['pointerdown',   (e) => { if (!this._scene || DialogueManager.isActive()) return; this._dragId = e.pointerId; this._c.setPointerCapture(e.pointerId); }],
+      ['pointermove',   (e) => { if (e.pointerId === this._dragId) this._scene.orbit(e.movementX, e.movementY); }],
+      ['pointerup',     release],
+      ['pointercancel', release],
+      ['dblclick',      () => this._scene?.resetView()],
+    ];
+
     // Back to the Delta — by turning back, or by sailing out of Crete's bay.
     PortalRegistry.register({
       from: 'sea', to: 'nile', key: null,
@@ -2857,15 +2877,19 @@ export class SeaRealm extends Realm {
   onEnter() {
     this._gl ??= document.getElementById('gl');
     this._gl.hidden = false;
+    this._c ??= document.getElementById('c');
+    for (const [type, fn] of this._pointer) this._c.addEventListener(type, fn);
+    this._c.style.touchAction = 'none';                 // a drag orbits the camera instead of scrolling
     this.voyage = createVoyage();
     this._narration = createNarrationMemory();
     this._lastTs = null;
     this._readyAt = performance.now();
-    if (this._scene) return;
+    if (this._scene) { this._scene.introView(); return; }
     loadScene()
       .then(mod => {
         if (RealmManager.currentId !== 'sea' || this._scene) return;
-        this._scene = mod.createSeaScene(this._gl, { windAngle: COURSE_HEADING });
+        this._scene = mod.createSeaScene(this._gl, { windAngle: COURSE_HEADING, crew: rowersFor(G) });
+        this._scene.introView();                          // open looking back at the Delta and the pyramids
         this._readyAt = performance.now();
       })
       .catch(err => {
@@ -2877,6 +2901,11 @@ export class SeaRealm extends Realm {
 
   onExit() {
     if (this._gl) this._gl.hidden = true;
+    if (this._c) {
+      for (const [type, fn] of this._pointer) this._c.removeEventListener(type, fn);
+      this._c.style.touchAction = '';
+    }
+    this._dragId = null;
   }
 
   update(ts) {
@@ -3702,9 +3731,8 @@ const SPEED_OF_SOUND = 343;   // m/s — thunder arrives after the flash
       SoundManager.playThunder(e.distance / SPEED_OF_SOUND, e.power);
 ```
 
-5. Replace `onExit()`'s body with:
+5. Append as the last line of `onExit()`'s body (keep the pointer-listener cleanup above it):
 ```js
-    if (this._gl) this._gl.hidden = true;
     SoundManager.setAmbience(1);   // leave other realms' noise tracks at full level
 ```
 
@@ -3764,7 +3792,7 @@ Ask the user to run this checklist twice (logged in; then logged out → guest) 
 4. Steer hard off course: a "strayed" line logs; the storm thickens; the sea turns the bow back.
 5. Point into the wind with the sail up: an "in irons" line logs.
 6. SPACE → **Turn back — the Delta** → back beside the boat. Board again (the Letter is kept).
-7. Pass the wreck, signal rock and bull horns (each logs once). Lightning and delayed thunder near Crete.
+7. Pass the wreck and the signal rock (each logs once). Lightning and delayed thunder near Crete.
 8. Enter the bay → arrival dialogue → moored; the storm eases.
 9. Sail out of the bay → "LEAVING THE BAY" → **Sail home** → Delta.
 10. Account only: in pgAdmin (`:5050`), `user_realm_unlocks` has a `sea` row for the user and `game_state.flags` contains `"crete_reached": true`. Guest: nothing written.

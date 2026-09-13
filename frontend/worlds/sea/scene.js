@@ -6,13 +6,17 @@ import * as THREE from 'three';
 import { createSky }         from './gfx/sky.js';
 import { createOcean }       from './gfx/ocean.js';
 import { createStorm }       from './gfx/storm.js';
-import { createChaseCam, stepChaseCam } from './chasecam.js';
+import { createShip }        from './gfx/ship.js';
+import { createLandmarks }   from './gfx/landmarks.js';
+import { createDelta }       from './gfx/delta.js';
+import { resolveWaves }      from './waves.js';
+import { createChaseCam, stepChaseCam, orbitDrag, releaseOrbit, resetOrbit, introOrbit } from './chasecam.js';
 import { createPerfMonitor } from './perf.js';
 
 export const VIEW_W = 780;
 export const VIEW_H = 540;
 
-export function createSeaScene(canvas, { windAngle }) {
+export function createSeaScene(canvas, { windAngle, crew = 0 }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.setSize(VIEW_W, VIEW_H);                 // also pins the CSS size to 780×540
@@ -32,9 +36,12 @@ export function createSeaScene(canvas, { windAngle }) {
   const sun = new THREE.DirectionalLight(0xffa060, 0.8);
   scene.add(sun, sun.target);
 
-  // PLACEHOLDER ship — replaced by gfx/ship.js in Task 9.
-  const ship = new THREE.Mesh(new THREE.BoxGeometry(4.8, 2, 18), new THREE.MeshStandardMaterial({ color: 0x8a7a3a }));
-  scene.add(ship);
+  const ship      = createShip({ crew });
+  const landmarks = createLandmarks();
+  scene.add(ship.group, ship.spray, landmarks.group, createDelta());
+  // Standard materials (ship, landmarks, Crete) fog toward the horizon slate;
+  // the sky and ocean shaders do their own.
+  scene.fog = new THREE.FogExp2(0x1a1f28, 0.0004);
 
   const cam     = createChaseCam();
   const perf    = createPerfMonitor();
@@ -55,8 +62,10 @@ export function createSeaScene(canvas, { windAngle }) {
       sun.position.set(v.x - Math.sin(windAngle) * 800, 90, v.z - Math.cos(windAngle) * 800);
       sun.target.position.set(v.x, 0, v.z);
 
-      ship.position.set(v.x, v.hull.y, v.z);
-      ship.rotation.set(-v.hull.pitch, v.heading, v.hull.roll, 'YXZ');
+      ship.update(v, dt);
+      landmarks.update(v, resolveWaves(v.storm, windAngle));
+      scene.fog.density = 0.00032 + 0.0005 * v.storm;
+      scene.fog.color.setRGB(0.10, 0.12, 0.16).multiplyScalar(1 - 0.35 * v.storm);
 
       storm.update(dt, v, camera);
       sky.update(camera, v, storm.flashLevel, storm.flashDir);
@@ -66,6 +75,15 @@ export function createSeaScene(canvas, { windAngle }) {
     flash(evt) { storm.flash(evt); },
     /** True once the one-shot perf fallback has halved the ocean and dropped rain. */
     get degraded() { return perf.fired; },
+    /** Drag (pixels) to look around the ship; release to ease back to the chase view. */
+    orbit(dx, dy) { orbitDrag(cam, dx, dy); },
+    releaseOrbit() { releaseOrbit(cam); },
+    /** Back to the default three-quarter chase view. */
+    resetView() { resetOrbit(cam); },
+    /** Departure shot: look back at the Delta, then swing round behind the ship. */
+    introView() { introOrbit(cam); },
+    /** Seat n rowers at the oars (the player's downline). */
+    setCrew(n) { ship.setCrew(n); },
     dispose() { renderer.dispose(); },
   };
 }

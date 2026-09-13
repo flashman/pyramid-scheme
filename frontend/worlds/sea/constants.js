@@ -62,7 +62,6 @@ export const LANDMARK_RADIUS = 260;
 export const LANDMARKS = [
   { id: 'wreck',       along:  500, lateral:  140 },
   { id: 'signal_rock', along: 1150, lateral: -190 },
-  { id: 'bull_horns',  along: 1750, lateral:  120 },
 ];
 export const CRETE_ISLAND = { along: COURSE_LEN + 1100, lateral: 0, radius: 900, height: 460 };  // shore ≈ FRONT_LIMIT + 80 m
 

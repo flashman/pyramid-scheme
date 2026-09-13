@@ -17,7 +17,8 @@
   h1 { font: 400 26px/1.1 var(--display); color: var(--brass); margin: 0; letter-spacing: .02em; text-wrap: balance; }
   header p { margin: 0; color: var(--muted); }
   .stage { overflow-x: auto; max-width: 100%; }
-  #gl { display: block; border: 1px solid var(--line); background: #05080c; outline: none; }
+  #gl { display: block; border: 1px solid var(--line); background: #05080c; outline: none; touch-action: none; cursor: grab; }
+  #gl:active { cursor: grabbing; }
   #gl:focus-visible { border-color: var(--brass); }
   .hint { color: var(--muted); margin-top: 6px; }
   aside { flex: 1 1 260px; background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; display: grid; gap: 16px; }
@@ -45,7 +46,7 @@
 
   <div>
     <div class="stage"><canvas id="gl" width="780" height="540" tabindex="0" aria-label="Sea view — click, then steer with arrow keys"></canvas></div>
-    <div class="hint">Click the view, then ← → steer · ↑ ↓ trim sail</div>
+    <div class="hint">Click the view, then ← → steer · ↑ ↓ trim sail · drag to look around · double-click to reset the view</div>
     <div id="error"></div>
   </div>
 
@@ -74,13 +75,18 @@
         <button id="j-delta" data-along="0">Delta</button>
         <button id="j-wreck" data-along="500">Wreck</button>
         <button id="j-rock" data-along="1150">Signal rock</button>
-        <button id="j-horns" data-along="1750">Bull horns</button>
         <button id="j-bay" data-along="2150">Bay approach</button>
+        <button id="j-harbor" data-along="2340">Harbor</button>
       </div>
     </section>
     <section>
       <h2>Weather</h2>
       <div class="row"><button id="bolt">Strike lightning ahead</button></div>
+    </section>
+    <section>
+      <h2>Crew</h2>
+      <label for="crew">Downline rowers <output id="crew-out" for="crew">8</output></label>
+      <input id="crew" type="range" min="0" max="24" step="1" value="8">
     </section>
   </aside>
 </div>
@@ -96,11 +102,19 @@
   canvas.addEventListener('keydown', e => { keys[e.key] = true; if (e.key.startsWith('Arrow')) e.preventDefault(); });
   canvas.addEventListener('keyup', e => { keys[e.key] = false; });
   canvas.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+  let dragId = null;
+  canvas.addEventListener('pointerdown', e => { canvas.focus(); dragId = e.pointerId; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => { if (e.pointerId === dragId) sea.orbit(e.movementX, e.movementY); });
+  const release = e => { if (e.pointerId !== dragId) return; dragId = null; sea.releaseOrbit(); };
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('dblclick', () => sea.resetView());
 
   const v = createVoyage();
   let sea;
   try {
-    sea = createSeaScene(canvas, { windAngle: COURSE_HEADING });
+    sea = createSeaScene(canvas, { windAngle: COURSE_HEADING, crew: 8 });
+    sea.introView();
   } catch (err) {
     $('error').textContent = 'The scene failed to start: ' + err.message;
     throw err;
@@ -109,8 +123,10 @@
   document.querySelectorAll('[data-along]').forEach(b => b.addEventListener('click', () => {
     const p = courseToWorld(Number(b.dataset.along), 0);
     Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false });
+    if (Number(b.dataset.along) === 0) sea.introView();             // the departure shot
     canvas.focus();
   }));
+  $('crew').addEventListener('input', e => { sea.setCrew(Number(e.target.value)); $('crew-out').textContent = e.target.value; });
   $('bolt').addEventListener('click', () => {
     const x = v.x + Math.sin(v.heading) * 900, z = v.z + Math.cos(v.heading) * 900;
     sea.flash({ type: 'lightning', x, z, distance: 900, power: 1 });

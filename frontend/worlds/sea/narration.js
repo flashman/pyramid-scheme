@@ -28,7 +28,6 @@ export const NARRATION = {
   landmark_near: { once: true, byId: {
     wreck:       ['A ship lies half-sunk, pots still bobbing around it. A previous voyage. Also paid in full.'],
     signal_rock: ['A fire gutters on a lone rock. Someone is still keeping it lit. No one has told them it is over.'],
-    bull_horns:  ['Stone horns rise from a reef — a bull, carved by people who respect bulls far too much.'],
   }},
   crete_clearer: { once: true, lines: [
     'The shape on the horizon sharpens into a mountain. An island. Something about it is waiting.',
