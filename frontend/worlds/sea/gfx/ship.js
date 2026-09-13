@@ -329,7 +329,7 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
   mast.position.set(0, 4.4, 1.0);
   body.add(mast);
   const rig = new THREE.Group();
-  rig.position.set(0, 8.8, 1.5);                  // hung well forward of the mast so the swung, luffing sail clears it
+  rig.position.set(0, 8.8, 1.15);
   const topYard = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 11.6, 8), wood);
   topYard.rotation.z = Math.PI / 2;
   const sailGeo  = new THREE.PlaneGeometry(11, 6, 22, 12);
@@ -559,7 +559,7 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
         const u = bx / 5.5, w = by / 3.0;
         const bulge   = (1 - u * u) * (1 - w * w);
         const flutter = Math.sin(v.t * 11 + bx * 1.2 + by) * 0.14 * (1 - fill) * (1 - w) * 0.5;
-        sp.setZ(i, bulge * fill * 2.4 + Math.abs(flutter));                // flutter only billows forward, never back into the mast
+        sp.setZ(i, bulge * fill * 2.4 + flutter);
       }
       sp.needsUpdate = true;
       sailGeo.computeVertexNormals();
