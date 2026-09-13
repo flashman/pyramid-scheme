@@ -43,6 +43,7 @@ export const HULL = {
   kPitch: 10, zetaPitch: 0.7,
   kRoll:   8, zetaRoll:  0.6,
   crestLift: 0.3,                                 // ride up onto the highest sampled crest this much
+  deckHeight: 0.8,                                // deck above the hull origin (FREEBOARD + DECK_Y in gfx/ship.js)
   heelMax: 0.14,                                  // rad of lean at full sail on a beam wind
 };
 
