@@ -1,0 +1,180 @@
+// ── FILE: worlds/sea/voyage.js ───────────────────────────
+// The voyage simulation — pure (no DOM, no three.js). SeaRealm steps it with
+// real elapsed time; scene.js only reads it. Fixed SUBSTEP steps inside an
+// accumulator make the ship behave identically at 30, 60 or 144 fps.
+//
+// stepVoyage(v, input, dt) mutates `v` and returns this frame's events:
+//   { type: 'departure' | 'first_swell' | 'strayed' | 'in_irons'
+//         | 'crete_clearer' | 'arrived' | 'bay_exit' }
+//   { type: 'storm_rising', level }    { type: 'landmark_near', id }
+// input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail) }
+
+import {
+  DEPARTURE, CRETE_BAY, COURSE_LEN, COURSE_HEADING,
+  CORRIDOR_HALF, OUTER_LIMIT, BACK_LIMIT, FRONT_LIMIT, WALL_DRIFT, WALL_TURN,
+  BAY_RADIUS, BAY_BOUNDARY, BAY_REARM,
+  WIND_VEER_MAX, CURRENT_SPEED, SAIL, RUDDER, SUBSTEP, MAX_DT, STORM,
+  LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse,
+} from './constants.js';
+
+const TAU = Math.PI * 2;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const smoothstep = (a, b, x) => { const u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+const LANDMARK_POS = LANDMARKS.map(l => ({ id: l.id, ...courseToWorld(l.along, l.lateral) }));
+
+// Course axes: F along the course, R to its right (lateral +).
+const FX = Math.sin(COURSE_HEADING),  FZ = Math.cos(COURSE_HEADING);
+const RX = -Math.cos(COURSE_HEADING), RZ = Math.sin(COURSE_HEADING);
+
+export function wrapAngle(a) {
+  a = (a + Math.PI) % TAU;
+  if (a < 0) a += TAU;
+  return a - Math.PI;
+}
+
+/** Sail drive fraction by angle off the wind's SOURCE (0 = bow into the wind, π = dead downwind). */
+export function polar(offWind) {
+  const a = Math.abs(offWind);
+  if (a < SAIL.irons) return 0;
+  if (a < Math.PI / 2) return 0.9 * smoothstep(SAIL.irons, Math.PI / 2, a);
+  return 0.9 + 0.1 * (a - Math.PI / 2) / (Math.PI / 2);
+}
+
+/** Storm intensity the sea eases toward at the ship's position. */
+export function stormTarget(v) {
+  if (v.arrived) return STORM.moored;
+  const { along, lateral } = worldToCourse(v.x, v.z);
+  const p    = clamp(along / COURSE_LEN, 0, 1);
+  const ramp = 0.1 + 0.25 * smoothstep(0, 0.25, p) + 0.4 * smoothstep(0.6, 0.95, p);
+  const off  = STORM.offCourse * clamp((Math.abs(lateral) - CORRIDOR_HALF) / (OUTER_LIMIT - CORRIDOR_HALF), 0, 1);
+  return clamp(ramp + off, 0, 1);
+}
+
+export function createVoyage({ rng = Math.random, waveParams } = {}) {
+  return {
+    t: 0, acc: 0, rng, waveParams,
+    x: DEPARTURE.x, z: DEPARTURE.z,
+    heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start,
+    windAngle: COURSE_HEADING,              // direction the wind blows TOWARD
+    drive: 0,                               // last substep's drive (m/s²)
+    storm: 0.1, arrived: false,
+    hull: { y: 0, vy: 0, pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 },
+    wake: [], wakeTimer: 0,
+    ironsTime: 0, nextFlash: 8,
+    once: {},                               // one-shot event keys already emitted this voyage
+    armed: { strayed: true, irons: true, bayExit: true },
+  };
+}
+
+export function stepVoyage(v, input, dt) {
+  const events = [];
+  if (!v.once.departure) { v.once.departure = true; events.push({ type: 'departure' }); }
+  v.acc += clamp(dt || 0, 0, MAX_DT);
+  while (v.acc >= SUBSTEP) {
+    v.acc -= SUBSTEP;
+    _substep(v, input || {}, SUBSTEP, events);
+  }
+  return events;
+}
+
+function _substep(v, input, h, events) {
+  v.t += h;
+  const steer = clamp(input.steer ?? 0, -1, 1);
+  const trim  = clamp(input.trim ?? 0, -1, 1);
+
+  // ── Controls: trim ramps, the rudder eases, and turning needs way on ──
+  v.sail    = clamp(v.sail + trim * SAIL.rate * h, 0, 1);
+  v.rudder += (steer * RUDDER.max - v.rudder) * (1 - Math.exp(-h / RUDDER.tau));
+  v.heading = wrapAngle(v.heading + v.speed * v.rudder * RUDDER.turnGain * h);
+
+  const { along, lateral } = worldToCourse(v.x, v.z);
+  if (Math.abs(lateral) > OUTER_LIMIT || along < BACK_LIMIT) {
+    // The sea itself swings the bow back toward Crete — stronger than full rudder.
+    v.heading = wrapAngle(v.heading + clamp(wrapAngle(COURSE_HEADING - v.heading), -1, 1) * WALL_TURN * h);
+  }
+
+  // ── Wind: steady in the corridor, veering back toward the line outside it.
+  //    Moored, it swings abeam so nothing pins the ship against the shore. ──
+  const excess = clamp((Math.abs(lateral) - CORRIDOR_HALF) / (OUTER_LIMIT - CORRIDOR_HALF), 0, 1);
+  v.windAngle = v.arrived
+    ? COURSE_HEADING + Math.PI / 2
+    : COURSE_HEADING + Math.sign(lateral) * excess * WIND_VEER_MAX;
+
+  // ── Drive against quadratic drag; speed is along the bow and never negative ──
+  const off = Math.abs(wrapAngle(v.heading - (v.windAngle + Math.PI)));
+  v.drive = v.sail * polar(off) * SAIL.drive;
+  v.speed = Math.max(0, v.speed + (v.drive - SAIL.drag * v.speed * v.speed) * h);
+
+  // ── Ground velocity = bow + current, limited by the soft walls ──
+  const cur = v.arrived ? 0 : CURRENT_SPEED;
+  let vx = Math.sin(v.heading) * v.speed + FX * cur;
+  let vz = Math.cos(v.heading) * v.speed + FZ * cur;
+  [vx, vz] = _walls(v, along, lateral, vx, vz);
+  v.x += vx * h;
+  v.z += vz * h;
+
+  // ── Storm eases toward its target ──
+  v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
+
+  _events(v, h, events);
+}
+
+/** Past a limit: cancel outward velocity and drift back in (overshoot ≤ one substep). */
+function _axis(pos, min, max, vel) {
+  if (pos > max) return Math.min(vel, 0) - WALL_DRIFT * Math.min(1, (pos - max) / 50);
+  if (pos < min) return Math.max(vel, 0) + WALL_DRIFT * Math.min(1, (min - pos) / 50);
+  return vel;
+}
+
+function _walls(v, along, lateral, vx, vz) {
+  const va = _axis(along, BACK_LIMIT, FRONT_LIMIT, vx * FX + vz * FZ);
+  const vl = _axis(lateral, -OUTER_LIMIT, OUTER_LIMIT, vx * RX + vz * RZ);
+  vx = FX * va + RX * vl;
+  vz = FZ * va + RZ * vl;
+  if (v.arrived) {   // moored: a radial wall around the bay
+    const bx = v.x - CRETE_BAY.x, bz = v.z - CRETE_BAY.z, d = Math.hypot(bx, bz);
+    if (d > BAY_BOUNDARY) {
+      const ux = bx / d, uz = bz / d, out = vx * ux + vz * uz;
+      const drift = WALL_DRIFT * Math.min(1, (d - BAY_BOUNDARY) / 50);
+      if (out > 0) { vx -= ux * out; vz -= uz * out; }
+      vx -= ux * drift; vz -= uz * drift;
+    }
+  }
+  return [vx, vz];
+}
+
+function _events(v, h, events) {
+  const { along, lateral } = worldToCourse(v.x, v.z);
+  const once = (key, evt) => { if (!v.once[key]) { v.once[key] = true; events.push(evt); } };
+
+  if (along > 150)               once('first_swell', { type: 'first_swell' });
+  if (along >= COURSE_LEN / 2)   once('crete_clearer', { type: 'crete_clearer' });
+  for (const m of STORM.marks) if (v.storm >= m) once(`storm_${m}`, { type: 'storm_rising', level: m });
+  for (const lm of LANDMARK_POS) {
+    if (Math.hypot(v.x - lm.x, v.z - lm.z) < LANDMARK_RADIUS) once(`lm_${lm.id}`, { type: 'landmark_near', id: lm.id });
+  }
+
+  // Strayed: re-arms once back well inside the corridor.
+  if (Math.abs(lateral) > CORRIDOR_HALF) {
+    if (v.armed.strayed) { v.armed.strayed = false; events.push({ type: 'strayed' }); }
+  } else if (Math.abs(lateral) < CORRIDOR_HALF - 40) {
+    v.armed.strayed = true;
+  }
+
+  // In irons: sail up, no drive, barely moving — for 3 s.
+  if (v.sail > 0.3 && v.drive === 0 && v.speed < 1) {
+    v.ironsTime += h;
+    if (v.ironsTime > 3 && v.armed.irons) { v.armed.irons = false; events.push({ type: 'in_irons' }); }
+  } else {
+    v.ironsTime = 0;
+    v.armed.irons = true;
+  }
+
+  // Arrival, then the bay-exit prompt (re-arms back inside BAY_REARM).
+  const bay = Math.hypot(v.x - CRETE_BAY.x, v.z - CRETE_BAY.z);
+  if (!v.arrived && bay < BAY_RADIUS) { v.arrived = true; events.push({ type: 'arrived' }); }
+  if (v.arrived) {
+    if (bay > BAY_BOUNDARY && v.armed.bayExit) { v.armed.bayExit = false; events.push({ type: 'bay_exit' }); }
+    else if (bay < BAY_REARM) v.armed.bayExit = true;
+  }
+}
