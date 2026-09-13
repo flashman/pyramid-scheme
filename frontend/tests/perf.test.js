@@ -14,16 +14,20 @@ test('a healthy 60 fps never degrades', () => {
 
 test('sustained slow frames degrade exactly once', () => {
   const mon = createPerfMonitor();
-  assert.equal(run(mon, 40, 10), 1);
+  assert.equal(run(mon, 50, 10), 1);
   assert.equal(mon.fired, true);
-  assert.equal(run(mon, 40, 10), 0);
+  assert.equal(run(mon, 50, 10), 0);
+});
+
+test('a 30 fps cap (Chrome Energy Saver) never degrades', () => {
+  assert.equal(run(createPerfMonitor(), 33.4, 30), 0);
 });
 
 test('a brief slowdown followed by recovery does not degrade', () => {
   const mon = createPerfMonitor();
-  run(mon, 40, 2);
+  run(mon, 50, 2);
   run(mon, 16.7, 2);
-  assert.equal(run(mon, 40, 2), 0);
+  assert.equal(run(mon, 50, 2), 0);
 });
 
 test('tab-switch hitches are ignored', () => {
