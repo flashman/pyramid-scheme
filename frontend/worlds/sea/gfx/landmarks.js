@@ -2,7 +2,8 @@
 // Things to pass on the way, and the destination: a half-sunk wreck with bobbing
 // JUST POTS crates, a lone rock with a signal fire, and Crete — Mount Ida above a
 // natural rocky bay: two headlands stepping down from cliffs to sea stacks, a
-// cliff-backed cove beach, boulders at the waterline, and high on the mountain
+// cliff-backed cove beach, boulders at the waterline, Knossos' tiered red colonnades on the slope above the
+// cove, and high on the mountain
 // the dark mouth of a cave with something glowing inside.
 
 import * as THREE from 'three';
@@ -74,6 +75,20 @@ function rockMass(rnd, rx, ry, rz, material) {
   return m;
 }
 
+/** The Minoan horns of consecration — a stylised pair of bull's horns on a plinth. */
+function hornsOfConsecration(x, y, z, m) {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.6, 0.8), m));
+  for (const s of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 1.8, 6), m);
+    horn.position.set(s * 0.9, 1.0, 0);
+    horn.rotation.z = -s * 0.25;                                   // tips splay outward
+    g.add(horn);
+  }
+  g.position.set(x, y, z);
+  return g;
+}
+
 /** Crete. Local −z faces the bay; the island is a cone scaled (1.3, 1, 0.8). The
     bay centre sits at local z ≈ −1100 with a 520 m sailing boundary, so every
     rock below stays outside that circle — the ship can't sail into stone. */
@@ -137,6 +152,47 @@ function crete() {
     group.add(boulder);
   }
 
+  // ── Knossos on the slope above the cove: a limestone platform, two tiers of red colonnades, a grand stair ──
+  const palace = new THREE.Group();
+  const pz = slopeZ(0, 0.72);
+  palace.position.set(0, landY(0, pz), pz);
+  const red = stone(0x8a2a1a), black = stone(0x1a1410), ochre = stone(0xb89868), limestone = stone(0xc8bca0);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(130, 50, 70), limestone);
+  base.position.y = -22;
+  palace.add(base);
+  for (const t of [{ y: 3, z: -30, n: 14, span: 118, colH: 12 }, { y: 18, z: -8, n: 9, span: 80, colH: 10 }]) {
+    for (let i = 0; i < t.n; i++) {
+      const cx = -t.span / 2 + (i + 0.5) * (t.span / t.n);
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.85, t.colH, 10), red);   // Minoan: wider at the top
+      col.position.set(cx, t.y + t.colH / 2, t.z);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.3, 0.9, 10), black);
+      cap.position.set(cx, t.y + t.colH + 0.2, t.z);
+      palace.add(col, cap);
+    }
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(t.span + 6, 2.2, 22), ochre);
+    roof.position.set(0, t.y + t.colH + 1.6, t.z + 8);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(t.span + 6, t.colH + 3, 14), limestone);
+    back.position.set(0, t.y + (t.colH + 3) / 2, t.z + 14);
+    palace.add(roof, back);
+    for (let i = 0; i < 7; i++) {
+      palace.add(hornsOfConsecration(-t.span / 2 + (i + 0.5) * (t.span / 7), t.y + t.colH + 2.7, t.z - 2, ochre));
+    }
+  }
+  for (let s = 0; s < 10; s++) {
+    const step = new THREE.Mesh(new THREE.BoxGeometry(24, 2.5, 5), limestone);
+    step.position.set(0, 1.75 - s * 2.5, -37.5 - s * 5);
+    palace.add(step);
+  }
+  for (const x of [-50, -30, -12, 12, 30, 50]) {
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), glow(0xffa040));
+    flame.position.set(x, 7, -33);
+    palace.add(flame);
+  }
+  const palaceLight = new THREE.PointLight(0xff9a40, 2500, 420, 2);
+  palaceLight.position.set(0, 12, -45);
+  palace.add(palaceLight);
+  group.add(palace);
+
   // ── High on the mountain: a cave mouth, and something glowing inside ──
   const lx = -70, lz = slopeZ(lx, 0.5) - 6;
   const mouth = new THREE.Group();
@@ -152,7 +208,7 @@ function crete() {
   mouth.add(lip, dark, ember, caveLight);
   group.add(mouth);
 
-  return { group, caveLight };
+  return { group, caveLight, palaceLight };
 }
 
 export function createLandmarks() {
@@ -180,6 +236,7 @@ export function createLandmarks() {
       s.light.intensity = 600 + Math.sin(v.t * 13) * 120 + Math.sin(v.t * 7.3) * 90;
       s.fire.scale.setScalar(1 + Math.sin(v.t * 17) * 0.15);
       c.caveLight.intensity = 300 + Math.sin(v.t * 0.7) * 150;
+      c.palaceLight.intensity = 2500 + Math.sin(v.t * 11) * 300;       // torchlight flicker
     },
   };
 }
