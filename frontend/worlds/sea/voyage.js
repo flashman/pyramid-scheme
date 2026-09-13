@@ -7,14 +7,17 @@
 //   { type: 'departure' | 'first_swell' | 'strayed' | 'in_irons'
 //         | 'crete_clearer' | 'arrived' | 'bay_exit' }
 //   { type: 'storm_rising', level }    { type: 'landmark_near', id }
+//   { type: 'lightning', x, z, distance, power }
 // input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail) }
+
+import { resolveWaves, heightAt } from './waves.js';
 
 import {
   DEPARTURE, CRETE_BAY, COURSE_LEN, COURSE_HEADING,
   CORRIDOR_HALF, OUTER_LIMIT, BACK_LIMIT, FRONT_LIMIT, WALL_DRIFT, WALL_TURN,
   BAY_RADIUS, BAY_BOUNDARY, BAY_REARM,
   WIND_VEER_MAX, CURRENT_SPEED, SAIL, RUDDER, SUBSTEP, MAX_DT, STORM,
-  LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse,
+  LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse, HULL, WAKE,
 } from './constants.js';
 
 const TAU = Math.PI * 2;
@@ -102,7 +105,8 @@ function _substep(v, input, h, events) {
 
   // ── Drive against quadratic drag; speed is along the bow and never negative ──
   const off = Math.abs(wrapAngle(v.heading - (v.windAngle + Math.PI)));
-  v.drive = v.sail * polar(off) * SAIL.drive;
+  const pol = polar(off);
+  v.drive = v.sail * pol * SAIL.drive;
   v.speed = Math.max(0, v.speed + (v.drive - SAIL.drag * v.speed * v.speed) * h);
 
   // ── Ground velocity = bow + current, limited by the soft walls ──
@@ -116,6 +120,9 @@ function _substep(v, input, h, events) {
   // ── Storm eases toward its target ──
   v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
 
+  _hull(v, h, pol);
+  _wake(v, h);
+  _lightning(v, h, events);
   _events(v, h, events);
 }
 
@@ -141,6 +148,56 @@ function _walls(v, along, lateral, vx, vz) {
     }
   }
   return [vx, vz];
+}
+
+/** Five hull samples on the shared wave surface drive heave, pitch and roll
+    through damped springs; sail force adds heel away from the wind. */
+function _hull(v, h, pol) {
+  const comps = resolveWaves(v.storm, COURSE_HEADING, v.waveParams);
+  const fx = Math.sin(v.heading),  fz = Math.cos(v.heading);
+  const rx = -Math.cos(v.heading), rz = Math.sin(v.heading);
+  const at = (fwd, right) => heightAt(comps, v.x + fx * fwd + rx * right, v.z + fz * fwd + rz * right, v.t);
+  const bow  = at(HULL.halfLen, 0),   stern = at(-HULL.halfLen, 0);
+  const port = at(0, -HULL.halfBeam), star  = at(0, HULL.halfBeam), mid = at(0, 0);
+  const hl = v.hull;
+  const spring = (pos, vel, target, k, zeta) => vel + (k * (target - pos) - 2 * zeta * Math.sqrt(k) * vel) * h;
+
+  hl.vy = spring(hl.y, hl.vy, (bow + stern + port + star + mid) / 5, HULL.kHeave, HULL.zetaHeave);
+  hl.y += hl.vy * h;
+
+  hl.pitchVel = spring(hl.pitch, hl.pitchVel, Math.atan2(bow - stern, 2 * HULL.halfLen), HULL.kPitch, HULL.zetaPitch);
+  hl.pitch += hl.pitchVel * h;
+
+  // +roll leans to starboard; wind pushes the rig to leeward, so lean away from it.
+  const heel = HULL.heelMax * v.sail * pol * Math.sin(wrapAngle(v.heading - v.windAngle));
+  hl.rollVel = spring(hl.roll, hl.rollVel, Math.atan2(port - star, 2 * HULL.halfBeam) + heel, HULL.kRoll, HULL.zetaRoll);
+  hl.roll += hl.rollVel * h;
+}
+
+/** Drop a wake point every WAKE.every seconds into a bounded ring. */
+function _wake(v, h) {
+  v.wakeTimer += h;
+  if (v.wakeTimer < WAKE.every) return;
+  v.wakeTimer -= WAKE.every;
+  v.wake.push({ x: v.x, z: v.z, t: v.t });
+  if (v.wake.length > WAKE.max) v.wake.shift();
+}
+
+/** Above STORM.flashFrom, strikes land ahead of the ship, more often as the storm grows. */
+function _lightning(v, h, events) {
+  if (v.storm < STORM.flashFrom) return;
+  v.nextFlash -= h;
+  if (v.nextFlash > 0) return;
+  const r = v.rng;
+  const u = (v.storm - STORM.flashFrom) / (1 - STORM.flashFrom);
+  const along = worldToCourse(v.x, v.z).along + 600 + r() * 1900;
+  const p = courseToWorld(along, (r() - 0.5) * 1600);
+  events.push({
+    type: 'lightning', x: p.x, z: p.z,
+    distance: Math.hypot(p.x - v.x, p.z - v.z),
+    power: 0.4 + 0.6 * u * r(),
+  });
+  v.nextFlash = (14 + (2.5 - 14) * u) * (0.6 + 0.8 * r());
 }
 
 function _events(v, h, events) {
