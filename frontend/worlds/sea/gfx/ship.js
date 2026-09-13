@@ -3,11 +3,12 @@
 // weathered reed hull riding with real freeboard, a worn and patched linen sail,
 // the hooded Shipmaster on his steering oar at the stern, and the player's
 // DOWNLINE at the oars — one chained galley slave per recruit, bent over their
-// benches, rowing at a rate set by the ship's speed while an overseer's whip
-// cracks harder the slower she goes. The pharaoh stands at the prow at true
-// human scale, keeping his balance, gazing about, and now and then raising his
-// crook toward Crete. Local +z is the bow. Everything that floats sits in
-// `body`, lifted by FREEBOARD so the hull rides the swell instead of being awash.
+// benches, rowing at a rate set by the ship's speed (each a touch out of time with the
+// next) while an overseer's whip cracks harder the slower she goes.
+// The pharaoh stands at the prow at true human scale, dressed for the player's
+// rank — a bare-headed future pharaoh at first, crowned only at PHARAOH — keeping
+// his balance, gazing about, and now and then raising his hand toward Crete.
+// Local +z is the bow. Everything that floats sits in `body`, lifted by FREEBOARD.
 
 import * as THREE from 'three';
 import { HULL, SAIL } from '../constants.js';
@@ -26,11 +27,17 @@ const STROKES_PER_MPS = 0.08;                 // stroke rate follows the ship: 1
 const UPPER_ARM = 0.32, FOREARM = 0.3;
 const WHIP_SEGS = 14;
 
+// The game's ranks (game/tiers.js), lowest first — the pharaoh gains regalia as he climbs.
+export const RANKS = ['PEASANT', 'SCRIBE', 'ACOLYTE', 'VIZIER', 'HIGH PRIEST', 'PHARAOH'];
+
 const mat = (color, extra = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...extra });
 
 /** Half-width of the hull at body-space z (matches hullGeometry's taper). */
 const halfWidthAt = (z) => HULL.halfBeam * (1 - Math.pow(Math.min(1, Math.abs(z / HULL.halfLen)), 3) * 0.85);
+
+/** Deterministic 0..1 hash, for per-rower variation. */
+const hash01 = (n) => { const s = Math.sin(n * 91.345 + 47.853) * 43758.5453; return s - Math.floor(s); };
 
 function canvasTexture(w, h, draw) {
   const c = document.createElement('canvas');
@@ -51,32 +58,49 @@ function rng32(seed) {
   };
 }
 
+/** Merge geometries into one non-indexed geometry (positions + normals), for instancing a body part. */
+function mergeGeometries(geos) {
+  const parts = geos.map(g => (g.index ? g.toNonIndexed() : g));
+  const count = parts.reduce((n, g) => n + g.attributes.position.count, 0);
+  const pos = new Float32Array(count * 3), nrm = new Float32Array(count * 3);
+  let o = 0;
+  for (const g of parts) {
+    pos.set(g.attributes.position.array, o * 3);
+    nrm.set(g.attributes.normal.array, o * 3);
+    o += g.attributes.position.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  return out;
+}
+
 // Sun-bleached bundled reeds (bow to stern), salt blooms and rot, a dark weed
 // line below the waterline, and frayed lashings. v: 0/1 = gunwale, 0.5 = keel.
 const reedTexture = () => canvasTexture(1024, 256, (x, w, h) => {
   const r = rng32(7);
   for (let y = 0; y < h; y++) {
     const toKeel = Math.min(y, h - y) / (h / 2);
-    const base = 150 - 60 * toKeel;                                   // bleached above, darker below
+    const base = 150 - 60 * toKeel;
     x.fillStyle = `rgb(${base + 12}, ${base - 4}, ${Math.round(base * 0.55)})`;
     x.fillRect(0, y, w, 1);
   }
-  for (let y = 0; y < h; y += 3) {                                     // individual reeds
+  for (let y = 0; y < h; y += 3) {
     x.fillStyle = `rgba(40, 30, 12, ${0.12 + r() * 0.25})`;
     x.fillRect(0, y, w, r() < 0.3 ? 2 : 1);
   }
-  for (let i = 0; i < 260; i++) {                                      // salt blooms and rot
+  for (let i = 0; i < 260; i++) {
     const px = r() * w, py = r() * h, rad = 4 + r() * 22;
     x.fillStyle = r() < 0.55 ? `rgba(225, 220, 200, ${0.05 + r() * 0.12})` : `rgba(30, 24, 10, ${0.08 + r() * 0.18})`;
     x.beginPath(); x.ellipse(px, py, rad * 2.5, rad * 0.6, 0, 0, Math.PI * 2); x.fill();
   }
-  const weed = x.createLinearGradient(0, 0, 0, h);                     // the weed line below the waterline
+  const weed = x.createLinearGradient(0, 0, 0, h);
   weed.addColorStop(0.28, 'rgba(20, 32, 18, 0)');
   weed.addColorStop(0.42, 'rgba(20, 32, 18, 0.55)');
   weed.addColorStop(0.58, 'rgba(20, 32, 18, 0.55)');
   weed.addColorStop(0.72, 'rgba(20, 32, 18, 0)');
   x.fillStyle = weed; x.fillRect(0, 0, w, h);
-  for (const u of [0.1, 0.17, 0.24, 0.76, 0.83, 0.9]) {                // lashings, some frayed loose
+  for (const u of [0.1, 0.17, 0.24, 0.76, 0.83, 0.9]) {
     x.fillStyle = '#3a2a10'; x.fillRect(u * w - 7, 0, 14, h);
     x.strokeStyle = 'rgba(58, 42, 16, 0.7)'; x.lineWidth = 2;
     for (let k = 0; k < 6; k++) {
@@ -87,25 +111,24 @@ const reedTexture = () => canvasTexture(1024, 256, (x, w, h) => {
 });
 
 // Weathered linen: bleached at the head, grimy at the foot, stained, two sewn
-// patches, a faded ochre border, and a ragged tear (cut to transparent; the
-// material's alphaTest punches it through).
+// patches, a faded ochre border, and a ragged tear (alphaTest punches it through).
 const sailTexture = () => canvasTexture(512, 512, (x, w, h) => {
   const r = rng32(11);
   const g = x.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, '#d8ccac'); g.addColorStop(1, '#a8906a');
   x.fillStyle = g; x.fillRect(0, 0, w, h);
-  for (let y = 0; y < h; y += 64) { x.fillStyle = 'rgba(90, 64, 34, 0.25)'; x.fillRect(0, y, w, 3); }   // panel seams
+  for (let y = 0; y < h; y += 64) { x.fillStyle = 'rgba(90, 64, 34, 0.25)'; x.fillRect(0, y, w, 3); }
   for (let i = 0; i < 140; i++) {
     x.fillStyle = r() < 0.5 ? `rgba(110, 70, 30, ${0.04 + r() * 0.1})` : `rgba(235, 230, 215, ${0.04 + r() * 0.08})`;
     x.beginPath(); x.arc(r() * w, r() * h, 6 + r() * 40, 0, Math.PI * 2); x.fill();
   }
-  for (const [px, py, pw, ph] of [[300, 150, 90, 70], [80, 330, 70, 90]]) {       // sewn patches
+  for (const [px, py, pw, ph] of [[300, 150, 90, 70], [80, 330, 70, 90]]) {
     x.fillStyle = 'rgba(150, 120, 80, 0.85)'; x.fillRect(px, py, pw, ph);
     x.setLineDash([4, 4]); x.strokeStyle = 'rgba(60, 40, 20, 0.8)'; x.lineWidth = 2;
     x.strokeRect(px + 3, py + 3, pw - 6, ph - 6); x.setLineDash([]);
   }
   x.strokeStyle = 'rgba(120, 48, 28, 0.75)'; x.lineWidth = 16; x.strokeRect(8, 8, w - 16, h - 16);
-  x.globalCompositeOperation = 'destination-out';                     // the tear at the foot
+  x.globalCompositeOperation = 'destination-out';
   x.beginPath(); x.moveTo(w * 0.62, h);
   for (let i = 0; i <= 10; i++) x.lineTo(w * (0.62 + i * 0.022), h - 20 - r() * 70 * Math.sin((i / 10) * Math.PI));
   x.lineTo(w * 0.84, h); x.closePath(); x.fill();
@@ -117,9 +140,9 @@ const eyeTexture = () => canvasTexture(128, 64, (x, w, h) => {
   x.strokeStyle = '#101418'; x.lineWidth = 6;
   x.beginPath(); x.ellipse(64, 26, 34, 14, 0, 0, Math.PI * 2); x.stroke();
   x.fillStyle = '#1f4f8a'; x.beginPath(); x.arc(64, 26, 9, 0, Math.PI * 2); x.fill();
-  x.beginPath(); x.moveTo(30, 12); x.lineTo(98, 8); x.stroke();                          // brow
-  x.beginPath(); x.moveTo(56, 40); x.lineTo(50, 60); x.stroke();                         // teardrop
-  x.beginPath(); x.moveTo(72, 40); x.quadraticCurveTo(98, 64, 108, 44); x.stroke();      // spiral tail
+  x.beginPath(); x.moveTo(30, 12); x.lineTo(98, 8); x.stroke();
+  x.beginPath(); x.moveTo(56, 40); x.lineTo(50, 60); x.stroke();
+  x.beginPath(); x.moveTo(72, 40); x.quadraticCurveTo(98, 64, 108, 44); x.stroke();
 });
 
 const nemesTexture = () => canvasTexture(32, 64, (x, w, h) => {
@@ -131,20 +154,20 @@ function hullGeometry() {
   const g = new THREE.SphereGeometry(1, 64, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
   const p = g.attributes.position, uv = g.attributes.uv;
   for (let i = 0; i < p.count; i++) {
-    const ux = p.getX(i), uy = p.getY(i), zn = p.getZ(i);                // y ≤ 0; zn −1 stern … +1 bow
+    const ux = p.getX(i), uy = p.getY(i), zn = p.getZ(i);
     const taper = 1 - Math.pow(Math.abs(zn), 3) * 0.85;
     const lift  = Math.max(0, (Math.abs(zn) - 0.45) / 0.55);
     const y = uy * HULL_DEPTH + lift * lift * (zn < 0 ? 5.2 : 3.0);
     const z = zn * HULL.halfLen + (zn < 0 ? Math.pow(lift, 4) * 2.2 : 0);
     p.setXYZ(i, ux * HULL.halfBeam * taper, y, z);
-    uv.setXY(i, (zn + 1) / 2, Math.atan2(uy, ux) / Math.PI + 1);        // along the length × around the bundle
+    uv.setXY(i, (zn + 1) / 2, Math.atan2(uy, ux) / Math.PI + 1);
   }
   g.computeVertexNormals();
   return g;
 }
 
-/** The pharaoh, modelled ~3 units tall and scaled to a true 1.8 m. The head
-    and the crook arm are separate pivots so he can look about and gesture. */
+/** The pharaoh, modelled ~3 units tall and scaled to a true 1.8 m. The head and
+    the gesturing arm are pivots; every piece of regalia is switchable by rank. */
 function pharaoh() {
   const g = new THREE.Group();
   const gold    = mat(0xd4a64a, { metalness: 0.7, roughness: 0.35, emissive: 0x3a2604, emissiveIntensity: 0.6 });
@@ -155,26 +178,29 @@ function pharaoh() {
 
   put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.55, 1.5, 20), linen), 0, 0.75, 0);       // robe
   put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.55, 20), skin), 0, 1.75, 0);        // chest
-  put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.4, 0.14, 28), gold), 0, 1.97, 0);        // broad collar
+  const collar = put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.4, 0.14, 28), gold), 0, 1.97, 0);
 
   const head = put(g, new THREE.Group(), 0, 2.05, 0);                                               // neck pivot
   put(head, new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 16), skin), 0, 0.22, 0.02);
-  put(head, new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.38, 0.42, 4, 1), stripes), 0, 0.22, -0.06)
-    .rotation.y = Math.PI / 4;                                                                        // nemes headcloth
-  for (const side of [-1, 1]) {
-    put(head, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.06), stripes), side * 0.24, -0.1, 0.12);  // lappets
-  }
-  put(head, new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 0.62, 20), linen), 0, 0.7, -0.02); // white crown
-  put(head, new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.25, 0.22, 20, 1, true),
-    mat(0x9a1c18, { side: THREE.DoubleSide })), 0, 0.5, -0.02);                                      // red crown
-  put(head, new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 8), gold), 0, 0.4, 0.26).rotation.x = 0.4;  // uraeus
+  const nemesGeo = new THREE.CylinderGeometry(0.22, 0.38, 0.42, 4, 1);
+  const nemesPlain = put(head, new THREE.Mesh(nemesGeo, linen), 0, 0.22, -0.06);
+  nemesPlain.rotation.y = Math.PI / 4;
+  const nemesStriped = put(head, new THREE.Mesh(nemesGeo, stripes), 0, 0.22, -0.06);
+  nemesStriped.rotation.y = Math.PI / 4;
+  const lappets = [-1, 1].map(side =>
+    put(head, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.06), stripes), side * 0.24, -0.1, 0.12));
+  const whiteCrown = put(head, new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 0.62, 20), linen), 0, 0.7, -0.02);
+  const redCrown = put(head, new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.25, 0.22, 20, 1, true),
+    mat(0x9a1c18, { side: THREE.DoubleSide })), 0, 0.5, -0.02);
+  const uraeus = put(head, new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 8), gold), 0, 0.4, 0.26);
+  uraeus.rotation.x = 0.4;
 
   const armGeo = new THREE.CylinderGeometry(0.07, 0.06, 0.75, 10);
-  armGeo.translate(0, -0.375, 0);                                                                    // pivots at the shoulder
+  armGeo.translate(0, -0.375, 0);
   const rest = put(g, new THREE.Group(), -0.36, 1.9, 0);
   rest.add(new THREE.Mesh(armGeo, skin));
   rest.rotation.set(-0.2, 0, -0.12);
-  const arm = put(g, new THREE.Group(), 0.36, 1.9, 0);                                                // the crook arm
+  const arm = put(g, new THREE.Group(), 0.36, 1.9, 0);
   arm.add(new THREE.Mesh(armGeo, skin));
   const crook = put(arm, new THREE.Group(), 0, -0.72, 0.02);
   crook.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1, 8), gold));
@@ -185,8 +211,26 @@ function pharaoh() {
 
   const cape = put(g, new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.9, 4, 10),
     mat(0x8a1c16, { side: THREE.DoubleSide })), 0, 1.1, -0.38);
-  g.scale.setScalar(1.8 / 3.06);                                    // crown tip ≈ 1.8 m
-  return { group: g, head, arm, cape, capeBase: cape.geometry.attributes.position.array.slice() };
+  g.scale.setScalar(1.8 / 3.06);
+  return {
+    group: g, head, arm, cape, capeBase: cape.geometry.attributes.position.array.slice(),
+    regalia: { collar, nemesPlain, nemesStriped, lappets, whiteCrown, redCrown, uraeus, crook, cape },
+  };
+}
+
+/** Rank → regalia: PEASANT bare-headed · SCRIBE linen headcloth · ACOLYTE striped nemes + cape
+    · VIZIER gold collar + crook · HIGH PRIEST red crown + uraeus · PHARAOH the white crown too. */
+function dressForRank(regalia, name) {
+  const lvl = Math.max(0, RANKS.indexOf(name));
+  regalia.nemesPlain.visible   = lvl === 1;
+  regalia.nemesStriped.visible = lvl >= 2;
+  for (const l of regalia.lappets) l.visible = lvl >= 2;
+  regalia.cape.visible   = lvl >= 2;
+  regalia.collar.visible = lvl >= 3;
+  regalia.crook.visible  = lvl >= 3;
+  regalia.redCrown.visible = lvl >= 4;
+  regalia.uraeus.visible   = lvl >= 4;
+  regalia.whiteCrown.visible = lvl >= 5;
 }
 
 /** The Shipmaster: a hooded figure whose face you never quite see. */
@@ -212,15 +256,15 @@ function overseer() {
   const skin = mat(0x6a4028), leather = mat(0x3a2414, { roughness: 0.9 });
   const put = (parent, mesh, x, y, z) => { mesh.position.set(x, y, z); parent.add(mesh); return mesh; };
   for (const x of [-0.14, 0.14]) put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.85, 8), skin), x, 0.42, 0);
-  put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.45, 12), leather), 0, 0.95, 0);    // kilt and belt
-  put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.25, 0.7, 12), skin), 0, 1.5, 0);        // barrel chest
-  put(g, new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.72, 0.62), leather), 0, 1.5, 0).rotation.z = 0.6;   // cross-strap
-  put(g, new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), skin), 0, 2.0, 0);                 // shaved head
+  put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.45, 12), leather), 0, 0.95, 0);
+  put(g, new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.25, 0.7, 12), skin), 0, 1.5, 0);
+  put(g, new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.72, 0.62), leather), 0, 1.5, 0).rotation.z = 0.6;
+  put(g, new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), skin), 0, 2.0, 0);
   const armGeo = new THREE.CylinderGeometry(0.08, 0.06, 0.65, 8);
   armGeo.translate(0, -0.325, 0);
   const other = put(g, new THREE.Group(), -0.36, 1.78, 0);
   other.add(new THREE.Mesh(armGeo, skin));
-  other.rotation.z = -0.3;                                                                          // fist on the hip
+  other.rotation.z = -0.3;
   const arm = put(g, new THREE.Group(), 0.36, 1.78, 0);
   arm.add(new THREE.Mesh(armGeo, skin));
   const whipPos = new Float32Array((WHIP_SEGS + 1) * 3);
@@ -232,7 +276,34 @@ function overseer() {
   return { group: g, arm, whipGeo, whipPos };
 }
 
-export function createShip({ crew = 0 } = {}) {
+/** A rower's torso, rower-local with the origin at the hip and +z toward the way they face (aft):
+    a lathed pelvis→waist→ribcage→shoulders profile, flattened front-to-back, with a neck and deltoids. */
+function rowerTorsoGeometry() {
+  const profile = [[0.001, -0.02], [0.15, 0.0], [0.16, 0.08], [0.125, 0.22], [0.15, 0.36],
+                   [0.18, 0.47], [0.19, 0.55], [0.12, 0.62], [0.05, 0.65], [0.001, 0.66]]
+    .map(([r, y]) => new THREE.Vector2(r, y));
+  const torso = new THREE.LatheGeometry(profile, 14);
+  torso.scale(1, 1, 0.72);
+  torso.computeVertexNormals();
+  const neck = new THREE.CylinderGeometry(0.045, 0.055, 0.12, 8);
+  neck.translate(0, 0.7, 0.03);
+  const deltoids = [-1, 1].map(s => { const d = new THREE.SphereGeometry(0.075, 10, 8); d.translate(s * 0.19, 0.55, 0); return d; });
+  return mergeGeometries([torso, neck, ...deltoids]);
+}
+
+/** A rower's head, same frame: a longish skull bowed forward, a jaw, and ears. */
+function rowerHeadGeometry() {
+  const skull = new THREE.SphereGeometry(0.1, 14, 12);
+  skull.scale(0.9, 1.12, 1.0);
+  skull.translate(0, 0.84, 0.07);
+  skull.computeVertexNormals();
+  const jaw = new THREE.BoxGeometry(0.12, 0.07, 0.1);
+  jaw.translate(0, 0.76, 0.11);
+  const ears = [-1, 1].map(s => { const e = new THREE.SphereGeometry(0.022, 6, 5); e.translate(s * 0.09, 0.84, 0.06); return e; });
+  return mergeGeometries([skull, jaw, ...ears]);
+}
+
+export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
   const group = new THREE.Group();
   const body  = new THREE.Group();
   body.position.y = FREEBOARD;
@@ -279,14 +350,12 @@ export function createShip({ crew = 0 } = {}) {
   const master = shipmaster();
   master.position.set(0.55, 0.83, -6.0);
   body.add(master);
-  // Pivots on the starboard quarter: the loom rises inboard to the Shipmaster's
-  // hands, the blade trails aft and down into the water. Swings with the rudder.
   const steering = new THREE.Group();
   steering.position.set(halfWidthAt(-6.6) * 0.9, 1.4, -6.6);
   const oarBody = new THREE.Group();
   oarBody.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.25, -0.75, -0.6).normalize());
   const loomGeo = new THREE.CylinderGeometry(0.07, 0.08, 6.5, 8);
-  loomGeo.translate(0, 2.05, 0);                                       // −1.2 m (handle) … +5.3 m (blade end)
+  loomGeo.translate(0, 2.05, 0);
   const rudderBlade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.8, 0.7), wood);
   rudderBlade.position.y = 4.5;
   oarBody.add(new THREE.Mesh(loomGeo, wood), rudderBlade);
@@ -299,19 +368,16 @@ export function createShip({ crew = 0 } = {}) {
   body.add(ov.group);
 
   // ── The rowers: your downline, chained to their benches (instanced) ──
-  const slaveSkin = mat(0x6a4630), rag = mat(0x5a4a36, { roughness: 1 });
+  const slaveSkin = mat(0x7a5236, { roughness: 0.75 }), rag = mat(0x5a4a36, { roughness: 1 });
   const iron = mat(0x55504a, { metalness: 0.6, roughness: 0.5 });
-  const torsoGeo = new THREE.CylinderGeometry(0.19, 0.14, 0.6, 10);
-  torsoGeo.translate(0, 0.32, 0);                                      // origin at the hip; broad shoulders, thin waist
-  const headGeo = new THREE.SphereGeometry(0.11, 12, 10);
-  headGeo.translate(0, 0.78, 0.07);                                    // shaved and bowed (rower-local +z → aft)
-  const clothGeo = new THREE.CylinderGeometry(0.17, 0.25, 0.24, 7);
-  clothGeo.translate(0, 0.02, 0);                                      // a ragged loincloth
-  const limbGeo = new THREE.CylinderGeometry(1, 1, 1, 6);              // unit segment, stretched per instance
+  const clothGeo = new THREE.CylinderGeometry(0.16, 0.24, 0.24, 7);
+  clothGeo.translate(0, 0.02, 0);
+  const limbGeo = new THREE.CylinderGeometry(1, 1, 1, 7);                 // unit segment, stretched per instance
+  const handGeo = new THREE.SphereGeometry(1, 8, 6);
   const benchGeo = new THREE.BoxGeometry(0.9, 0.1, 0.34);
   const shackleGeo = new THREE.TorusGeometry(0.07, 0.02, 6, 10);
   const shaftGeo = new THREE.CylinderGeometry(0.035, 0.035, OAR_LEN + OAR_INBOARD, 6);
-  shaftGeo.translate(0, (OAR_LEN - OAR_INBOARD) / 2, 0);               // origin at the oarlock; the loom runs inboard
+  shaftGeo.translate(0, (OAR_LEN - OAR_INBOARD) / 2, 0);
   const bladeGeo = new THREE.BoxGeometry(0.05, 0.9, 0.28);
   bladeGeo.translate(0, OAR_LEN - 0.3, 0);
   const instanced = (geo, m, per = 1) => {
@@ -321,13 +387,15 @@ export function createShip({ crew = 0 } = {}) {
     body.add(im);
     return im;
   };
-  const torsos = instanced(torsoGeo, slaveSkin), heads = instanced(headGeo, slaveSkin), cloths = instanced(clothGeo, rag);
+  const torsos = instanced(rowerTorsoGeometry(), slaveSkin), heads = instanced(rowerHeadGeometry(), slaveSkin);
+  const cloths = instanced(clothGeo, rag);
   const benches = instanced(benchGeo, wood), shafts = instanced(shaftGeo, wood), blades = instanced(bladeGeo, wood);
   const upperArms = instanced(limbGeo, slaveSkin, 2), forearms = instanced(limbGeo, slaveSkin, 2);
+  const hands = instanced(handGeo, slaveSkin, 2);
   const thighs = instanced(limbGeo, slaveSkin, 2), shins = instanced(limbGeo, slaveSkin, 2);
   const shackles = instanced(shackleGeo, iron, 2), chains = instanced(limbGeo, iron, 2);
   const perRower = [torsos, heads, cloths, benches, shafts, blades];
-  const perLimb  = [upperArms, forearms, thighs, shins, shackles, chains];
+  const perLimb  = [upperArms, forearms, hands, thighs, shins, shackles, chains];
 
   const dummy = new THREE.Object3D();
   const UP = new THREE.Vector3(0, 1, 0);
@@ -344,7 +412,7 @@ export function createShip({ crew = 0 } = {}) {
   }
 
   const armDir = new THREE.Vector3(), armPole = new THREE.Vector3(), handAt = new THREE.Vector3(), elbow = new THREE.Vector3();
-  /** Two-bone arm: shoulder → elbow → hand, the elbow bending down and outward. */
+  /** Two-bone arm: shoulder → elbow → hand, the elbow bending down and outward; a fist at the end. */
   function arm(i, shoulderAt, hand, poleX) {
     armDir.subVectors(hand, shoulderAt);
     const d = Math.max(0.05, Math.min(armDir.length(), UPPER_ARM + FOREARM - 1e-3));
@@ -355,8 +423,13 @@ export function createShip({ crew = 0 } = {}) {
     armPole.set(poleX, -1, 0);
     armPole.addScaledVector(armDir, -armPole.dot(armDir)).normalize();
     elbow.copy(shoulderAt).addScaledVector(armDir, along).addScaledVector(armPole, lift);
-    segment(upperArms, i, shoulderAt, elbow, 0.05);
+    segment(upperArms, i, shoulderAt, elbow, 0.055);
     segment(forearms, i, elbow, handAt, 0.045);
+    dummy.position.copy(handAt);
+    dummy.quaternion.identity();
+    dummy.scale.setScalar(0.05);
+    dummy.updateMatrix();
+    hands.setMatrixAt(i, dummy.matrix);
   }
 
   let seats = [];
@@ -370,10 +443,14 @@ export function createShip({ crew = 0 } = {}) {
     const pitch = (BENCH_TO - BENCH_FROM) / PER_SIDE;
     seats = Array.from({ length: count }, (_, k) => {
       const side = k % 2 ? -1 : 1;
-      const z = BENCH_FROM + (order[Math.floor(k / 2)] + 0.5) * pitch;     // the oarlock station
+      const z = BENCH_FROM + (order[Math.floor(k / 2)] + 0.5) * pitch;
       const half = halfWidthAt(z);
-      // Seated forward of the oarlock so the arms reach out at the catch and pull in at the finish.
-      return { side, z, half, hip: new THREE.Vector3(side * (half - 0.75), DECK_Y + 0.35, z + 0.45) };
+      return {
+        side, z, half,
+        hip: new THREE.Vector3(side * (half - 0.75), DECK_Y + 0.35, z + 0.45),
+        offset: (hash01(k) - 0.5) * 0.5,          // each rower a touch early or late…
+        wander: hash01(k + 17) * Math.PI * 2,     // …drifting slowly in and out of time
+      };
     });
     seats.forEach((s, i) => {
       dummy.rotation.set(0, 0, 0);
@@ -383,7 +460,7 @@ export function createShip({ crew = 0 } = {}) {
       benches.setMatrixAt(i, dummy.matrix);
       for (const [j, dx] of [[0, -0.1], [1, 0.1]]) {
         hipAt.set(s.hip.x + dx, s.hip.y, s.hip.z);
-        knee.set(hipAt.x, hipAt.y + 0.02, hipAt.z - 0.4);                   // thighs toward the stern: they face aft
+        knee.set(hipAt.x, hipAt.y + 0.02, hipAt.z - 0.4);
         foot.set(hipAt.x, DECK_Y + 0.05, hipAt.z - 0.48);
         segment(thighs, i * 2 + j, hipAt, knee, 0.075);
         segment(shins, i * 2 + j, knee, foot, 0.06);
@@ -393,7 +470,7 @@ export function createShip({ crew = 0 } = {}) {
         dummy.updateMatrix();
         shackles.setMatrixAt(i * 2 + j, dummy.matrix);
         ankle.set(foot.x, DECK_Y + 0.07, foot.z);
-        anchor.set(s.hip.x, DECK_Y + 0.02, s.hip.z - 0.02);                 // chained to the bench foot
+        anchor.set(s.hip.x, DECK_Y + 0.02, s.hip.z - 0.02);
         segment(chains, i * 2 + j, ankle, anchor, 0.015);
       }
     });
@@ -407,6 +484,7 @@ export function createShip({ crew = 0 } = {}) {
   const ph = pharaoh();
   ph.group.position.set(0, DECK_Y + 0.1, HULL.halfLen * 0.55);
   body.add(ph.group);
+  dressForRank(ph.regalia, rank);
   const lantern = new THREE.PointLight(0xffc070, 12, 12, 2);
   lantern.position.set(0, 2.8, HULL.halfLen * 0.55 + 1.0);
   body.add(lantern);
@@ -427,12 +505,12 @@ export function createShip({ crew = 0 } = {}) {
 
   return {
     group, spray, setCrew,
+    setRank(name) { dressForRank(ph.regalia, name); },
     update(v, dt) {
       group.position.set(v.x, v.hull.y, v.z);
       group.rotation.set(-v.hull.pitch, v.heading, v.hull.roll, 'YXZ');
 
-      // Sail: furls upward with trim, swings toward the wind, fills with drive,
-      // luffs (flutters) when it has none.
+      // Sail: furls upward with trim, swings toward the wind, fills when it draws, luffs when it doesn't.
       rig.scale.y    = 0.12 + 0.88 * v.sail;
       rig.rotation.y = Math.max(-0.6, Math.min(0.6, wrapAngle(v.windAngle - v.heading) * 0.5));
       const fill = Math.min(1, v.drive / (SAIL.drive * 0.9));
@@ -449,13 +527,13 @@ export function createShip({ crew = 0 } = {}) {
 
       steering.rotation.y = -v.rudder * 0.9;
 
-      // Rowers: the stroke rate follows the ship's speed; bent over, reaching aft at the catch.
+      // Rowers: the stroke rate follows the ship's speed; each slightly out of time.
       strokePhase += dt * v.speed * STROKES_PER_MPS * Math.PI * 2;
-      const lean  = -0.25 - 0.3 * Math.sin(strokePhase);
-      const sweep = Math.sin(strokePhase) * 0.45;
-      const elev  = -0.33 + 0.12 * Math.cos(strokePhase);               // blades bite sweeping aft, lift on the return
-      const cl = Math.cos(lean), sl = Math.sin(lean);
       seats.forEach((s, i) => {
+        const phase = strokePhase + s.offset + 0.12 * Math.sin(v.t * 0.35 + s.wander);
+        const lean  = -0.25 - 0.3 * Math.sin(phase);                     // bent over; reaching aft at the catch
+        const sweep = Math.sin(phase) * 0.45;
+        const elev  = -0.33 + 0.12 * Math.cos(phase);                    // blades bite sweeping aft, lift on the return
         dummy.scale.set(1, 1, 1);
         dummy.position.copy(s.hip);
         dummy.rotation.set(lean, Math.PI, 0);
@@ -470,13 +548,14 @@ export function createShip({ crew = 0 } = {}) {
         dummy.updateMatrix();
         shafts.setMatrixAt(i, dummy.matrix);
         blades.setMatrixAt(i, dummy.matrix);
+        const cl = Math.cos(lean), sl = Math.sin(lean);
         for (const [j, dx] of [[0, -0.19], [1, 0.19]]) {
-          shoulderAt.set(s.hip.x + dx, s.hip.y + 0.58 * cl, s.hip.z + 0.58 * sl);
+          shoulderAt.set(s.hip.x + dx, s.hip.y + 0.56 * cl, s.hip.z + 0.56 * sl);
           handTarget.copy(lock).addScaledVector(oarDir, -(OAR_INBOARD - 0.12) + (j ? 0.09 : -0.09));
           arm(i * 2 + j, shoulderAt, handTarget, dx * 5);
         }
       });
-      for (const im of [torsos, heads, cloths, shafts, blades, upperArms, forearms]) im.instanceMatrix.needsUpdate = true;
+      for (const im of [torsos, heads, cloths, shafts, blades, upperArms, forearms, hands]) im.instanceMatrix.needsUpdate = true;
 
       // The overseer's whip: wind up, crack, recover — more often the slower she goes.
       whipClock += dt;
@@ -486,7 +565,7 @@ export function createShip({ crew = 0 } = {}) {
       if (c < 0.45)     { const u = c / 0.45;          swing = 0.2 + 2.4 * u; bend = 1.2 * u; }
       else if (c < 0.6) { const u = (c - 0.45) / 0.15; swing = 2.6 - 3.6 * u; bend = 1.2 - 2.0 * u; }
       else              { const u = (c - 0.6) / 0.4;   swing = -1.0 + 1.2 * u; bend = -0.8 + 1.1 * u; }
-      ov.arm.rotation.x = swing;                                          // + up and back, − forward and down
+      ov.arm.rotation.x = swing;
       for (let k = 0; k <= WHIP_SEGS; k++) {
         const u = k / WHIP_SEGS, ang = bend * u * 1.6;
         ov.whipPos[k * 3]     = 0;
@@ -495,8 +574,8 @@ export function createShip({ crew = 0 } = {}) {
       }
       ov.whipGeo.attributes.position.needsUpdate = true;
 
-      // The pharaoh keeps his feet against the swell, gazes about, and every
-      // 11 s raises the crook toward Crete, holds it, and lowers it.
+      // The pharaoh keeps his feet against the swell, gazes about, and every 11 s
+      // raises his hand (and, once he has one, the crook) toward Crete.
       ph.group.rotation.x = v.hull.pitch * 0.6;
       ph.group.rotation.z = -v.hull.roll * 0.6;
       ph.head.rotation.y = Math.sin(v.t * 0.21) * 0.55 + Math.sin(v.t * 0.53) * 0.15;
@@ -505,7 +584,6 @@ export function createShip({ crew = 0 } = {}) {
       const raise = cycle < 0.62 ? 0 : cycle < 0.72 ? (cycle - 0.62) / 0.1 : cycle < 0.9 ? 1 : 1 - (cycle - 0.9) / 0.1;
       ph.arm.rotation.x = -(0.5 + 1.7 * raise * raise * (3 - 2 * raise));
 
-      // Cape: pinned at the shoulders, trailing and flapping with speed.
       const cp = ph.cape.geometry.attributes.position;
       for (let i = 0; i < cp.count; i++) {
         const y = ph.capeBase[i * 3 + 1];

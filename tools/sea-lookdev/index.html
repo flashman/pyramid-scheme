@@ -33,6 +33,7 @@
   button:focus-visible, input:focus-visible { outline: 1px solid var(--brass); outline-offset: 2px; }
   label { display: flex; align-items: center; gap: 8px; }
   input[type="range"] { flex: 1; accent-color: var(--brass); }
+  select { font: inherit; color: var(--text); background: var(--ink); border: 1px solid var(--line); padding: 4px 6px; }
   #error { color: #e08a6f; white-space: pre-wrap; }
   #error:empty { display: none; }
 </style>
@@ -88,6 +89,15 @@
       <label for="crew">Downline rowers <output id="crew-out" for="crew">8</output></label>
       <input id="crew" type="range" min="0" max="24" step="1" value="8">
     </section>
+    <section>
+      <h2>Rank</h2>
+      <label for="rank">The pharaoh's rank
+        <select id="rank">
+          <option>PEASANT</option><option>SCRIBE</option><option>ACOLYTE</option>
+          <option>VIZIER</option><option>HIGH PRIEST</option><option>PHARAOH</option>
+        </select>
+      </label>
+    </section>
   </aside>
 </div>
 
@@ -113,7 +123,7 @@
   const v = createVoyage();
   let sea;
   try {
-    sea = createSeaScene(canvas, { windAngle: COURSE_HEADING, crew: 8 });
+    sea = createSeaScene(canvas, { windAngle: COURSE_HEADING, crew: 8, rank: 'PEASANT' });
     sea.introView();
   } catch (err) {
     $('error').textContent = 'The scene failed to start: ' + err.message;
@@ -126,6 +136,7 @@
     if (Number(b.dataset.along) === 0) sea.introView();             // the departure shot
     canvas.focus();
   }));
+  $('rank').addEventListener('change', e => { sea.setRank(e.target.value); canvas.focus(); });
   $('crew').addEventListener('input', e => { sea.setCrew(Number(e.target.value)); $('crew-out').textContent = e.target.value; });
   $('bolt').addEventListener('click', () => {
     const x = v.x + Math.sin(v.heading) * 900, z = v.z + Math.cos(v.heading) * 900;

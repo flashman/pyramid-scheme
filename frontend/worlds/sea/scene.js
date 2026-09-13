@@ -16,7 +16,7 @@ import { createPerfMonitor } from './perf.js';
 export const VIEW_W = 780;
 export const VIEW_H = 540;
 
-export function createSeaScene(canvas, { windAngle, crew = 0 }) {
+export function createSeaScene(canvas, { windAngle, crew = 0, rank = 'PEASANT' }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.setSize(VIEW_W, VIEW_H);                 // also pins the CSS size to 780×540
@@ -36,7 +36,7 @@ export function createSeaScene(canvas, { windAngle, crew = 0 }) {
   const sun = new THREE.DirectionalLight(0xffa060, 0.8);
   scene.add(sun, sun.target);
 
-  const ship      = createShip({ crew });
+  const ship      = createShip({ crew, rank });
   const landmarks = createLandmarks();
   scene.add(ship.group, ship.spray, landmarks.group, createDelta());
   // Standard materials (ship, landmarks, Crete) fog toward the horizon slate;
@@ -84,6 +84,8 @@ export function createSeaScene(canvas, { windAngle, crew = 0 }) {
     introView() { introOrbit(cam); },
     /** Seat n rowers at the oars (the player's downline). */
     setCrew(n) { ship.setCrew(n); },
+    /** Dress the pharaoh for the player's rank (game/tiers.js names, PEASANT … PHARAOH). */
+    setRank(name) { ship.setRank(name); },
     dispose() { renderer.dispose(); },
   };
 }

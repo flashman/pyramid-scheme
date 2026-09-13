@@ -38,6 +38,7 @@
 - Dev panel label is `⛵ SEA` (`🌊` is already the Oasis button).
 - Camera (decided in Task 9 look-dev): the default is a three-quarter chase view; dragging orbits around the ship and the view holds where you leave it (double-click resets) — dead astern hid the ship (spec §3 said low & behind).
 - Crew (decided in Task 9 look-dev): the player's downline rows as chained galley slaves — one per recruit (max 24), four hired hands when there is no downline — stroke rate set by ship speed, driven by a whip-cracking overseer (more often the slower she goes); a hooded Shipmaster works a single steering oar at the stern; the pharaoh stands at true human scale (1.8 m), keeping his balance, gazing about and periodically raising his crook toward Crete.
+- Rank (decided in Task 9 look-dev): the pharaoh's regalia follows the player's tier — a bare-headed future pharaoh at PEASANT, gaining headcloth, cape, collar and crook, then the red and white crowns, by PHARAOH. Rowers stroke slightly out of sync.
 - Scenery (decided in Task 9 look-dev): the bull-horns landmark is dropped; Crete's bay is natural rock (headlands, sea stacks, cliff-backed cove) with a glowing cave mouth high on the mountain; the voyage opens on the Nile Delta (marsh, papyrus, palms) with the pyramids of Giza on the horizon, the camera starting on that view and swinging round to the chase.
 
 ## File map
@@ -2647,7 +2648,7 @@ git commit -m "feat(sea): reed ship with pharaoh, wreck, signal rock, bull horns
 - Modify: `frontend/ui/dev-panel.js`
 
 **Interfaces:**
-- Consumes: `createSeaScene(canvas, {windAngle, crew}) → {render, flash, orbit(dx, dy), releaseOrbit(), resetView(), introView(), setCrew(n)}` (Tasks 7–9, via dynamic import only); `createVoyage, stepVoyage` (Tasks 2–3); `createNarrationMemory, narrate` (Task 4); `PortalRegistry.use` (Task 6); existing `DialogueManager`, `Dialogue`, `Flags`, `Events`, `G.keys`, `Api.hasToken/post`, `log`, `X/CW/CH`, `Inventory`.
+- Consumes: `createSeaScene(canvas, {windAngle, crew}) → {render, flash, orbit(dx, dy), releaseOrbit(), resetView(), introView(), setCrew(n), setRank(name)}` (Tasks 7–9, via dynamic import only); `createVoyage, stepVoyage` (Tasks 2–3); `createNarrationMemory, narrate` (Task 4); `PortalRegistry.use` (Task 6); existing `DialogueManager`, `Dialogue`, `Flags`, `Events`, `G.keys`, `Api.hasToken/post`, `log`, `X/CW/CH`, `Inventory`.
 - Produces:
   - `SeaRealm` (id `'sea'`) registered in the manifest; registers edge `sea → nile` (key-less, `seaTransRender`, 2200 ms); listens for `Events 'sea:preload'`.
   - `seaTransRender(progress)` exported from `worlds/transitions.js` (Task 13 uses it for `nile → sea`).
@@ -2814,6 +2815,7 @@ import { Flags }           from '../../engine/flags.js';
 import { Events }          from '../../engine/events.js';
 import { X, CW, CH }       from '../../engine/canvas.js';
 import { G }               from '../../game/state.js';
+import { getTier }         from '../../game/tiers.js';
 import { Api }             from '../../game/api.js';
 import { log }             from '../../ui/panels.js';
 import { seaTransRender }  from '../transitions.js';
@@ -2888,7 +2890,7 @@ export class SeaRealm extends Realm {
     loadScene()
       .then(mod => {
         if (RealmManager.currentId !== 'sea' || this._scene) return;
-        this._scene = mod.createSeaScene(this._gl, { windAngle: COURSE_HEADING, crew: rowersFor(G) });
+        this._scene = mod.createSeaScene(this._gl, { windAngle: COURSE_HEADING, crew: rowersFor(G), rank: getTier().name });
         this._scene.introView();                          // open looking back at the Delta and the pyramids
         this._readyAt = performance.now();
       })
