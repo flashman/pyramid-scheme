@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createVoyage, stepVoyage, polar, stormTarget, wrapAngle } from '../worlds/sea/voyage.js';
+import { createVoyage, stepVoyage, polar, stormTarget, wrapAngle, haulProgress } from '../worlds/sea/voyage.js';
 import {
   COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BEACH, FRONT_LIMIT, HULL, WRECK, beachY,
   courseToWorld, worldToCourse,
@@ -182,6 +182,18 @@ test('landmark_near fires once per landmark', () => {
   assert.equal(events.filter(e => e.type === 'landmark_near' && e.id === 'wreck').length, 1);
 });
 
+test('the haul: over the side, then heaves that brace and pull, then done', () => {
+  const total = BEACH.ashore + BEACH.heaves * BEACH.heaveTime;
+  assert.equal(haulProgress(0).stage, 'ashore');
+  assert.equal(haulProgress(BEACH.ashore * 0.9).dist, 0);
+  let last = 0;
+  for (let t = 0; t <= total + 1; t += 0.05) { const d = haulProgress(t).dist; assert.ok(d >= last - 1e-9, `slid back at ${t}`); last = d; }
+  const bracing = [0.01, BEACH.slack * 0.9].map(f => haulProgress(BEACH.ashore + (2 + f) * BEACH.heaveTime).dist);
+  assert.ok(Math.abs(bracing[0] - 2 * BEACH.haul / BEACH.heaves) < 1e-6 && Math.abs(bracing[1] - bracing[0]) < 1e-9, 'moved while bracing');
+  assert.equal(haulProgress(total).stage, 'done');
+  assert.equal(haulProgress(total).dist, BEACH.haul);
+});
+
 test('the beach rises from under the bay to a flat berm', () => {
   assert.equal(beachY(0), 0);
   assert.ok(Math.abs(beachY(10) - 10 * BEACH.slope) < 1e-12);
@@ -199,7 +211,10 @@ test('running up the beach lands the ship; the crew hauls her clear of the water
   const bow = worldToCourse(v.x, v.z).along + HULL.halfLen;
   assert.ok(bow >= BEACH.along && bow <= BEACH.along + 10, `bow at ${(bow - BEACH.along).toFixed(1)} m up the sand`);
   const before = worldToCourse(v.x, v.z).along;
-  sail(v, BEACH.haulTime + 4, 60, () => ({ trim: 1, row: 1 }));
+  events.push(...sail(v, BEACH.ashore + BEACH.heaves * BEACH.heaveTime + 4, 60, () => ({ trim: 1, row: 1 })));
+  assert.equal(events.filter(e => e.type === 'haul_ropes').length, 1);
+  assert.deepEqual(events.filter(e => e.type === 'heave').map(e => e.id), [...Array(BEACH.heaves).keys()]);
+  assert.equal(events.filter(e => e.type === 'hauled').length, 1);
   const hauled = worldToCourse(v.x, v.z).along - before;
   assert.ok(Math.abs(hauled - BEACH.haul) < 0.5, `hauled ${hauled.toFixed(1)} m`);
   assert.ok(v.hull.y - BEACH.keel > 0.8, `belly ${(v.hull.y - BEACH.keel).toFixed(2)} m above the bay`);

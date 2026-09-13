@@ -39,6 +39,16 @@ export const NARRATION = {
   wrecked: { once: true, lines: [
     'The rock opens the hull like a ledger. The sea comes in to audit.',
   ]},
+  haul_ropes: { once: true, lines: [
+    "The Shipmaster's hired men drop over the side with the bow ropes. The downline stays chained to the benches. Hauling is skilled work, and skilled work is paid.",
+  ]},
+  heave: { once: true, byId: {
+    0: ['"HEAVE!" The hull lurches a length up the sand. The overseer\'s whip keeps the beat for men who are not even pulling.'],
+    4: ['"HEAVE!" Reed groans over the rollers. Every length up the beach is a length the sea can no longer repossess.'],
+  }},
+  hauled: { once: true, lines: [
+    'She is up on the rollers and clear of the water. The Shipmaster chocks the hull. Crete signs for delivery.',
+  ]},
   lightning: { once: true, lines: [
     'Lightning walks across the water ahead. The thunder takes its time. It knows you are coming to it.',
   ]},

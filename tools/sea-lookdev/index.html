@@ -23,6 +23,7 @@
   #gl:active { cursor: grabbing; }
   #gl:focus-visible { border-color: var(--brass); }
   .hint { color: var(--muted); margin-top: 6px; }
+  .log { color: var(--brass); font: 400 16px/1.4 var(--display); max-width: 780px; min-height: 2.8em; margin-top: 8px; text-wrap: pretty; }
   aside { flex: 1 1 260px; background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; display: grid; gap: 16px; }
   h2 { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
   dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-variant-numeric: tabular-nums; }
@@ -50,6 +51,7 @@
   <div>
     <div class="stage"><canvas id="gl" width="780" height="540" tabindex="0" aria-label="Sea view — click, then steer with arrow keys"></canvas><div id="toast"></div></div>
     <div class="hint">Click the view, then ← → steer · ↑ ↓ trim sail · ⇧ ↑ ↓ rowing · drag to look around · double-click to reset the view</div>
+    <div id="log" class="log" aria-live="polite"></div>
     <div id="error"></div>
   </div>
 
@@ -108,6 +110,7 @@
   import { createVoyage, stepVoyage, wrapAngle } from './sea/voyage.js';
   import { COURSE_HEADING, CRETE_BAY, courseToWorld } from './sea/constants.js';
   import { createSeaScene } from './sea/scene.js';
+  import { narrate, createNarrationMemory } from './sea/narration.js';
 
   const $ = (id) => document.getElementById(id);
   const canvas = $('gl'), storm = $('storm'), auto = $('auto');
@@ -124,6 +127,7 @@
   canvas.addEventListener('dblclick', () => sea.resetView());
 
   const v = createVoyage();
+  const memory = createNarrationMemory();
   let sea;
   try {
     sea = createSeaScene(canvas, { windAngle: COURSE_HEADING, crew: 8, rank: 'PEASANT' });
@@ -135,7 +139,8 @@
 
   document.querySelectorAll('[data-along]').forEach(b => b.addEventListener('click', () => {
     const p = courseToWorld(Number(b.dataset.along), Number(b.dataset.lateral || 0));
-    Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false, landed: false, haul: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false });
+    Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false, landed: false, haulT: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false });
+    Object.assign(memory, createNarrationMemory()); $('log').textContent = '';
     if (Number(b.dataset.along) === 0) sea.introView();             // the departure shot
     canvas.focus();
   }));
@@ -165,9 +170,10 @@
       if (e.type === 'wrecked') $('toast').textContent = 'THE HULL OPENS ON THE ROCK';
       if (e.type === 'sunk') {
         $('toast').textContent = 'THE SEA HAS ACCEPTED YOUR PASSAGE.\nIT IS NON-REFUNDABLE.';
-        setTimeout(() => { Object.assign(v, createVoyage()); sea.introView(); $('toast').textContent = ''; }, 3000);
+        setTimeout(() => { Object.assign(v, createVoyage()); Object.assign(memory, createNarrationMemory()); $('log').textContent = ''; sea.introView(); $('toast').textContent = ''; }, 3000);
       }
     }
+    for (const line of narrate(events, v.t, memory)) $('log').textContent = line;
     sea.render(v, dt);
 
     $('i-speed').textContent = (v.speed * 1.94384).toFixed(1) + ' kn';

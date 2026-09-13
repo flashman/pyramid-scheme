@@ -52,3 +52,9 @@ test('rng picks among a table entry\'s lines', () => {
   const [line] = narrate([{ type: 'strayed' }], 0, createNarrationMemory(), () => 0.999);
   assert.equal(line, '✦ ' + lines[lines.length - 1]);
 });
+
+test('the haul speaks as the ropes go out, on chosen heaves, and when she is up', () => {
+  const heaves = Array.from({ length: 7 }, (_, id) => ({ type: 'heave', id }));
+  const lines = narrate([{ type: 'haul_ropes' }, ...heaves, { type: 'hauled' }], 0, createNarrationMemory(), first);
+  assert.equal(lines.length, 2 + Object.keys(NARRATION.heave.byId).length);
+});

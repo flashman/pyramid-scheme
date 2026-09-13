@@ -38,7 +38,7 @@ export function createSeaScene(canvas, { windAngle, crew = 0, rank = 'PEASANT' }
 
   const ship      = createShip({ crew, rank });
   const landmarks = createLandmarks();
-  scene.add(ship.group, ship.spray, landmarks.group, createDelta());
+  scene.add(ship.group, ship.spray, ship.gang, landmarks.group, createDelta());
   // Standard materials (ship, landmarks, Crete) fog toward the horizon slate;
   // the sky and ocean shaders do their own.
   scene.fog = new THREE.FogExp2(0x1a1f28, 0.0004);

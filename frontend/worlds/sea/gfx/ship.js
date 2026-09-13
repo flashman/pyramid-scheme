@@ -8,11 +8,12 @@
 // The pharaoh stands at the prow at true human scale, dressed for the player's
 // rank — a bare-headed future pharaoh at first, crowned only at PHARAOH — keeping
 // his balance, gazing about, and now and then raising his hand toward Crete.
+// Beached, the Shipmaster's hired men go over the side and heave her up the sand on two bow ropes.
 // Local +z is the bow. Everything that floats sits in `body`, lifted by FREEBOARD.
 
 import * as THREE from 'three';
-import { HULL, SAIL } from '../constants.js';
-import { wrapAngle } from '../voyage.js';
+import { HULL, SAIL, BEACH, beachY, worldToCourse } from '../constants.js';
+import { wrapAngle, haulProgress } from '../voyage.js';
 
 const FREEBOARD  = 1.0;     // m the gunwale rides above the mean waterline
 const HULL_DEPTH = 1.7;     // m from gunwale to keel
@@ -518,6 +519,97 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
   }
   setCrew(crew);
 
+  // ── The haul gang: the Shipmaster's hired men. Once she's beached they go over the side with two
+  //    bow ropes, walk them up the sand, then brace and heave her up the rollers. World space. ──
+  const gang = new THREE.Group();
+  gang.visible = false;
+  const hiredSkin = mat(0x6e4a30, { roughness: 0.8 }), kilt = mat(0x8a7a5a, { roughness: 1 });
+  const limb = (parent, x, y, len, r) => {                                // a pivot at the joint, the limb hanging below it
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, 0);
+    const m = new THREE.Mesh(limbGeo, hiredSkin);
+    m.scale.set(r, len, r);
+    m.position.y = -len / 2;
+    pivot.add(m);
+    parent.add(pivot);
+    return pivot;
+  };
+  const haulers = [0, 1, 2, 3].map(k => {
+    const g = new THREE.Group();                                          // origin at the feet; +z is the way he faces
+    const torso = new THREE.Group();
+    torso.position.y = 0.86;
+    torso.add(new THREE.Mesh(rowerTorsoGeometry(), hiredSkin), new THREE.Mesh(rowerHeadGeometry(), hiredSkin), new THREE.Mesh(clothGeo, kilt));
+    g.add(torso);
+    const legs = [-0.1, 0.1].map(x => limb(g, x, 0.86, 0.86, 0.07));
+    const arms = [-0.19, 0.19].map(x => limb(torso, x, 0.56, 0.62, 0.05));
+    gang.add(g);
+    return { g, torso, legs, arms, side: k % 2 ? -1 : 1, rank: k >> 1, hand: new THREE.Vector3() };
+  });
+  const haulRopes = [-1, 1].map(side => {
+    const pts = new Float32Array(4 * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x3a2e1e }));
+    line.frustumCulled = false;
+    gang.add(line);
+    const man = (rank) => haulers.find(m => m.side === side && m.rank === rank);
+    return { side, pts, geo, near: man(0), far: man(1) };
+  });
+  const bowAt = new THREE.Vector3(), handAt2 = new THREE.Vector3();
+  const clamp01 = (x) => Math.min(1, Math.max(0, x));
+  const sandAt = (x, z) => beachY(worldToCourse(x, z).along - BEACH.along);
+
+  function updateGang(v, hp) {
+    gang.visible = !!hp;
+    if (!hp) return;
+    group.updateMatrix();
+    const fx = Math.sin(v.heading), fz = Math.cos(v.heading), rx = -fz, rz = fx;
+    const bx = v.x + fx * HULL.halfLen, bz = v.z + fz * HULL.halfLen;
+    haulers.forEach((m, k) => {
+      // Where he hauls from — up the beach off the bow — and where he went over the side.
+      const station = 3 + m.rank * 1.8, lat = m.side * (0.8 + m.rank * 0.35);
+      const sx = bx + fx * station + rx * lat, sz = bz + fz * station + rz * lat;
+      const ox = v.x + fx * (1.5 - k) + rx * m.side * (HULL.halfBeam + 0.4);
+      const oz = v.z + fz * (1.5 - k) + rz * m.side * (HULL.halfBeam + 0.4);
+      const u = hp.stage === 'ashore' ? clamp01(hp.u * 1.15 - k * 0.05) : 1;   // one after another
+      const hop = clamp01(u / 0.25), w = clamp01((u - 0.25) / 0.75), walk = w * w * (3 - 2 * w);
+      const x = ox + (sx - ox) * walk, z = oz + (sz - oz) * walk;
+      const ground = sandAt(x, z), gunwale = v.hull.y + FREEBOARD;
+      m.g.position.set(x, hop < 1 ? gunwale + (ground - gunwale) * hop + Math.sin(hop * Math.PI) * 0.5 : ground, z);
+
+      let lean = 0.1, swing = 0, reach;
+      if (u < 1) {                                                        // over the side and out with the rope
+        m.g.rotation.y = v.heading;
+        swing = hop < 1 ? 0.3 : 0.45 * Math.sin(w * Math.PI * 7);
+        reach = -0.5;
+      } else {                                                            // on the rope, facing the ship
+        m.g.rotation.y = v.heading + Math.PI;
+        if (hp.stage === 'heaving') {
+          const bracing = hp.f < BEACH.slack;
+          lean  = bracing ? 0.15 + 0.4 * hp.f / BEACH.slack : 0.55 - 0.15 * hp.pull;
+          swing = bracing ? 0 : 0.35 * Math.sin(hp.pull * Math.PI * 2 + k);
+        }
+        reach = -1.25 + lean;                                             // arms out along the rope
+      }
+      m.torso.rotation.x = -lean;                                         // lean back, away from the ship…
+      m.legs[0].rotation.x = -0.5 * lean + swing;                         // …heels dug in toward it
+      m.legs[1].rotation.x = -0.5 * lean - swing;
+      for (const a of m.arms) a.rotation.x = reach;
+      m.g.updateMatrixWorld(true);
+      m.hand.set(0, 0, 0);
+      for (const a of m.arms) m.hand.add(a.localToWorld(handAt2.set(0, -0.62, 0)));
+      m.hand.multiplyScalar(0.5);
+    });
+    // Each rope: bow → the near man's hands → the far man's → a tail trailing on the sand.
+    for (const r of haulRopes) {
+      bowAt.set(r.side * 0.3, FREEBOARD + 1.0, HULL.halfLen * 0.8).applyMatrix4(group.matrix);
+      const tx = r.far.hand.x + fx * 1.8, tz = r.far.hand.z + fz * 1.8;
+      [bowAt, r.near.hand, r.far.hand].forEach((p, i) => { r.pts[i * 3] = p.x; r.pts[i * 3 + 1] = p.y; r.pts[i * 3 + 2] = p.z; });
+      r.pts[9] = tx; r.pts[10] = sandAt(tx, tz) + 0.03; r.pts[11] = tz;
+      r.geo.attributes.position.needsUpdate = true;
+    }
+  }
+
   // ── The pharaoh at the prow, and a lantern so the figure reads in the gloom ──
   const ph = pharaoh();
   ph.group.position.set(0, DECK_Y + 0.1, HULL.halfLen * 0.55);
@@ -538,15 +630,16 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
   spray.frustumCulled = false;
   let nextSpray = 0, sprayCooldown = 0;
 
-  let strokePhase = 0, whipClock = 0;
+  let strokePhase = 0, whipClock = 0, lastHeave = -1;
   const shoulderAt = new THREE.Vector3(), handTarget = new THREE.Vector3(), oarDir = new THREE.Vector3(), lock = new THREE.Vector3();
 
   return {
-    group, spray, setCrew,
+    group, spray, gang, setCrew,
     setRank(name) { dressForRank(ph.regalia, name); },
     update(v, dt) {
       group.position.set(v.x, v.hull.y, v.z);
       group.rotation.set(-v.hull.pitch, v.heading, v.hull.roll, 'YXZ');
+      const hp = v.landed ? haulProgress(v.haulT) : null;
 
       // Sail: furls upward with trim, swings toward the wind, fills when it draws, luffs when it doesn't.
       rig.scale.y    = 0.12 + 0.88 * v.sail;
@@ -604,7 +697,9 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
 
       // The overseer's whip: wind up, crack, recover — faster the harder they're driven.
       whipClock += dt;
-      if (!v.landed && !v.sinking && whipClock > 5.2 - 3 * v.rowing) whipClock = 0;          // beached: the whip is lowered
+      if (!v.landed && !v.sinking && whipClock > 5.2 - 3 * v.rowing) whipClock = 0;          // beached: the whip is lowered…
+      if (hp && hp.stage === 'heaving' && hp.heave !== lastHeave) { lastHeave = hp.heave; whipClock = 0; }   // …except to call each heave
+      if (!hp) lastHeave = -1;
       const c = Math.min(1, whipClock / 0.7);
       let swing, bend;
       if (c < 0.45)     { const u = c / 0.45;          swing = 0.2 + 2.4 * u; bend = 1.2 * u; }
@@ -636,6 +731,8 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
         cp.setZ(i, -amount * (0.25 + v.speed * 0.03) + Math.sin(v.t * 7 + y * 4) * 0.08 * amount);
       }
       cp.needsUpdate = true;
+
+      updateGang(v, hp);
 
       // Bow spray when the hull slams down at speed.
       sprayCooldown -= dt;

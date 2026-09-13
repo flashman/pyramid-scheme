@@ -9,6 +9,7 @@
 //   { type: 'wrecked', speed, id }   — a hard hit on rock; she sinks, then 'sunk'
 //   { type: 'storm_rising', level }    { type: 'landmark_near', id }
 //   { type: 'lightning', x, z, distance, power }
+//   { type: 'haul_ropes' }  { type: 'heave', id: n }  { type: 'hauled' }   — dragging her up the beach
 // input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail), row: -1..1 (+1 rows harder) }
 
 import { resolveWaves, heightAt, shelterAt } from './waves.js';
@@ -56,6 +57,19 @@ export function stormTarget(v) {
   return STORM.bay + (open - STORM.bay) * exposed;
 }
 
+/** Where the haul stands `t` s after landing. First the hired men go over the side with the ropes
+    ('ashore', u 0..1); then BEACH.heaves heaves, each bracing through its slack and then pulling
+    her a length up the rollers ('heaving': heave index, f 0..1 through the heave, pull 0..1
+    through its pull); then 'done'. `dist` is how far she has come. */
+export function haulProgress(t) {
+  if (t < BEACH.ashore) return { stage: 'ashore', u: t / BEACH.ashore, heave: -1, f: 0, pull: 0, dist: 0 };
+  const s = (t - BEACH.ashore) / BEACH.heaveTime;
+  if (s >= BEACH.heaves) return { stage: 'done', u: 1, heave: BEACH.heaves - 1, f: 1, pull: 1, dist: BEACH.haul };
+  const heave = Math.floor(s), f = s - heave;
+  const pull = smoothstep(BEACH.slack, 1, f);
+  return { stage: 'heaving', u: 1, heave, f, pull, dist: BEACH.haul * (heave + pull) / BEACH.heaves };
+}
+
 export function createVoyage({ rng = Math.random, waveParams } = {}) {
   return {
     t: 0, acc: 0, rng, waveParams,
@@ -63,7 +77,7 @@ export function createVoyage({ rng = Math.random, waveParams } = {}) {
     heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start, rowing: ROW.start,
     windAngle: COURSE_HEADING,              // direction the wind blows TOWARD
     sailDrive: 0, drive: 0,                 // last substep's sail drive and total drive (m/s²)
-    storm: 0.1, arrived: false, landed: false, haul: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false,
+    storm: 0.1, arrived: false, landed: false, haulT: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false,
     hull: { y: 0, vy: 0, pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 },
     wake: [], wakeTimer: 0,
     ironsTime: 0, nextFlash: 8, scrapeTimer: 0,
@@ -95,10 +109,16 @@ function _substep(v, input, h, events) {
   }
   if (v.landed) {                                   // beached: the crew hauls her up the rollers, then she stays
     v.speed = 0; v.sailDrive = 0; v.drive = 0;
-    if (v.haul < 1) {
-      v.haul = Math.min(1, v.haul + h / BEACH.haulTime);
-      const step = BEACH.haul * v.haul * v.haul * (3 - 2 * v.haul) - v.hauled;   // slow to start, slow to settle
-      v.hauled += step;
+    const total = BEACH.ashore + BEACH.heaves * BEACH.heaveTime;
+    if (v.haulT < total) {
+      if (v.haulT === 0) events.push({ type: 'haul_ropes' });
+      const was = haulProgress(v.haulT);
+      v.haulT = Math.min(total, v.haulT + h);
+      const now = haulProgress(v.haulT);
+      if (now.heave > was.heave) events.push({ type: 'heave', id: now.heave });
+      if (now.stage === 'done') events.push({ type: 'hauled' });
+      const step = now.dist - v.hauled;
+      v.hauled = now.dist;
       v.x += FX * step; v.z += FZ * step;                                         // straight up the beach
       v.heading = wrapAngle(v.heading + wrapAngle(COURSE_HEADING - v.heading) * Math.min(1, h * 0.5));
     }
