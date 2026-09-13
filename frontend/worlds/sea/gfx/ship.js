@@ -8,7 +8,7 @@
 // The pharaoh stands at the prow at true human scale, dressed for the player's
 // rank — a bare-headed future pharaoh at first, crowned only at PHARAOH — keeping
 // his balance, gazing about, and now and then raising his hand toward Crete.
-// Beached, the Shipmaster's hired men go over the side and heave her up the sand on two bow ropes.
+// Beached, the downline is sent over the side to heave her up the sand on two bow ropes.
 // Local +z is the bow. Everything that floats sits in `body`, lifted by FREEBOARD.
 
 import * as THREE from 'three';
@@ -519,68 +519,83 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
   }
   setCrew(crew);
 
-  // ── The haul gang: the Shipmaster's hired men. Once she's beached they go over the side with two
-  //    bow ropes, walk them up the sand, then brace and heave her up the rollers. World space. ──
+  // ── The haul: once she's beached the overseer sends the downline over the side — at least 8, at most
+  //    16, hired men making up the numbers — with two bow ropes. Each rower blinks off his bench as his
+  //    hauler stands up there, climbs over, walks the rope up the sand, then braces and heaves. World space. ──
+  const MIN_HAULERS = 8, MAX_HAULERS = 16;
   const gang = new THREE.Group();
   gang.visible = false;
-  const hiredSkin = mat(0x6e4a30, { roughness: 0.8 }), kilt = mat(0x8a7a5a, { roughness: 1 });
   const limb = (parent, x, y, len, r) => {                                // a pivot at the joint, the limb hanging below it
     const pivot = new THREE.Group();
     pivot.position.set(x, y, 0);
-    const m = new THREE.Mesh(limbGeo, hiredSkin);
+    const m = new THREE.Mesh(limbGeo, slaveSkin);
     m.scale.set(r, len, r);
     m.position.y = -len / 2;
     pivot.add(m);
     parent.add(pivot);
     return pivot;
   };
-  const haulers = [0, 1, 2, 3].map(k => {
+  const haulerTorso = rowerTorsoGeometry(), haulerHead = rowerHeadGeometry();
+  const haulers = Array.from({ length: MAX_HAULERS }, (_, k) => {
     const g = new THREE.Group();                                          // origin at the feet; +z is the way he faces
     const torso = new THREE.Group();
     torso.position.y = 0.86;
-    torso.add(new THREE.Mesh(rowerTorsoGeometry(), hiredSkin), new THREE.Mesh(rowerHeadGeometry(), hiredSkin), new THREE.Mesh(clothGeo, kilt));
+    torso.add(new THREE.Mesh(haulerTorso, slaveSkin), new THREE.Mesh(haulerHead, slaveSkin), new THREE.Mesh(clothGeo, rag));
     g.add(torso);
     const legs = [-0.1, 0.1].map(x => limb(g, x, 0.86, 0.86, 0.07));
     const arms = [-0.19, 0.19].map(x => limb(torso, x, 0.56, 0.62, 0.05));
     gang.add(g);
-    return { g, torso, legs, arms, side: k % 2 ? -1 : 1, rank: k >> 1, hand: new THREE.Vector3() };
+    return { g, torso, legs, arms, side: k % 2 ? -1 : 1, rank: k >> 1, hand: new THREE.Vector3() };   // same sides as the benches
   });
   const haulRopes = [-1, 1].map(side => {
-    const pts = new Float32Array(4 * 3);
+    const pts = new Float32Array((MAX_HAULERS / 2 + 2) * 3);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
     const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x3a2e1e }));
     line.frustumCulled = false;
     gang.add(line);
-    const man = (rank) => haulers.find(m => m.side === side && m.rank === rank);
-    return { side, pts, geo, near: man(0), far: man(1) };
+    return { side, pts, geo, men: haulers.filter(m => m.side === side) };   // in rank order, nearest the bow first
   });
-  const bowAt = new THREE.Vector3(), handAt2 = new THREE.Vector3();
+  const bowAt = new THREE.Vector3(), handAt2 = new THREE.Vector3(), from = new THREE.Vector3();
   const clamp01 = (x) => Math.min(1, Math.max(0, x));
   const sandAt = (x, z) => beachY(worldToCourse(x, z).along - BEACH.along);
+  const rowerParts = [torsos, heads, cloths], rowerLimbs = [upperArms, forearms, hands, thighs, shins];
 
   function updateGang(v, hp) {
     gang.visible = !!hp;
+    for (const im of rowerParts) im.count = hp ? 0 : seats.length;       // ashore, the benches empty (shackles stay)
+    for (const im of rowerLimbs) im.count = hp ? 0 : seats.length * 2;
     if (!hp) return;
+    const n = Math.min(MAX_HAULERS, Math.max(MIN_HAULERS, seats.length + (seats.length % 2)));
     group.updateMatrix();
-    const fx = Math.sin(v.heading), fz = Math.cos(v.heading), rx = -fz, rz = fx;
+    const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
+    const px = Math.cos(v.heading), pz = -Math.sin(v.heading);           // the ship's local +x, in world
     const bx = v.x + fx * HULL.halfLen, bz = v.z + fz * HULL.halfLen;
     haulers.forEach((m, k) => {
-      // Where he hauls from — up the beach off the bow — and where he went over the side.
-      const station = 3 + m.rank * 1.8, lat = m.side * (0.8 + m.rank * 0.35);
-      const sx = bx + fx * station + rx * lat, sz = bz + fz * station + rz * lat;
-      const ox = v.x + fx * (1.5 - k) + rx * m.side * (HULL.halfBeam + 0.4);
-      const oz = v.z + fz * (1.5 - k) + rz * m.side * (HULL.halfBeam + 0.4);
-      const u = hp.stage === 'ashore' ? clamp01(hp.u * 1.15 - k * 0.05) : 1;   // one after another
-      const hop = clamp01(u / 0.25), w = clamp01((u - 0.25) / 0.75), walk = w * w * (3 - 2 * w);
-      const x = ox + (sx - ox) * walk, z = oz + (sz - oz) * walk;
-      const ground = sandAt(x, z), gunwale = v.hull.y + FREEBOARD;
-      m.g.position.set(x, hop < 1 ? gunwale + (ground - gunwale) * hop + Math.sin(hop * Math.PI) * 0.5 : ground, z);
+      m.g.visible = k < n;
+      if (k >= n) return;
+      // Up from his bench (or a spot on deck, for a hired man), over the side, and up the sand to his place on the rope.
+      const seat = seats[k];
+      const deckZ = seat ? seat.hip.z : 1.5 - m.rank;
+      from.set(seat ? seat.hip.x : m.side * 0.6, DECK_Y + FREEBOARD, deckZ).applyMatrix4(group.matrix);
+      const off = m.side * (HULL.halfBeam + 0.5);
+      const ox = v.x + fx * deckZ + px * off, oz = v.z + fz * deckZ + pz * off;
+      const station = 2.5 + m.rank * 1.5, lat = m.side * (0.7 + m.rank * 0.1);
+      const sx = bx + fx * station + px * lat, sz = bz + fz * station + pz * lat;
+      const u = hp.stage === 'ashore' ? clamp01(hp.u * 1.3 - 0.3 * k / n) : 1;   // one after another
+      const hop = clamp01(u / 0.3), w = clamp01((u - 0.3) / 0.7), walk = w * w * (3 - 2 * w);
+      if (hop < 1) {
+        const x = from.x + (ox - from.x) * hop, z = from.z + (oz - from.z) * hop;
+        m.g.position.set(x, from.y + (sandAt(ox, oz) - from.y) * hop + Math.sin(hop * Math.PI) * 1.2, z);
+      } else {
+        const x = ox + (sx - ox) * walk, z = oz + (sz - oz) * walk;
+        m.g.position.set(x, sandAt(x, z), z);
+      }
 
       let lean = 0.1, swing = 0, reach;
       if (u < 1) {                                                        // over the side and out with the rope
         m.g.rotation.y = v.heading;
-        swing = hop < 1 ? 0.3 : 0.45 * Math.sin(w * Math.PI * 7);
+        swing = hop < 1 ? 0.3 : 0.45 * Math.sin(w * Math.PI * 9 + k);
         reach = -0.5;
       } else {                                                            // on the rope, facing the ship
         m.g.rotation.y = v.heading + Math.PI;
@@ -600,12 +615,19 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
       for (const a of m.arms) m.hand.add(a.localToWorld(handAt2.set(0, -0.62, 0)));
       m.hand.multiplyScalar(0.5);
     });
-    // Each rope: bow → the near man's hands → the far man's → a tail trailing on the sand.
+    // Each rope: bow → every man's hands on that side, nearest first → a tail trailing on the sand.
     for (const r of haulRopes) {
+      const count = n / 2;
       bowAt.set(r.side * 0.3, FREEBOARD + 1.0, HULL.halfLen * 0.8).applyMatrix4(group.matrix);
-      const tx = r.far.hand.x + fx * 1.8, tz = r.far.hand.z + fz * 1.8;
-      [bowAt, r.near.hand, r.far.hand].forEach((p, i) => { r.pts[i * 3] = p.x; r.pts[i * 3 + 1] = p.y; r.pts[i * 3 + 2] = p.z; });
-      r.pts[9] = tx; r.pts[10] = sandAt(tx, tz) + 0.03; r.pts[11] = tz;
+      r.pts[0] = bowAt.x; r.pts[1] = bowAt.y; r.pts[2] = bowAt.z;
+      for (let i = 0; i < count; i++) {
+        const h = r.men[i].hand;
+        r.pts[(i + 1) * 3] = h.x; r.pts[(i + 1) * 3 + 1] = h.y; r.pts[(i + 1) * 3 + 2] = h.z;
+      }
+      const last = r.men[count - 1].hand, tx = last.x + fx * 1.8, tz = last.z + fz * 1.8;
+      const t = (count + 1) * 3;
+      r.pts[t] = tx; r.pts[t + 1] = sandAt(tx, tz) + 0.03; r.pts[t + 2] = tz;
+      r.geo.setDrawRange(0, count + 2);
       r.geo.attributes.position.needsUpdate = true;
     }
   }

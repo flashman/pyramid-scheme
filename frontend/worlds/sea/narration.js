@@ -40,10 +40,10 @@ export const NARRATION = {
     'The rock opens the hull like a ledger. The sea comes in to audit.',
   ]},
   haul_ropes: { once: true, lines: [
-    "The Shipmaster's hired men drop over the side with the bow ropes. The downline stays chained to the benches. Hauling is skilled work, and skilled work is paid.",
+    'The overseer unlocks the shackles and sends the downline over the side with the bow ropes. The chains come off for hauling. They go back on for the voyage home.',
   ]},
   heave: { once: true, byId: {
-    0: ['"HEAVE!" The hull lurches a length up the sand. The overseer\'s whip keeps the beat for men who are not even pulling.'],
+    0: ['"HEAVE!" The hull lurches a length up the sand. The whip keeps the beat. The downline pulls as one — the first time anyone has called them a team.'],
     4: ['"HEAVE!" Reed groans over the rollers. Every length up the beach is a length the sea can no longer repossess.'],
   }},
   hauled: { once: true, lines: [
