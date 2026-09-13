@@ -17,7 +17,7 @@ import { COLLIDERS } from './coast.js';
 import {
   DEPARTURE, CRETE_BAY, COURSE_LEN, COURSE_HEADING,
   CORRIDOR_HALF, OUTER_LIMIT, BACK_LIMIT, FRONT_LIMIT, WALL_DRIFT, WALL_TURN,
-  BEACH, SHELTER,
+  BEACH, SHELTER, beachY,
   WIND_VEER_MAX, CURRENT_SPEED, SAIL, ROW, WRECK, RUDDER, SUBSTEP, MAX_DT, STORM,
   LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse, HULL, WAKE,
 } from './constants.js';
@@ -63,7 +63,7 @@ export function createVoyage({ rng = Math.random, waveParams } = {}) {
     heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start, rowing: ROW.start,
     windAngle: COURSE_HEADING,              // direction the wind blows TOWARD
     sailDrive: 0, drive: 0,                 // last substep's sail drive and total drive (m/s²)
-    storm: 0.1, arrived: false, landed: false, sinking: false, sinkT: 0, sunk: false,
+    storm: 0.1, arrived: false, landed: false, haul: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false,
     hull: { y: 0, vy: 0, pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 },
     wake: [], wakeTimer: 0,
     ironsTime: 0, nextFlash: 8, scrapeTimer: 0,
@@ -93,8 +93,15 @@ function _substep(v, input, h, events) {
     if (!v.sunk && v.sinkT >= WRECK.sinkTime) { v.sunk = true; events.push({ type: 'sunk' }); }
     return;
   }
-  if (v.landed) {                                   // beached: she stays on the sand
+  if (v.landed) {                                   // beached: the crew hauls her up the rollers, then she stays
     v.speed = 0; v.sailDrive = 0; v.drive = 0;
+    if (v.haul < 1) {
+      v.haul = Math.min(1, v.haul + h / BEACH.haulTime);
+      const step = BEACH.haul * v.haul * v.haul * (3 - 2 * v.haul) - v.hauled;   // slow to start, slow to settle
+      v.hauled += step;
+      v.x += FX * step; v.z += FZ * step;                                         // straight up the beach
+      v.heading = wrapAngle(v.heading + wrapAngle(COURSE_HEADING - v.heading) * Math.min(1, h * 0.5));
+    }
     v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
     _hull(v, h, 0);
     _lightning(v, h, events);
@@ -226,18 +233,30 @@ function _hull(v, h, pol) {
   const heaveTarget = mean + HULL.crestLift * Math.max(0, Math.max(...samples) - mean);
   const sunk = v.sinking ? Math.min(1, v.sinkT / WRECK.sinkTime) : 0;       // 0 afloat … 1 gone
   const hl = v.hull;
+
+  // On the beach the keel takes the ground: two points on her belly rest on the sand's slope.
+  const { along, lateral } = worldToCourse(v.x, v.z);
+  let ground = -Infinity, groundPitch = 0;
+  if (Math.abs(lateral) < BEACH.halfWidth && along > BEACH.along - 40) {
+    const reach = Math.cos(v.heading - COURSE_HEADING) * BEACH.contact;
+    const fore = beachY(along + reach - BEACH.along), aft = beachY(along - reach - BEACH.along);
+    ground = (fore + aft) / 2 + BEACH.keel;
+    groundPitch = Math.atan2(fore - aft, 2 * BEACH.contact);
+  }
+  const aground = ground > heaveTarget;
   const spring = (pos, vel, target, k, zeta) => vel + (k * (target - pos) - 2 * zeta * Math.sqrt(k) * vel) * h;
 
-  hl.vy = spring(hl.y, hl.vy, (v.landed ? Math.max(heaveTarget, BEACH.restY) : heaveTarget) - WRECK.depth * sunk * sunk, HULL.kHeave, HULL.zetaHeave);
+  hl.vy = spring(hl.y, hl.vy, (aground ? ground : heaveTarget) - WRECK.depth * sunk * sunk, HULL.kHeave, HULL.zetaHeave);
   hl.y += hl.vy * h;
+  if (hl.y < ground) { hl.y = ground; hl.vy = Math.max(0, hl.vy); }        // sand doesn't give
 
   const pitchTarget = Math.atan2((bow + bowQ) / 2 - (stern + sternQ) / 2, 1.5 * HULL.halfLen + 0.75 * lead);
-  hl.pitchVel = spring(hl.pitch, hl.pitchVel, v.sinking ? WRECK.pitch * sunk : v.landed ? BEACH.restPitch : pitchTarget, HULL.kPitch, HULL.zetaPitch);
+  hl.pitchVel = spring(hl.pitch, hl.pitchVel, v.sinking ? WRECK.pitch * sunk : aground ? groundPitch : pitchTarget, HULL.kPitch, HULL.zetaPitch);
   hl.pitch += hl.pitchVel * h;
 
   // +roll leans to starboard; wind pushes the rig to leeward, so lean away from it.
   const heel = HULL.heelMax * v.sail * pol * Math.sin(wrapAngle(v.heading - v.windAngle));
-  hl.rollVel = spring(hl.roll, hl.rollVel, (v.sinking ? WRECK.roll * sunk : v.landed ? BEACH.restRoll : Math.atan2(port - star, 2 * HULL.halfBeam) + heel), HULL.kRoll, HULL.zetaRoll);
+  hl.rollVel = spring(hl.roll, hl.rollVel, (v.sinking ? WRECK.roll * sunk : aground ? BEACH.restRoll : Math.atan2(port - star, 2 * HULL.halfBeam) + heel), HULL.kRoll, HULL.zetaRoll);
   hl.roll += hl.rollVel * h;
 }
 

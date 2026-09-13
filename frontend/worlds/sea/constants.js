@@ -23,8 +23,21 @@ export const BEACH = {
   halfWidth: 100,                                  // half-width of the beach across the course
   friction:  4,                                    // m/s² the sand takes off the ship once the bow is on it
   bite:      3,                                    // extra m/s² per metre the bow has run up
-  restY: 0.3, restPitch: 0.06, restRoll: 0.03,     // how she sits on the sand
+  slope:     0.1,                                  // the sand rises 1 m in 10 from the waterline…
+  toe:      -1.6,                                  // …out of the bay floor here…
+  top:       3.2,                                  // …up to a flat berm
+  keel:      0.6,                                  // hull origin above the two points of her belly that take the ground
+  contact:   4,                                    // m fore and aft of amidships where those points are
+  haul:      22,                                   // m the crew drags her up the rollers once she's landed…
+  haulTime:  12,                                   // …over this many seconds
+  restRoll:  0.03,                                 // a slight list on the sand
 };
+
+/** Sand height at `depth` m up the beach from the waterline (negative: under the bay).
+    The sand mesh in gfx/landmarks.js and the keel in voyage.js both read this. */
+export function beachY(depth) {
+  return Math.min(BEACH.top, Math.max(BEACH.toe, depth * BEACH.slope));
+}
 
 export const WIND_SPEED    = 11;                  // m/s — visual/audio only; drive is SAIL.drive
 export const WIND_VEER_MAX = 0.9;                 // rad the wind veers toward the line at OUTER_LIMIT

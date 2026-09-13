@@ -135,7 +135,7 @@
 
   document.querySelectorAll('[data-along]').forEach(b => b.addEventListener('click', () => {
     const p = courseToWorld(Number(b.dataset.along), Number(b.dataset.lateral || 0));
-    Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false, landed: false, sinking: false, sinkT: 0, sunk: false });
+    Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false, landed: false, haul: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false });
     if (Number(b.dataset.along) === 0) sea.introView();             // the departure shot
     canvas.focus();
   }));

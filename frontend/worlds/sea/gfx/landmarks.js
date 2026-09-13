@@ -7,7 +7,7 @@
 // the dark mouth of a cave with something glowing inside.
 
 import * as THREE from 'three';
-import { LANDMARKS, CRETE_ISLAND, COURSE_HEADING, courseToWorld } from '../constants.js';
+import { LANDMARKS, CRETE_ISLAND, COURSE_HEADING, BEACH, beachY, courseToWorld } from '../constants.js';
 import { heightAt } from '../waves.js';
 import { CRETE_ROCKS } from '../coast.js';
 
@@ -127,32 +127,46 @@ function crete() {
   // strip at the water, timber rollers down the landing lane, pierced stone anchors, and two
   // small boats already hauled up — how Bronze Age crews landed, as at Knossos's harbour, Amnisos.
   const beach = new THREE.Group();
-  const wet = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 40), stone(0x8a7a5a));
-  wet.scale.set(114, 1, 48);
-  wet.position.set(0, -0.35, -668);
-  const sand = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 40), stone(0xb8a67c));
-  sand.scale.set(110, 1, 44);
-  sand.position.set(0, 0.0, -666);                                  // a metre proud of the calm bay
-  beach.add(wet, sand);
+  // One sloped sheet of sand, shaped by beachY() — the same profile the keel rides up. Dark and wet
+  // at the water, dry above; it tucks under the cliffs at either side.
+  const D0 = BEACH.along - CRETE_ISLAND.along;                        // local z of the waterline
+  const beachAt = (x, d) => {
+    const u = Math.min(1, Math.max(0, (Math.abs(x) - BEACH.halfWidth + 10) / 35));
+    return beachY(d) + (d > 1 ? 0.05 * Math.sin(x * 0.7) * Math.sin(d * 0.9) : 0) - 4 * u * u * (3 - 2 * u);
+  };
+  const sandGeo = new THREE.PlaneGeometry(2 * BEACH.halfWidth + 50, 100, 60, 50);
+  const sp = sandGeo.attributes.position, colors = [];
+  const wetC = new THREE.Color(0x6e5f45), dryC = new THREE.Color(0xb8a67c), c = new THREE.Color();
+  for (let i = 0; i < sp.count; i++) {
+    const x = sp.getX(i), d = sp.getY(i) + 20;                          // d runs −30 (under the bay) … 70 (the berm)
+    const y = beachAt(x, d);
+    sp.setXYZ(i, x, y, D0 + d);
+    c.copy(wetC).lerp(dryC, Math.min(1, Math.max(0, (y - 0.1) / 0.6)));
+    colors.push(c.r, c.g, c.b);
+  }
+  sandGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  sandGeo.computeVertexNormals();
+  const sandMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide });
+  beach.add(new THREE.Mesh(sandGeo, sandMat));
   const timber = stone(0x5a3e22);
-  for (let z = -712; z <= -684; z += 4) {
+  for (let d = 0; d <= 33; d += 3) {                                  // the rollers she's hauled up on
     const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 6, 8), timber);
     roller.rotation.z = Math.PI / 2;
-    roller.position.set(0, 1.15, z);
+    roller.position.set(0, beachY(d) + 0.1, D0 + d);
     beach.add(roller);
   }
   const anchorStone = stone(0x6a6660), hole = new THREE.MeshBasicMaterial({ color: 0x1a1816 });
-  for (const [x, z, lean] of [[-14, -690, 0.2], [-22, -682, -0.3], [17, -688, 0.1], [26, -679, 0.35], [-30, -694, -0.15]]) {
+  for (const [x, d, lean] of [[-14, 10, 0.2], [-22, 18, -0.3], [17, 12, 0.1], [26, 21, 0.35], [-30, 6, -0.15]]) {
     const anchor = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.35), anchorStone);
     const bore = new THREE.Mesh(new THREE.CircleGeometry(0.13, 10), hole);
     bore.position.set(0, 0.25, 0.18);
     anchor.add(bore);
-    anchor.position.set(x, 1.45, z);
+    anchor.position.set(x, beachY(d) + 0.45, D0 + d);
     anchor.rotation.set(0, lean * 3, lean);
     beach.add(anchor);
   }
   const boatHull = new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
-  for (const [x, z, yaw, tilt] of [[-48, -684, 0.2, 0.12], [52, -680, -0.15, -0.1]]) {
+  for (const [x, d, yaw, tilt] of [[-48, 16, 0.2, 0.12], [52, 20, -0.15, -0.1]]) {
     const boat = new THREE.Group();
     const hullMesh = new THREE.Mesh(boatHull, stone(0x5a4630));
     hullMesh.scale.set(1.5, 1.1, 6);
@@ -160,8 +174,8 @@ function crete() {
     mast.rotation.x = Math.PI / 2;
     mast.position.set(0.3, 0.3, 0.5);
     boat.add(hullMesh, mast);
-    boat.position.set(x, 1.7, z);
-    boat.rotation.set(0, yaw, tilt);
+    boat.position.set(x, beachY(d) + 0.95, D0 + d);
+    boat.rotation.set(-Math.atan(BEACH.slope), yaw, tilt);
     beach.add(boat);
   }
   group.add(beach);

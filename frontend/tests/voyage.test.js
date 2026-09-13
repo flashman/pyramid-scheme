@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createVoyage, stepVoyage, polar, stormTarget, wrapAngle } from '../worlds/sea/voyage.js';
 import {
-  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BEACH, FRONT_LIMIT, HULL, WRECK,
+  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BEACH, FRONT_LIMIT, HULL, WRECK, beachY,
   courseToWorld, worldToCourse,
 } from '../worlds/sea/constants.js';
 import { COLLIDERS } from '../worlds/sea/coast.js';
@@ -182,17 +182,31 @@ test('landmark_near fires once per landmark', () => {
   assert.equal(events.filter(e => e.type === 'landmark_near' && e.id === 'wreck').length, 1);
 });
 
-test('running up the beach lands the ship: she stops on the sand and stays put', () => {
+test('the beach rises from under the bay to a flat berm', () => {
+  assert.equal(beachY(0), 0);
+  assert.ok(Math.abs(beachY(10) - 10 * BEACH.slope) < 1e-12);
+  assert.equal(beachY(-100), BEACH.toe);
+  assert.equal(beachY(1000), BEACH.top);
+});
+
+test('running up the beach lands the ship; the crew hauls her clear of the water and she stays put', () => {
   const v = createVoyage();
   place(v, BEACH.along - 150, 0);
-  const events = sail(v, 60, 60, () => ({ trim: 1 }));
+  const events = [];
+  for (let i = 0; i < 60 * 60 && !v.landed; i++) events.push(...stepVoyage(v, { trim: 1 }, 1 / 60));
   assert.ok(events.some(e => e.type === 'arrived'), 'never landed');
   assert.ok(v.landed && v.speed === 0);
   const bow = worldToCourse(v.x, v.z).along + HULL.halfLen;
   assert.ok(bow >= BEACH.along && bow <= BEACH.along + 10, `bow at ${(bow - BEACH.along).toFixed(1)} m up the sand`);
+  const before = worldToCourse(v.x, v.z).along;
+  sail(v, BEACH.haulTime + 4, 60, () => ({ trim: 1, row: 1 }));
+  const hauled = worldToCourse(v.x, v.z).along - before;
+  assert.ok(Math.abs(hauled - BEACH.haul) < 0.5, `hauled ${hauled.toFixed(1)} m`);
+  assert.ok(v.hull.y - BEACH.keel > 0.8, `belly ${(v.hull.y - BEACH.keel).toFixed(2)} m above the bay`);
+  assert.ok(Math.abs(v.hull.pitch - Math.atan(BEACH.slope)) < 0.02, `pitch ${v.hull.pitch.toFixed(3)}`);
   const x = v.x, z = v.z;
   sail(v, 30, 60, () => ({ trim: 1, row: 1 }));
-  assert.ok(Math.hypot(v.x - x, v.z - z) < 0.01, 'moved after landing');
+  assert.ok(Math.hypot(v.x - x, v.z - z) < 0.01, 'moved after hauling');
   assert.equal(stormTarget(v), STORM.bay);
 });
 
