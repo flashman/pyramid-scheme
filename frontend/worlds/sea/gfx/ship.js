@@ -343,6 +343,44 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
   rig.add(topYard, sail);
   body.add(rig);
 
+  // ── Rigging: stays, halyard, lifts carrying the lower yard, brails down the sail, braces and sheets.
+  //    Ends on the yards follow the rig every frame, so furling visibly hauls the lower yard up the lifts. ──
+  const rigging = (() => {
+    const mastHead = new THREE.Vector3(0, 9.0, 1.0);
+    const R = (x, y, z) => ({ rig: new THREE.Vector3(x, y, z) });           // a point in the rig's own frame
+    const lines = [
+      [mastHead, new THREE.Vector3(0, 2.6, HULL.halfLen * 0.88)],             // forestay to the bow
+      [mastHead, new THREE.Vector3(0, 3.6, -HULL.halfLen * 0.82)],            // backstay to the stern
+      [R(0, 0.1, 0), mastHead],                                                // halyard up to the masthead…
+      [mastHead, new THREE.Vector3(0.3, -0.05, 0.4)],                          // …and down to the pin rail
+    ];
+    for (const x of [-5.2, -3.4, -1.6, 1.6, 3.4, 5.2]) lines.push([mastHead, R(x, -6, 0)]);   // lifts carry the lower yard
+    for (const x of [-4.2, -2.1, 2.1, 4.2]) lines.push([R(x, 0, -0.2), R(x, -6, -0.2)]);      // brails gather the sail as it furls
+    for (const side of [-1, 1]) {
+      lines.push([R(side * 5.6, 0, 0), new THREE.Vector3(side * 1.7, 0.3, -3.8)]);             // braces: top yard → aft deck
+      lines.push([R(side * 5.6, -6, 0), new THREE.Vector3(side * 1.9, 0.1, -1.2)]);            // sheets: lower yard → deck
+    }
+    const pos = new Float32Array(lines.length * 6);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const ropes = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x3a2e1e }));
+    ropes.frustumCulled = false;
+    body.add(ropes);
+    const tmp = new THREE.Vector3();
+    const end = (e) => (e.rig ? tmp.copy(e.rig).applyMatrix4(rig.matrix) : e);
+    return {
+      update() {
+        rig.updateMatrix();
+        lines.forEach(([a, b], i) => {
+          const pa = end(a); pos[i * 6] = pa.x; pos[i * 6 + 1] = pa.y; pos[i * 6 + 2] = pa.z;
+          const pb = end(b); pos[i * 6 + 3] = pb.x; pos[i * 6 + 4] = pb.y; pos[i * 6 + 5] = pb.z;
+        });
+        geo.attributes.position.needsUpdate = true;
+      },
+    };
+  })();
+  rigging.update();
+
   // ── Stern: a raised platform, the Shipmaster, and his single steering oar ──
   const platform = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 1.6), wood);
   platform.position.set(0, 0.7, -6.0);
@@ -513,6 +551,7 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
       // Sail: furls upward with trim, swings toward the wind, fills when it draws, luffs when it doesn't.
       rig.scale.y    = 0.12 + 0.88 * v.sail;
       rig.rotation.y = Math.max(-0.6, Math.min(0.6, wrapAngle(v.windAngle - v.heading) * 0.5));
+      rigging.update();                                                  // ropes follow the yards
       const fill = Math.min(1, v.sailDrive / SAIL.drive);
       const sp = sailGeo.attributes.position;
       for (let i = 0; i < sp.count; i++) {
