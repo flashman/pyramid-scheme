@@ -598,3 +598,27 @@ export function deepTransRender(progress) {
     }
   }
 }
+
+// ── THE SEA (nile ↔ sea) ─────────────────────────────────
+// The light drains into a storm-dark, a horizon line draws across, and slanted
+// rain thickens. The sea fades itself in from this same dark on arrival.
+export function seaTransRender(progress) {
+  const p = progress;
+  const dark = Math.min(1, p / 0.7);
+  X.save();
+  X.fillStyle = `rgba(6, 10, 16, ${dark * dark * (3 - 2 * dark)})`;
+  X.fillRect(0, 0, CW, CH);
+  const lineW = CW * Math.min(1, p / 0.55);
+  X.globalAlpha = 0.7 * (1 - Math.max(0, (p - 0.75) / 0.25));
+  X.fillStyle = '#9aa8b8';
+  X.fillRect((CW - lineW) / 2, CH * 0.52, lineW, 2);
+  X.strokeStyle = '#8894a4';
+  X.lineWidth = 1;
+  for (let i = 0; i < 60; i++) {
+    const sx = (_tRnd(i * 3.1) * CW + p * 180) % CW;
+    const sy = (_tRnd(i * 7.7) * CH + p * 900) % CH;
+    X.globalAlpha = p * (0.15 + _tRnd(i) * 0.35);
+    X.beginPath(); X.moveTo(sx, sy); X.lineTo(sx - 6, sy + 18); X.stroke();
+  }
+  X.restore();
+}

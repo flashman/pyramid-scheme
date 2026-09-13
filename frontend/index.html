@@ -50,6 +50,7 @@
   </div>
 
   <div id="cc">
+    <canvas id="gl" width="780" height="540" hidden></canvas>
     <canvas id="c" width="780" height="540"></canvas>
     <div id="sl"></div>
     <div id="dlg">
@@ -112,6 +113,7 @@
       <div class="help-row"><span class="help-key">Z</span><span class="help-val">jump</span></div>
       <div class="help-row"><span class="help-key">↓ / ↑</span><span class="help-val">descend / surface</span></div>
       <div class="help-row"><span class="help-key">SPACE</span><span class="help-val">interact</span></div>
+      <div class="help-row"><span class="help-key">AT SEA</span><span class="help-val">← → steer · ↑ ↓ sail · ⇧ ↑ ↓ rowing · drag to look (double-click resets) · SPACE shipmaster</span></div>
     </div>
 
     <div class="help-section">
@@ -139,6 +141,8 @@
   window.API_BASE = "__API_BASE__";
   if (window.API_BASE.indexOf("API_BASE") !== -1) window.API_BASE = "";
 </script>
+<!-- three.js 0.170.0 (MIT) — vendored single-file build, fetched only when THE SEA is entered. -->
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
 <script type="module" src="main.js"></script>
 </body>
 </html>

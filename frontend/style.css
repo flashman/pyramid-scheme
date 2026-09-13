@@ -53,6 +53,10 @@ body{background:var(--bg-page);display:flex;flex-direction:column;align-items:ce
 #lp{width:178px;flex-shrink:0;display:flex;flex-direction:column;gap:5px}
 #cc{flex:1;position:relative}
 canvas{display:block;image-rendering:pixelated;border:3px solid var(--gold-dim);box-shadow:0 0 0 2px var(--amber-dark),0 0 20px rgba(200,160,32,.3)}
+/* THE SEA: WebGL canvas under the transparent 2D canvas (DOM order paints #c on top) */
+#c{position:relative}
+#gl{position:absolute;top:0;left:0;image-rendering:auto}
+#gl[hidden]{display:none}
 #sl{position:absolute;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px);pointer-events:none;z-index:10}
 #rp{width:178px;flex-shrink:0;display:flex;flex-direction:column;gap:5px}
 .pb{background:var(--bg-panel);border:3px solid var(--gold-dim);padding:8px 7px;position:relative}
