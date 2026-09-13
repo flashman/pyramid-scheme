@@ -1,7 +1,7 @@
 // ── FILE: worlds/sea/gfx/landmarks.js ────────────────────
 // Things to pass on the way, and the destination: a half-sunk wreck with bobbing
 // JUST POTS crates, a lone rock with a signal fire, and Crete — Mount Ida above a
-// natural rocky bay: two headlands stepping down from cliffs to sea stacks, a
+// natural rocky bay with a hidden mouth: a long hooked headland and a short one, stacks screening the way in, a
 // cliff-backed landing beach (timber rollers, stone anchors, boats hauled up), boulders at the waterline, Knossos' tiered red colonnades on the slope above the
 // cove, and high on the mountain
 // the dark mouth of a cave with something glowing inside.
@@ -109,34 +109,42 @@ function crete() {
   ida.position.set(r * 0.2, h * 0.9, -r * 0.1);
   group.add(land, ida);
 
-  // ── Two headlands: tall cliffs where they leave the island, low rocks at the tips ──
-  for (const side of [-1, 1]) {
-    for (let i = 0; i <= 8; i++) {
-      const t = i / 8;
-      const size = 90 * (1 - t) + 25;
-      const ry = 0.6 * (120 * (1 - t) + 18);
-      const rock = rockMass(rnd, size * (0.8 + rnd() * 0.4), ry, size * (0.7 + rnd() * 0.4), pick());
-      rock.position.set(side * (540 + 220 * t * t) + (rnd() - 0.5) * 30, ry * 0.4 - 8, -600 - 650 * t);
+  // ── Two unequal headlands, and a mouth you only see from off to one side ──
+  // The eastern arm (local +x) runs long and hooks across in front of the cove; the western
+  // arm is short and low. The way in is past the western tip and behind the hook, so from
+  // straight offshore the cove is hidden. Rocks are spaced, sized and heightened unevenly.
+  const arm = (points, count, size, height) => {
+    const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, 0, z)));
+    for (let i = 0; i < count; i++) {
+      const t = Math.min(1, (i + rnd() * 0.8) / count);
+      const p = curve.getPoint(t);
+      const fall = 1 - 0.75 * t;                                      // big where it leaves the island, ragged at the tip
+      const sz = size * fall * (0.6 + rnd() * 0.8);
+      const ry = height * fall * (0.5 + rnd() * 0.9);
+      const rock = rockMass(rnd, sz * (0.8 + rnd() * 0.5), ry, sz * (0.7 + rnd() * 0.5), pick());
+      rock.position.set(p.x + (rnd() - 0.5) * sz, ry * 0.4 - 8, p.z + (rnd() - 0.5) * sz);
       group.add(rock);
     }
-    // Sea stacks standing off the headland tip.
-    for (let i = 0; i < 3; i++) {
-      const sh = 45 + rnd() * 35;
-      const stack = new THREE.Mesh(roughen(new THREE.ConeGeometry(10 + rnd() * 6, sh, 7, 4), 4), pick());
-      stack.position.set(side * (720 + rnd() * 80), sh / 2 - 6, -1190 - rnd() * 120);
-      group.add(stack);
-    }
+  };
+  arm([[380, -600], [480, -820], [370, -1030], [140, -1110], [-60, -1085]], 16, 95, 130);   // the long eastern hook
+  arm([[-420, -590], [-520, -760], [-470, -905]], 7, 80, 90);                               // the short western arm
+  // Stacks and reef rocks screening the mouth.
+  for (const [x, z, h, r] of [[-380, -1180, 75, 12], [-150, -1245, 48, 10], [270, -1205, 30, 9], [-560, -1010, 38, 11], [60, -1180, 22, 8]]) {
+    const stack = new THREE.Mesh(roughen(new THREE.ConeGeometry(r, h, 7, 4), 3.5), pick());
+    stack.position.set(x, h / 2 - 6, z);
+    stack.rotation.y = rnd() * Math.PI;
+    group.add(stack);
   }
 
-  // ── Cliffs along the back of the bay, broken by a small cove beach in the middle ──
-  for (let i = 0; i <= 12; i++) {
-    const x = -440 + i * 73;
+  // ── Cliffs along the back of the cove, unevenly spaced, broken by the landing beach ──
+  for (let x = -440; x <= 440; x += 45 + rnd() * 50) {
     if (Math.abs(x) < 120) continue;
-    const ry = 25 + rnd() * 30;
-    const cliff = rockMass(rnd, 40 + rnd() * 15, ry, 30 + rnd() * 15, pick());
-    cliff.position.set(x, ry * 0.4 - 8, slopeZ(x, 0.93));
+    const ry = 20 + rnd() * 40;
+    const cliff = rockMass(rnd, 35 + rnd() * 25, ry, 25 + rnd() * 20, pick());
+    cliff.position.set(x, ry * 0.4 - 8, slopeZ(x, 0.92 + rnd() * 0.03));
     group.add(cliff);
   }
+
   // The landing beach (its waterline is BEACH.along ≈ local z −700): dry sand, a darker wet
   // strip at the water, timber rollers down the landing lane, pierced stone anchors, and two
   // small boats already hauled up — how Bronze Age crews landed, as at Knossos's harbour, Amnisos.

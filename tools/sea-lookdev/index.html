@@ -77,7 +77,7 @@
         <button id="j-delta" data-along="0">Delta</button>
         <button id="j-wreck" data-along="500">Wreck</button>
         <button id="j-rock" data-along="1150">Signal rock</button>
-        <button id="j-bay" data-along="2150">Bay approach</button>
+        <button id="j-bay" data-along="2100" data-lateral="300">Bay mouth</button>
         <button id="j-beach" data-along="2470">Beach</button>
       </div>
     </section>
@@ -132,7 +132,7 @@
   }
 
   document.querySelectorAll('[data-along]').forEach(b => b.addEventListener('click', () => {
-    const p = courseToWorld(Number(b.dataset.along), 0);
+    const p = courseToWorld(Number(b.dataset.along), Number(b.dataset.lateral || 0));
     Object.assign(v, { x: p.x, z: p.z, heading: COURSE_HEADING, arrived: false, landed: false });
     if (Number(b.dataset.along) === 0) sea.introView();             // the departure shot
     canvas.focus();
