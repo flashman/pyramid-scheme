@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { createSky }         from './gfx/sky.js';
 import { createOcean }       from './gfx/ocean.js';
+import { createStorm }       from './gfx/storm.js';
 import { createChaseCam, stepChaseCam } from './chasecam.js';
 import { createPerfMonitor } from './perf.js';
 
@@ -23,7 +24,8 @@ export function createSeaScene(canvas, { windAngle }) {
 
   const sky   = createSky(windAngle);
   const ocean = createOcean(windAngle);
-  scene.add(sky.mesh, ocean.mesh);
+  const storm = createStorm();
+  scene.add(sky.mesh, ocean.mesh, storm.group);
 
   // A low amber sun behind (toward Egypt) and a cold sky fill.
   scene.add(new THREE.HemisphereLight(0x3a4260, 0x0a0c10, 0.9));
@@ -36,13 +38,12 @@ export function createSeaScene(canvas, { windAngle }) {
 
   const cam     = createChaseCam();
   const perf    = createPerfMonitor();
-  const noFlash = new THREE.Vector3(0, 1, 0);
   let last = performance.now();
 
   return {
     render(v, dt) {
       const now = performance.now();
-      if (perf.sample(now - last)) ocean.degrade();
+      if (perf.sample(now - last)) { ocean.degrade(); storm.disableRain(); }
       last = now;
 
       stepChaseCam(cam, v, dt);
@@ -57,11 +58,14 @@ export function createSeaScene(canvas, { windAngle }) {
       ship.position.set(v.x, v.hull.y, v.z);
       ship.rotation.set(-v.hull.pitch, v.heading, v.hull.roll, 'YXZ');
 
-      sky.update(camera, v, 0, noFlash);
-      ocean.update(camera, v, 0, noFlash);
+      storm.update(dt, v, camera);
+      sky.update(camera, v, storm.flashLevel, storm.flashDir);
+      ocean.update(camera, v, storm.flashLevel, storm.flashDir);
       renderer.render(scene, camera);
     },
-    flash() {},
+    flash(evt) { storm.flash(evt); },
+    /** True once the one-shot perf fallback has halved the ocean and dropped rain. */
+    get degraded() { return perf.fired; },
     dispose() { renderer.dispose(); },
   };
 }

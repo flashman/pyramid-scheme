@@ -59,6 +59,8 @@
         <dt>To Crete</dt><dd id="i-dist">2.40 km</dd>
         <dt>Storm</dt><dd id="i-storm">0.10</dd>
         <dt>Voyage time</dt><dd id="i-time">0 s</dd>
+        <dt>Frame</dt><dd id="i-frame">– ms</dd>
+        <dt>Quality</dt><dd id="i-quality">Full</dd>
       </dl>
     </section>
     <section>
@@ -115,9 +117,10 @@
     canvas.focus();
   });
 
-  let last = performance.now();
+  let last = performance.now(), frameAvg = 16.7;
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
+    frameAvg += ((now - last) - frameAvg) * 0.05;
     last = now;
     const input = {
       steer: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0),
@@ -136,6 +139,9 @@
     dist.className = v.arrived ? 'arrived' : '';
     $('i-storm').textContent = v.storm.toFixed(2);
     $('i-time').textContent = Math.round(v.t) + ' s';
+    $('i-frame').textContent = frameAvg.toFixed(1) + ' ms · ' + Math.round(1000 / frameAvg) + ' fps';
+    $('i-quality').textContent = sea.degraded ? 'Reduced (rain off)' : 'Full';
+    $('i-quality').className = sea.degraded ? 'arrived' : '';
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
