@@ -710,6 +710,7 @@ const REALM_THEME = {
   council:  'council',
   atlantis: 'atlantis',
   nile:     'nile',
+  sea:      null,        // deliberately silent until THE SEA's theme is written (plan Task 14)
 };
 
 // ── SoundManager singleton ────────────────────────────────
@@ -742,7 +743,8 @@ class SoundManagerClass {
     this._currentRealm = realmId;
     if (!this._enabled) return;
     const themeName = REALM_THEME[realmId];
-    if (!themeName) return;
+    if (themeName === null) { this._stop(); return; }   // a silent realm: the previous theme stops
+    if (!themeName) return;                            // unmapped (e.g. the Deep): whatever is playing carries on
     this._ensureCtx();
     this._stop();
     if (this._ctx.state === 'suspended') return;
