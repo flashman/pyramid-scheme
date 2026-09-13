@@ -5,7 +5,7 @@
 //
 // stepVoyage(v, input, dt) mutates `v` and returns this frame's events:
 //   { type: 'departure' | 'first_swell' | 'strayed' | 'in_irons'
-//         | 'crete_clearer' | 'arrived' | 'bay_exit' }
+//         | 'crete_clearer' | 'arrived' (landed on Crete's beach) }
 //   { type: 'storm_rising', level }    { type: 'landmark_near', id }
 //   { type: 'lightning', x, z, distance, power }
 // input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail), row: -1..1 (+1 rows harder) }
@@ -15,7 +15,7 @@ import { resolveWaves, heightAt } from './waves.js';
 import {
   DEPARTURE, CRETE_BAY, COURSE_LEN, COURSE_HEADING,
   CORRIDOR_HALF, OUTER_LIMIT, BACK_LIMIT, FRONT_LIMIT, WALL_DRIFT, WALL_TURN,
-  BAY_RADIUS, BAY_BOUNDARY, BAY_REARM,
+  BEACH,
   WIND_VEER_MAX, CURRENT_SPEED, SAIL, ROW, RUDDER, SUBSTEP, MAX_DT, STORM,
   LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse, HULL, WAKE,
 } from './constants.js';
@@ -60,7 +60,7 @@ export function createVoyage({ rng = Math.random, waveParams } = {}) {
     heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start, rowing: ROW.start,
     windAngle: COURSE_HEADING,              // direction the wind blows TOWARD
     sailDrive: 0, drive: 0,                 // last substep's sail drive and total drive (m/s²)
-    storm: 0.1, arrived: false,
+    storm: 0.1, arrived: false, landed: false,
     hull: { y: 0, vy: 0, pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 },
     wake: [], wakeTimer: 0,
     ironsTime: 0, nextFlash: 8,
@@ -82,6 +82,13 @@ export function stepVoyage(v, input, dt) {
 
 function _substep(v, input, h, events) {
   v.t += h;
+  if (v.landed) {                                   // beached: she stays on the sand
+    v.speed = 0; v.sailDrive = 0; v.drive = 0;
+    v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
+    _hull(v, h, 0);
+    _lightning(v, h, events);
+    return;
+  }
   const steer = clamp(input.steer ?? 0, -1, 1);
   const trim  = clamp(input.trim ?? 0, -1, 1);
   const row   = clamp(input.row ?? 0, -1, 1);
@@ -119,6 +126,7 @@ function _substep(v, input, h, events) {
   [vx, vz] = _walls(v, along, lateral, vx, vz);
   v.x += vx * h;
   v.z += vz * h;
+  _beach(v, h, events);
 
   // ── Storm eases toward its target ──
   v.storm += (stormTarget(v) - v.storm) * (1 - Math.exp(-h / STORM.tau));
@@ -137,20 +145,27 @@ function _axis(pos, min, max, vel) {
 }
 
 function _walls(v, along, lateral, vx, vz) {
-  const va = _axis(along, BACK_LIMIT, FRONT_LIMIT, vx * FX + vz * FZ);
+  const onBeach = Math.abs(lateral) < BEACH.halfWidth - HULL.halfBeam;     // the cliffs open only here
+  const va = _axis(along, BACK_LIMIT, onBeach ? Infinity : FRONT_LIMIT, vx * FX + vz * FZ);
   const vl = _axis(lateral, -OUTER_LIMIT, OUTER_LIMIT, vx * RX + vz * RZ);
   vx = FX * va + RX * vl;
   vz = FZ * va + RZ * vl;
-  if (v.arrived) {   // moored: a radial wall around the bay
-    const bx = v.x - CRETE_BAY.x, bz = v.z - CRETE_BAY.z, d = Math.hypot(bx, bz);
-    if (d > BAY_BOUNDARY) {
-      const ux = bx / d, uz = bz / d, out = vx * ux + vz * uz;
-      const drift = WALL_DRIFT * Math.min(1, (d - BAY_BOUNDARY) / 50);
-      if (out > 0) { vx -= ux * out; vz -= uz * out; }
-      vx -= ux * drift; vz -= uz * drift;
-    }
-  }
   return [vx, vz];
+}
+
+/** Crete's beach: inside the landing band the bow runs up the sand, the ship grinds
+    to a stop, and she is landed — the arrival. */
+function _beach(v, h, events) {
+  const { along, lateral } = worldToCourse(v.x, v.z);
+  if (Math.abs(lateral) >= BEACH.halfWidth - HULL.halfBeam) return;
+  const depth = along + Math.cos(v.heading - COURSE_HEADING) * HULL.halfLen - BEACH.along;   // how far the bow is up the sand
+  if (depth <= 0) return;
+  v.speed = Math.max(0, v.speed - (BEACH.friction + depth * BEACH.bite) * h);
+  if (v.speed < 0.3) {
+    v.speed = 0;
+    v.landed = true;
+    if (!v.arrived) { v.arrived = true; events.push({ type: 'arrived' }); }
+  }
 }
 
 /** Five hull samples on the shared wave surface drive heave, pitch and roll
@@ -171,16 +186,16 @@ function _hull(v, h, pol) {
   const hl = v.hull;
   const spring = (pos, vel, target, k, zeta) => vel + (k * (target - pos) - 2 * zeta * Math.sqrt(k) * vel) * h;
 
-  hl.vy = spring(hl.y, hl.vy, heaveTarget, HULL.kHeave, HULL.zetaHeave);
+  hl.vy = spring(hl.y, hl.vy, v.landed ? Math.max(heaveTarget, BEACH.restY) : heaveTarget, HULL.kHeave, HULL.zetaHeave);
   hl.y += hl.vy * h;
 
   const pitchTarget = Math.atan2((bow + bowQ) / 2 - (stern + sternQ) / 2, 1.5 * HULL.halfLen + 0.75 * lead);
-  hl.pitchVel = spring(hl.pitch, hl.pitchVel, pitchTarget, HULL.kPitch, HULL.zetaPitch);
+  hl.pitchVel = spring(hl.pitch, hl.pitchVel, v.landed ? BEACH.restPitch : pitchTarget, HULL.kPitch, HULL.zetaPitch);
   hl.pitch += hl.pitchVel * h;
 
   // +roll leans to starboard; wind pushes the rig to leeward, so lean away from it.
   const heel = HULL.heelMax * v.sail * pol * Math.sin(wrapAngle(v.heading - v.windAngle));
-  hl.rollVel = spring(hl.roll, hl.rollVel, Math.atan2(port - star, 2 * HULL.halfBeam) + heel, HULL.kRoll, HULL.zetaRoll);
+  hl.rollVel = spring(hl.roll, hl.rollVel, (v.landed ? BEACH.restRoll : Math.atan2(port - star, 2 * HULL.halfBeam) + heel), HULL.kRoll, HULL.zetaRoll);
   hl.roll += hl.rollVel * h;
 }
 
@@ -237,11 +252,5 @@ function _events(v, h, events) {
     v.armed.irons = true;
   }
 
-  // Arrival, then the bay-exit prompt (re-arms back inside BAY_REARM).
-  const bay = Math.hypot(v.x - CRETE_BAY.x, v.z - CRETE_BAY.z);
-  if (!v.arrived && bay < BAY_RADIUS) { v.arrived = true; events.push({ type: 'arrived' }); }
-  if (v.arrived) {
-    if (bay > BAY_BOUNDARY && v.armed.bayExit) { v.armed.bayExit = false; events.push({ type: 'bay_exit' }); }
-    else if (bay < BAY_REARM) v.armed.bayExit = true;
-  }
+  // Arrival is running up the beach — see _beach().
 }

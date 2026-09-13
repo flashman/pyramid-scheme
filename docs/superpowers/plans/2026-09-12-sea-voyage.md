@@ -39,6 +39,7 @@
 - Camera (decided in Task 9 look-dev): the default is a three-quarter chase view; dragging orbits around the ship and the view holds where you leave it (double-click resets) — dead astern hid the ship (spec §3 said low & behind).
 - Crew (decided in Task 9 look-dev): the player's downline rows as chained galley slaves — one per recruit (max 24), four hired hands when there is no downline — stroke rate set by ship speed, driven by a whip-cracking overseer (more often the slower she goes); a hooded Shipmaster works a single steering oar at the stern; the pharaoh stands at true human scale (1.8 m), keeping his balance, gazing about and periodically raising his crook toward Crete.
 - Speed (decided in Task 9 look-dev): two controls — ↑/↓ trims the sail, ⇧+↑/↓ sets the rowing effort (0–100%, starts at 40%). The rowers push whatever the wind does, so the ship makes way even into the wind; they stroke at that effort and rest at zero. Full sail drive is 1.2 so both together still take ~3 minutes.
+- Landing (decided in Task 9 look-dev): arrival is running the ship up a sandy beach in the cove below Knossos — Bronze Age ships were beached, as at Amnisos — with timber rollers, pierced stone anchors and hauled-up boats. The front wall opens only along the beach (cliffs either side); the landed ship stays put and the Shipmaster's menu sails home. The 220 m bay radius and the bay-exit prompt are gone.
 - Rank (decided in Task 9 look-dev): the pharaoh's regalia follows the player's tier — a bare-headed future pharaoh at PEASANT, gaining headcloth, cape, collar and crook, then the red and white crowns, by PHARAOH. Rowers stroke slightly out of sync.
 - Scenery (decided in Task 9 look-dev): the bull-horns landmark is dropped; Crete's bay is natural rock (headlands, sea stacks, cliff-backed cove) with a glowing cave mouth high on the mountain; the voyage opens on the Nile Delta (marsh, papyrus, palms) with the pyramids of Giza on the horizon, the camera starting on that view and swinging round to the chase.
 
@@ -2751,7 +2752,7 @@ export function buildSeaMenuDialogue({ arrived, onTurnBack }) {
     start: {
       speaker: SHIPMASTER,
       text: arrived
-        ? 'WE ARE ANCHORED OFF CRETE.\nTHE ISLAND IS NOT TAKING VISITORS.\nTHE VIEW IS INCLUDED IN YOUR PASSAGE.'
+        ? 'WE ARE ON THE BEACH AT CRETE.\nTHE ISLAND IS NOT TAKING VISITORS.\nTHE VIEW IS INCLUDED IN YOUR PASSAGE.'
         : 'THE HEADING IS CRETE.\nTHE WIND AGREES.\nTHE WIND IS PAID TO AGREE.',
       choices: [
         { label: 'Keep sailing', next: null },
@@ -2776,7 +2777,7 @@ export function buildArrivalDialogue() {
     },
     anchor: {
       speaker: SHIPMASTER,
-      text: 'THE ISLAND IS NOT TAKING VISITORS.\nYOU MAY ANCHOR AND ADMIRE IT.\nADMIRATION IS FREE.\nIT IS THE ONLY THING HERE THAT IS.',
+      text: 'THE ISLAND IS NOT TAKING VISITORS.\nTHE SHIP IS ON THE SAND.\nYOU MAY STAND HERE AND ADMIRE IT.\nADMIRATION IS FREE.\nIT IS THE ONLY THING HERE THAT IS.',
       next: null,
     },
   });
@@ -3797,8 +3798,8 @@ Ask the user to run this checklist twice (logged in; then logged out → guest) 
 5. Point into the wind with the sail up: an "in irons" line logs.
 6. SPACE → **Turn back — the Delta** → back beside the boat. Board again (the Letter is kept).
 7. Pass the wreck and the signal rock (each logs once). Lightning and delayed thunder near Crete.
-8. Enter the bay → arrival dialogue → moored; the storm eases.
-9. Sail out of the bay → "LEAVING THE BAY" → **Sail home** → Delta.
+8. Sail into the cove below Knossos and run the ship up the beach → she grinds to a stop → arrival dialogue; the storm eases.
+9. SPACE → **Sail home — the Delta** → Delta.
 10. Account only: in pgAdmin (`:5050`), `user_realm_unlocks` has a `sea` row for the user and `game_state.flags` contains `"crete_reached": true`. Guest: nothing written.
 11. Both: side panels, log, dialogue box, and (touch emulation) the mobile arrow + space buttons all work at sea.
 

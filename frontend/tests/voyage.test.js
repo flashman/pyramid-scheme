@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createVoyage, stepVoyage, polar, stormTarget, wrapAngle } from '../worlds/sea/voyage.js';
 import {
-  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BAY_BOUNDARY,
+  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BEACH, FRONT_LIMIT, HULL,
   courseToWorld, worldToCourse,
 } from '../worlds/sea/constants.js';
 import { sail, steerToward } from './helpers/sea.js';
@@ -83,11 +83,12 @@ test('a stopped ship cannot spin', () => {
   assert.ok(Math.abs(wrapAngle(v.heading - COURSE_HEADING)) < 1e-9);
 });
 
-test('sailing straight for Crete arrives in 180–300 s', () => {
+test('sailing straight for Crete lands on the beach in 180–300 s', () => {
   const v = createVoyage();
+  const beach = courseToWorld(BEACH.along + 50, 0);
   let t = 0;
   while (!v.arrived && t < 400) {
-    stepVoyage(v, steerToward(Math.atan2(CRETE_BAY.x - v.x, CRETE_BAY.z - v.z))(v), 1 / 60);
+    stepVoyage(v, steerToward(Math.atan2(beach.x - v.x, beach.z - v.z))(v), 1 / 60);
     t += 1 / 60;
   }
   assert.ok(v.arrived, 'never arrived');
@@ -140,28 +141,28 @@ test('landmark_near fires once per landmark', () => {
   assert.equal(events.filter(e => e.type === 'landmark_near' && e.id === 'wreck').length, 1);
 });
 
-test('arrival switches off the pull: a becalmed, moored ship stays put', () => {
+test('running up the beach lands the ship: she stops on the sand and stays put', () => {
   const v = createVoyage();
-  place(v, COURSE_LEN - 300, 0);
-  const events = [];
-  for (let i = 0; i < 60 * 60 && !v.arrived; i++) events.push(...stepVoyage(v, { trim: 1 }, 1 / 60));
-  assert.ok(events.some(e => e.type === 'arrived'));
-  assert.equal(stormTarget(v), STORM.moored);
-  v.sail = 0; v.rowing = 0; v.speed = 0;
+  place(v, BEACH.along - 150, 0);
+  const events = sail(v, 60, 60, () => ({ trim: 1 }));
+  assert.ok(events.some(e => e.type === 'arrived'), 'never landed');
+  assert.ok(v.landed && v.speed === 0);
+  const bow = worldToCourse(v.x, v.z).along + HULL.halfLen;
+  assert.ok(bow >= BEACH.along && bow <= BEACH.along + 10, `bow at ${(bow - BEACH.along).toFixed(1)} m up the sand`);
   const x = v.x, z = v.z;
-  sail(v, 30, 60, () => ({ trim: -1 }));
-  assert.ok(Math.hypot(v.x - x, v.z - z) < 0.01);
+  sail(v, 30, 60, () => ({ trim: 1, row: 1 }));
+  assert.ok(Math.hypot(v.x - x, v.z - z) < 0.01, 'moved after landing');
+  assert.equal(stormTarget(v), STORM.moored);
 });
 
-test('moored: sailing out of the bay prompts once and the boundary holds', () => {
+test('the cliffs either side of the beach stop the ship short of the shore', () => {
   const v = createVoyage();
-  v.x = CRETE_BAY.x; v.z = CRETE_BAY.z; v.arrived = true;
-  v.heading = wrapAngle(COURSE_HEADING + Math.PI);   // straight back out of the bay
-  const events = []; let maxD = 0;
-  for (let i = 0; i < 300 * 60; i++) {
+  place(v, BEACH.along - 150, BEACH.halfWidth + 80);
+  let maxAlong = -Infinity; const events = [];
+  for (let i = 0; i < 60 * 60; i++) {
     events.push(...stepVoyage(v, { trim: 1 }, 1 / 60));
-    maxD = Math.max(maxD, Math.hypot(v.x - CRETE_BAY.x, v.z - CRETE_BAY.z));
+    maxAlong = Math.max(maxAlong, worldToCourse(v.x, v.z).along);
   }
-  assert.ok(maxD <= BAY_BOUNDARY + 5, `max ${maxD.toFixed(1)}`);
-  assert.equal(events.filter(e => e.type === 'bay_exit').length, 1);
+  assert.ok(maxAlong <= FRONT_LIMIT + 5, `max along ${maxAlong.toFixed(1)} vs ${FRONT_LIMIT.toFixed(1)}`);
+  assert.ok(!v.arrived);
 });

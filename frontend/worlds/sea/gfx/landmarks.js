@@ -2,7 +2,7 @@
 // Things to pass on the way, and the destination: a half-sunk wreck with bobbing
 // JUST POTS crates, a lone rock with a signal fire, and Crete — Mount Ida above a
 // natural rocky bay: two headlands stepping down from cliffs to sea stacks, a
-// cliff-backed cove beach, boulders at the waterline, Knossos' tiered red colonnades on the slope above the
+// cliff-backed landing beach (timber rollers, stone anchors, boats hauled up), boulders at the waterline, Knossos' tiered red colonnades on the slope above the
 // cove, and high on the mountain
 // the dark mouth of a cave with something glowing inside.
 
@@ -137,14 +137,53 @@ function crete() {
     cliff.position.set(x, ry * 0.4 - 8, slopeZ(x, 0.93));
     group.add(cliff);
   }
-  const cove = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 32), stone(0xb8a878));
-  cove.scale.set(150, 1, 55);
-  cove.position.set(0, 0.2, slopeZ(0, 0.95));
-  group.add(cove);
+  // The landing beach (its waterline is BEACH.along ≈ local z −700): dry sand, a darker wet
+  // strip at the water, timber rollers down the landing lane, pierced stone anchors, and two
+  // small boats already hauled up — how Bronze Age crews landed, as at Knossos's harbour, Amnisos.
+  const beach = new THREE.Group();
+  const wet = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 40), stone(0x8a7a5a));
+  wet.scale.set(114, 1, 48);
+  wet.position.set(0, -0.75, -668);
+  const sand = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 40), stone(0xb8a67c));
+  sand.scale.set(110, 1, 44);
+  sand.position.set(0, -0.6, -666);
+  beach.add(wet, sand);
+  const timber = stone(0x5a3e22);
+  for (let z = -712; z <= -684; z += 4) {
+    const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 6, 8), timber);
+    roller.rotation.z = Math.PI / 2;
+    roller.position.set(0, 0.55, z);
+    beach.add(roller);
+  }
+  const anchorStone = stone(0x6a6660), hole = new THREE.MeshBasicMaterial({ color: 0x1a1816 });
+  for (const [x, z, lean] of [[-14, -690, 0.2], [-22, -682, -0.3], [17, -688, 0.1], [26, -679, 0.35], [-30, -694, -0.15]]) {
+    const anchor = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.35), anchorStone);
+    const bore = new THREE.Mesh(new THREE.CircleGeometry(0.13, 10), hole);
+    bore.position.set(0, 0.25, 0.18);
+    anchor.add(bore);
+    anchor.position.set(x, 0.85, z);
+    anchor.rotation.set(0, lean * 3, lean);
+    beach.add(anchor);
+  }
+  const boatHull = new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+  for (const [x, z, yaw, tilt] of [[-48, -684, 0.2, 0.12], [52, -680, -0.15, -0.1]]) {
+    const boat = new THREE.Group();
+    const hullMesh = new THREE.Mesh(boatHull, stone(0x5a4630));
+    hullMesh.scale.set(1.5, 1.1, 6);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 7, 6), timber);   // unstepped, lying along the hull
+    mast.rotation.x = Math.PI / 2;
+    mast.position.set(0.3, 0.3, 0.5);
+    boat.add(hullMesh, mast);
+    boat.position.set(x, 1.1, z);
+    boat.rotation.set(0, yaw, tilt);
+    beach.add(boat);
+  }
+  group.add(beach);
 
   // ── Boulders at the waterline ──
   for (let i = 0; i < 40; i++) {
     const x = (rnd() - 0.5) * 1100;
+    if (Math.abs(x) < 130) continue;                                // keep the landing beach clear
     const z = Math.abs(x) > 480 ? -620 - rnd() * 600 : slopeZ(x, 0.95) - rnd() * 40;
     const s = 3 + rnd() * 7;
     const boulder = rockMass(rnd, s, s * 0.7, s, pick());
