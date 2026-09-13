@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 
-const RAIN_COUNT = 2400;
+const RAIN_COUNT = 1400;
 const RAIN_BOX   = 30;      // half-size (m) of the rain volume around the camera (dense near the lens)
 const BOLT_NEAR  = 1800;    // strikes closer than this draw a visible bolt
 
@@ -96,7 +96,7 @@ export function createStorm({ rng = Math.random } = {}) {
       const level = rainEnabled ? Math.min(1, Math.max(0, (v.storm - 0.5) / 0.2)) : 0;
       rain.visible = level > 0;
       if (level === 0) return;
-      rainMat.opacity = 0.7 * level;
+      rainMat.opacity = 0.45 * level;
       const fall = 26;
       const wx = Math.sin(v.windAngle) * 6, wz = Math.cos(v.windAngle) * 6;
       const { x: cx, y: cy, z: cz } = camera.position;
@@ -106,7 +106,7 @@ export function createStorm({ rng = Math.random } = {}) {
         const y = cy + wrap(seeds[k + 1] - v.t * fall, RAIN_BOX);
         const z = cz + wrap(seeds[k + 2] + v.t * wz, RAIN_BOX * 2);
         rainPos[o]     = x;              rainPos[o + 1] = y;       rainPos[o + 2] = z;
-        rainPos[o + 3] = x - wx * 0.1;   rainPos[o + 4] = y + 2.6; rainPos[o + 5] = z - wz * 0.1;
+        rainPos[o + 3] = x - wx * 0.1;   rainPos[o + 4] = y + 2.0; rainPos[o + 5] = z - wz * 0.1;
       }
       rainGeo.attributes.position.needsUpdate = true;
     },
