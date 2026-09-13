@@ -157,15 +157,22 @@ function _hull(v, h, pol) {
   const fx = Math.sin(v.heading),  fz = Math.cos(v.heading);
   const rx = -Math.cos(v.heading), rz = Math.sin(v.heading);
   const at = (fwd, right) => heightAt(comps, v.x + fx * fwd + rx * right, v.z + fz * fwd + rz * right, v.t);
-  const bow  = at(HULL.halfLen, 0),   stern = at(-HULL.halfLen, 0);
-  const port = at(0, -HULL.halfBeam), star  = at(0, HULL.halfBeam), mid = at(0, 0);
+  // Driving into the waves the ship meets crests sooner, so the bow reads the water a little ahead of itself.
+  const lead = Math.min(6, v.speed * 0.35);
+  const bow  = at(HULL.halfLen + lead, 0),             stern  = at(-HULL.halfLen, 0);
+  const bowQ = at(HULL.halfLen * 0.5 + lead * 0.5, 0), sternQ = at(-HULL.halfLen * 0.5, 0);
+  const port = at(0, -HULL.halfBeam),     star   = at(0, HULL.halfBeam), mid = at(0, 0);
+  const samples = [bow, bowQ, mid, sternQ, stern, port, star];
+  const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+  const heaveTarget = mean + HULL.crestLift * Math.max(0, Math.max(...samples) - mean);
   const hl = v.hull;
   const spring = (pos, vel, target, k, zeta) => vel + (k * (target - pos) - 2 * zeta * Math.sqrt(k) * vel) * h;
 
-  hl.vy = spring(hl.y, hl.vy, (bow + stern + port + star + mid) / 5, HULL.kHeave, HULL.zetaHeave);
+  hl.vy = spring(hl.y, hl.vy, heaveTarget, HULL.kHeave, HULL.zetaHeave);
   hl.y += hl.vy * h;
 
-  hl.pitchVel = spring(hl.pitch, hl.pitchVel, Math.atan2(bow - stern, 2 * HULL.halfLen), HULL.kPitch, HULL.zetaPitch);
+  const pitchTarget = Math.atan2((bow + bowQ) / 2 - (stern + sternQ) / 2, 1.5 * HULL.halfLen + 0.75 * lead);
+  hl.pitchVel = spring(hl.pitch, hl.pitchVel, pitchTarget, HULL.kPitch, HULL.zetaPitch);
   hl.pitch += hl.pitchVel * h;
 
   // +roll leans to starboard; wind pushes the rig to leeward, so lean away from it.

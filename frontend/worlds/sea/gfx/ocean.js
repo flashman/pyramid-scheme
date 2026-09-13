@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { glslWaves } from '../waves.js';
 import { SKY_GLSL } from './sky.js';
-import { WAKE } from '../constants.js';
+import { WAKE, HULL } from '../constants.js';
 
 const EXTENT = 4200;   // grid half-size (m)
 const SNAP   = 4;      // the grid moves with the camera in whole steps of this
@@ -38,7 +38,7 @@ export function createOcean(windAngle, { grid = 280 } = {}) {
   const uniforms = {
     uTime: { value: 0 }, uStorm: { value: 0.1 }, uSkyTime: { value: 0 },
     uWindAngle: { value: windAngle }, uFlash: { value: 0 }, uFlashDir: { value: new THREE.Vector3(0, 1, 0) },
-    uOffset: { value: new THREE.Vector2() }, uCamPos: { value: new THREE.Vector3() }, uShip: { value: new THREE.Vector2() },
+    uOffset: { value: new THREE.Vector2() }, uCamPos: { value: new THREE.Vector3() }, uShip: { value: new THREE.Vector2() }, uShipHeading: { value: 0 },
     uDeep:  { value: new THREE.Color(0.004, 0.020, 0.028) },
     uCrest: { value: new THREE.Color(0.030, 0.160, 0.140) },
     uWake:  { value: Array.from({ length: WAKE.max }, () => new THREE.Vector3(0, 1e4, 1e4)) },
@@ -65,11 +65,20 @@ export function createOcean(windAngle, { grid = 280 } = {}) {
       uniform vec3 uDeep;
       uniform vec3 uCrest;
       uniform vec2 uShip;
+      uniform float uShipHeading;
       uniform vec3 uWake[${WAKE.max}];
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vFold;
       void main() {
+        // The hull keeps the sea out: never draw water inside the ship's footprint
+        // (x across the beam, y along the bow — the same taper as the hull mesh).
+        vec2 rel = vWorld.xz - uShip;
+        float ch = cos(uShipHeading), sh = sin(uShipHeading);
+        vec2 local = vec2(rel.x * ch - rel.y * sh, rel.x * sh + rel.y * ch);
+        float zn = local.y / ${HULL.halfLen.toFixed(2)};
+        if (abs(zn) < 1.0 && abs(local.x) < ${HULL.halfBeam.toFixed(2)} * (1.0 - pow(abs(zn), 3.0) * 0.85) * 0.92) discard;
+
         vec3 N = normalize(vNormal);
         vec3 toCam = uCamPos - vWorld;
         float dist = length(toCam);
@@ -123,6 +132,7 @@ export function createOcean(windAngle, { grid = 280 } = {}) {
       uniforms.uFlash.value = flash;
       uniforms.uFlashDir.value.copy(flashDir);
       uniforms.uShip.value.set(v.x, v.z);
+      uniforms.uShipHeading.value = v.heading;
       for (let i = 0; i < WAKE.max; i++) {
         const w = v.wake[v.wake.length - 1 - i];
         if (w) uniforms.uWake.value[i].set(w.x, w.z, v.t - w.t);

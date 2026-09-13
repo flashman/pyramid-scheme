@@ -39,9 +39,10 @@ export const RUDDER = {
 
 export const HULL = {
   halfLen: 9, halfBeam: 2.4,
-  kHeave:  6, zetaHeave: 0.5,
-  kPitch:  5, zetaPitch: 0.55,
-  kRoll:   4, zetaRoll:  0.4,
+  kHeave: 12, zetaHeave: 0.7,                     // stiff enough to ride chop instead of lagging under it
+  kPitch: 10, zetaPitch: 0.7,
+  kRoll:   8, zetaRoll:  0.6,
+  crestLift: 0.3,                                 // ride up onto the highest sampled crest this much
   heelMax: 0.14,                                  // rad of lean at full sail on a beam wind
 };
 

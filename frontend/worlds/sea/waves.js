@@ -14,7 +14,7 @@ export const GRAVITY = 9.81;
 //   Q = Q_base · (Q_BASE + Q_GAIN·s) · clampQ, where clampQ keeps Σ Q·k·A ≤ MAX_STEEPNESS
 // (above that limit Gerstner crests loop over themselves).
 export const AMP_BASE = 0.25;
-export const AMP_GAIN = 1.75;
+export const AMP_GAIN = 1.3;     // capped so a full storm doesn't bury an 18 m reed ship
 export const Q_BASE   = 0.3;
 export const Q_GAIN   = 0.7;
 export const MAX_STEEPNESS    = 0.95;
