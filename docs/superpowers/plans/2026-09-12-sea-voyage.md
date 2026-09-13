@@ -38,6 +38,7 @@
 - Dev panel label is `⛵ SEA` (`🌊` is already the Oasis button).
 - Camera (decided in Task 9 look-dev): the default is a three-quarter chase view; dragging orbits around the ship and the view holds where you leave it (double-click resets) — dead astern hid the ship (spec §3 said low & behind).
 - Crew (decided in Task 9 look-dev): the player's downline rows as chained galley slaves — one per recruit (max 24), four hired hands when there is no downline — stroke rate set by ship speed, driven by a whip-cracking overseer (more often the slower she goes); a hooded Shipmaster works a single steering oar at the stern; the pharaoh stands at true human scale (1.8 m), keeping his balance, gazing about and periodically raising his crook toward Crete.
+- Speed (decided in Task 9 look-dev): two controls — ↑/↓ trims the sail, ⇧+↑/↓ sets the rowing effort (0–100%, starts at 40%). The rowers push whatever the wind does, so the ship makes way even into the wind; they stroke at that effort and rest at zero. Full sail drive is 1.2 so both together still take ~3 minutes.
 - Rank (decided in Task 9 look-dev): the pharaoh's regalia follows the player's tier — a bare-headed future pharaoh at PEASANT, gaining headcloth, cape, collar and crook, then the red and white crowns, by PHARAOH. Rowers stroke slightly out of sync.
 - Scenery (decided in Task 9 look-dev): the bull-horns landmark is dropped; Crete's bay is natural rock (headlands, sea stacks, cliff-backed cove) with a glowing cave mouth high on the mountain; the voyage opens on the Nile Delta (marsh, papyrus, palms) with the pyramids of Giza on the horizon, the camera starting on that view and swinging round to the chase.
 
@@ -2689,7 +2690,7 @@ COPY vendor/     /usr/share/nginx/html/vendor/
 
 3. In the help panel's `▶ CONTROLS` section, after the `SPACE … interact` row, add:
 ```html
-      <div class="help-row"><span class="help-key">AT SEA</span><span class="help-val">← → steer · ↑ ↓ sail · drag to look (double-click resets) · SPACE shipmaster</span></div>
+      <div class="help-row"><span class="help-key">AT SEA</span><span class="help-val">← → steer · ↑ ↓ sail · ⇧ ↑ ↓ rowing · drag to look (double-click resets) · SPACE shipmaster</span></div>
 ```
 
 - [ ] **Step 4: Stack the canvases in `style.css`**
@@ -2917,10 +2918,11 @@ export class SeaRealm extends Realm {
     if (!this._scene || !this.voyage) return;           // hold at the Delta until the sails are raised
 
     const helm = DialogueManager.isActive()
-      ? { steer: 0, trim: 0 }                           // hands off the tiller while talking
+      ? { steer: 0, trim: 0, row: 0 }                   // hands off the tiller while talking
       : {
           steer: (G.keys.ArrowLeft ? 1 : 0) - (G.keys.ArrowRight ? 1 : 0),
-          trim:  (G.keys.ArrowUp ? 1 : 0) - (G.keys.ArrowDown ? 1 : 0),
+          trim:  G.keys.Shift ? 0 : (G.keys.ArrowUp ? 1 : 0) - (G.keys.ArrowDown ? 1 : 0),   // ↑/↓ trims the sail
+          row:   G.keys.Shift ? (G.keys.ArrowUp ? 1 : 0) - (G.keys.ArrowDown ? 1 : 0) : 0,   // ⇧+↑/↓ sets the rowing effort
         };
     const events = stepVoyage(this.voyage, helm, this._dt);
     for (const line of narrate(events, this.voyage.t, this._narration)) log(line, 'hi');

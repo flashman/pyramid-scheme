@@ -26,9 +26,16 @@ export const CURRENT_SPEED = 0.6;                 // m/s drift toward Crete (off
 export const SAIL = {
   rate:  0.6,                                     // trim change per second while ↑/↓ held
   start: 0.5,                                     // trim at departure
-  drive: 1.5,                                     // m/s² at full sail, dead downwind
+  drive: 1.2,                                     // m/s² at full sail, dead downwind
   drag:  0.015,                                   // quadratic → terminal speed √(drive/drag) = 10 m/s
   irons: 40 * Math.PI / 180,                      // within this of the wind's source: no drive
+};
+
+// The rowers push whatever the wind does. ⇧+↑/↓ sets their effort.
+export const ROW = {
+  rate:  0.5,                                     // effort change per second while ⇧+↑/↓ held
+  start: 0.4,                                     // effort at departure
+  drive: 0.6,                                     // m/s² at full effort
 };
 
 export const RUDDER = {

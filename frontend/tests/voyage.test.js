@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createVoyage, stepVoyage, polar, stormTarget, wrapAngle } from '../worlds/sea/voyage.js';
 import {
-  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, STORM, BAY_BOUNDARY,
+  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BAY_BOUNDARY,
   courseToWorld, worldToCourse,
 } from '../worlds/sea/constants.js';
 import { sail, steerToward } from './helpers/sea.js';
@@ -41,6 +41,7 @@ test('departure fires once, on the first step', () => {
 
 test('speed converges to terminal velocity downwind at full sail (traced through drag)', () => {
   const v = createVoyage();
+  v.rowing = 0;                                            // the sail alone
   sail(v, 60, 60, () => ({ trim: 1 }));
   const terminal = Math.sqrt(SAIL.drive / SAIL.drag);
   assert.ok(Math.abs(v.speed - terminal) / terminal < 0.01, `speed ${v.speed}`);
@@ -49,9 +50,23 @@ test('speed converges to terminal velocity downwind at full sail (traced through
 test('in irons the ship barely moves, and says so', () => {
   const v = createVoyage();
   v.heading = wrapAngle(COURSE_HEADING + Math.PI);          // bow straight into the wind
+  v.rowing = 0;
   const events = sail(v, 30, 60, () => ({ trim: 1 }));
   assert.ok(v.speed < 0.5, `speed ${v.speed}`);
   assert.ok(events.some(e => e.type === 'in_irons'));
+});
+
+test('the rowers add their own drive, even into the wind, set by ⇧↑/⇧↓', () => {
+  const v = createVoyage();
+  v.heading = wrapAngle(COURSE_HEADING + Math.PI);          // into the wind: the sail gives nothing
+  v.rowing = 0;
+  sail(v, 5, 60, () => ({ row: 1 }));
+  assert.ok(v.rowing > 0.99, `rowing ${v.rowing}`);
+  sail(v, 30, 60, () => ({}));
+  const expected = Math.sqrt(ROW.drive / SAIL.drag);
+  assert.ok(Math.abs(v.speed - expected) / expected < 0.02, `speed ${v.speed} vs ${expected}`);
+  sail(v, 5, 60, () => ({ row: -1 }));
+  assert.equal(v.rowing, 0);
 });
 
 test('steer +1 turns left (heading increases)', () => {
@@ -63,7 +78,7 @@ test('steer +1 turns left (heading increases)', () => {
 
 test('a stopped ship cannot spin', () => {
   const v = createVoyage();
-  v.sail = 0; v.speed = 0;
+  v.sail = 0; v.rowing = 0; v.speed = 0;
   sail(v, 5, 60, () => ({ steer: 1, trim: -1 }));
   assert.ok(Math.abs(wrapAngle(v.heading - COURSE_HEADING)) < 1e-9);
 });
@@ -103,7 +118,7 @@ test('storm target ramps with progress and rises off course', () => {
 test('storm intensity converges to its target', () => {
   const v = createVoyage();
   place(v, 1200, 0);
-  v.sail = 0;
+  v.sail = 0; v.rowing = 0;
   sail(v, 60, 60, () => ({ trim: -1 }));
   assert.ok(Math.abs(v.storm - stormTarget(v)) < 0.01, `storm ${v.storm}`);
 });
@@ -111,7 +126,7 @@ test('storm intensity converges to its target', () => {
 test('storm_rising fires once per threshold', () => {
   const v = createVoyage();
   place(v, COURSE_LEN - 250, 0);          // storm target 0.75
-  v.sail = 0;
+  v.sail = 0; v.rowing = 0;
   const events = sail(v, 60, 60, () => ({ trim: -1 }));
   const levels = events.filter(e => e.type === 'storm_rising').map(e => e.level);
   assert.deepEqual(levels, STORM.marks);
@@ -120,7 +135,7 @@ test('storm_rising fires once per threshold', () => {
 test('landmark_near fires once per landmark', () => {
   const v = createVoyage();
   place(v, 500, 140);                      // the wreck
-  v.sail = 0;
+  v.sail = 0; v.rowing = 0;
   const events = sail(v, 3, 60, () => ({ trim: -1 }));
   assert.equal(events.filter(e => e.type === 'landmark_near' && e.id === 'wreck').length, 1);
 });
@@ -132,7 +147,7 @@ test('arrival switches off the pull: a becalmed, moored ship stays put', () => {
   for (let i = 0; i < 60 * 60 && !v.arrived; i++) events.push(...stepVoyage(v, { trim: 1 }, 1 / 60));
   assert.ok(events.some(e => e.type === 'arrived'));
   assert.equal(stormTarget(v), STORM.moored);
-  v.sail = 0; v.speed = 0;
+  v.sail = 0; v.rowing = 0; v.speed = 0;
   const x = v.x, z = v.z;
   sail(v, 30, 60, () => ({ trim: -1 }));
   assert.ok(Math.hypot(v.x - x, v.z - z) < 0.01);

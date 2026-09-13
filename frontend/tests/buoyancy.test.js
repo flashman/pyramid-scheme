@@ -6,7 +6,7 @@ import { mulberry32, sail } from './helpers/sea.js';
 
 test('on flat water the hull settles to rest within 5 s (residual < 1 cm)', () => {
   const v = createVoyage({ waveParams: [] });
-  v.hull.y = 2; v.hull.pitch = 0.2; v.hull.roll = -0.2; v.sail = 0;
+  v.hull.y = 2; v.hull.pitch = 0.2; v.hull.roll = -0.2; v.sail = 0; v.rowing = 0;
   sail(v, 5, 60, () => ({ trim: -1 }));
   assert.ok(Math.abs(v.hull.y) < 0.01, `y ${v.hull.y}`);
   assert.ok(Math.abs(v.hull.pitch) < 0.01, `pitch ${v.hull.pitch}`);
@@ -73,7 +73,7 @@ test('a stormy sea throws lightning ahead of the ship', () => {
 
 test('a calm sea throws no lightning', () => {
   const v = createVoyage({ rng: mulberry32(3) });
-  v.sail = 0;
+  v.sail = 0; v.rowing = 0;
   const events = sail(v, 60, 60, () => ({ trim: -1 }));
   assert.equal(events.filter(e => e.type === 'lightning').length, 0);
 });

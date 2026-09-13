@@ -47,7 +47,7 @@
 
   <div>
     <div class="stage"><canvas id="gl" width="780" height="540" tabindex="0" aria-label="Sea view — click, then steer with arrow keys"></canvas></div>
-    <div class="hint">Click the view, then ← → steer · ↑ ↓ trim sail · drag to look around · double-click to reset the view</div>
+    <div class="hint">Click the view, then ← → steer · ↑ ↓ trim sail · ⇧ ↑ ↓ rowing · drag to look around · double-click to reset the view</div>
     <div id="error"></div>
   </div>
 
@@ -57,6 +57,7 @@
       <dl>
         <dt>Speed</dt><dd id="i-speed">0.0 kn</dd>
         <dt>Sail</dt><dd id="i-sail">50%</dd>
+        <dt>Rowing</dt><dd id="i-row">40%</dd>
         <dt>Off course</dt><dd id="i-heading">0°</dd>
         <dt>To Crete</dt><dd id="i-dist">2.40 km</dd>
         <dt>Storm</dt><dd id="i-storm">0.10</dd>
@@ -149,9 +150,11 @@
     const dt = Math.min(0.1, (now - last) / 1000);
     frameAvg += ((now - last) - frameAvg) * 0.05;
     last = now;
+    const upDown = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
     const input = {
       steer: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0),
-      trim:  (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0),
+      trim:  keys.Shift ? 0 : upDown,            // ↑/↓ trims the sail
+      row:   keys.Shift ? upDown : 0,            // ⇧+↑/↓ sets the rowing effort
     };
     const events = stepVoyage(v, input, dt);
     if (auto.checked) storm.value = v.storm.toFixed(2); else v.storm = Number(storm.value);
@@ -160,6 +163,7 @@
 
     $('i-speed').textContent = (v.speed * 1.94384).toFixed(1) + ' kn';
     $('i-sail').textContent = Math.round(v.sail * 100) + '%';
+    $('i-row').textContent = Math.round(v.rowing * 100) + '%';
     $('i-heading').textContent = Math.round(wrapAngle(v.heading - COURSE_HEADING) * 180 / Math.PI) + '°';
     const dist = $('i-dist');
     dist.textContent = v.arrived ? 'Moored' : (Math.hypot(CRETE_BAY.x - v.x, CRETE_BAY.z - v.z) / 1000).toFixed(2) + ' km';

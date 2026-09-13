@@ -8,7 +8,7 @@
 //         | 'crete_clearer' | 'arrived' | 'bay_exit' }
 //   { type: 'storm_rising', level }    { type: 'landmark_near', id }
 //   { type: 'lightning', x, z, distance, power }
-// input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail) }
+// input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail), row: -1..1 (+1 rows harder) }
 
 import { resolveWaves, heightAt } from './waves.js';
 
@@ -16,7 +16,7 @@ import {
   DEPARTURE, CRETE_BAY, COURSE_LEN, COURSE_HEADING,
   CORRIDOR_HALF, OUTER_LIMIT, BACK_LIMIT, FRONT_LIMIT, WALL_DRIFT, WALL_TURN,
   BAY_RADIUS, BAY_BOUNDARY, BAY_REARM,
-  WIND_VEER_MAX, CURRENT_SPEED, SAIL, RUDDER, SUBSTEP, MAX_DT, STORM,
+  WIND_VEER_MAX, CURRENT_SPEED, SAIL, ROW, RUDDER, SUBSTEP, MAX_DT, STORM,
   LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse, HULL, WAKE,
 } from './constants.js';
 
@@ -57,9 +57,9 @@ export function createVoyage({ rng = Math.random, waveParams } = {}) {
   return {
     t: 0, acc: 0, rng, waveParams,
     x: DEPARTURE.x, z: DEPARTURE.z,
-    heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start,
+    heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start, rowing: ROW.start,
     windAngle: COURSE_HEADING,              // direction the wind blows TOWARD
-    drive: 0,                               // last substep's drive (m/s²)
+    sailDrive: 0, drive: 0,                 // last substep's sail drive and total drive (m/s²)
     storm: 0.1, arrived: false,
     hull: { y: 0, vy: 0, pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 },
     wake: [], wakeTimer: 0,
@@ -84,9 +84,11 @@ function _substep(v, input, h, events) {
   v.t += h;
   const steer = clamp(input.steer ?? 0, -1, 1);
   const trim  = clamp(input.trim ?? 0, -1, 1);
+  const row   = clamp(input.row ?? 0, -1, 1);
 
   // ── Controls: trim ramps, the rudder eases, and turning needs way on ──
   v.sail    = clamp(v.sail + trim * SAIL.rate * h, 0, 1);
+  v.rowing  = clamp(v.rowing + row * ROW.rate * h, 0, 1);
   v.rudder += (steer * RUDDER.max - v.rudder) * (1 - Math.exp(-h / RUDDER.tau));
   v.heading = wrapAngle(v.heading + v.speed * v.rudder * RUDDER.turnGain * h);
 
@@ -106,7 +108,8 @@ function _substep(v, input, h, events) {
   // ── Drive against quadratic drag; speed is along the bow and never negative ──
   const off = Math.abs(wrapAngle(v.heading - (v.windAngle + Math.PI)));
   const pol = polar(off);
-  v.drive = v.sail * pol * SAIL.drive;
+  v.sailDrive = v.sail * pol * SAIL.drive;
+  v.drive = v.sailDrive + v.rowing * ROW.drive;              // the rowers push whatever the wind does
   v.speed = Math.max(0, v.speed + (v.drive - SAIL.drag * v.speed * v.speed) * h);
 
   // ── Ground velocity = bow + current, limited by the soft walls ──
@@ -225,8 +228,8 @@ function _events(v, h, events) {
     v.armed.strayed = true;
   }
 
-  // In irons: sail up, no drive, barely moving — for 3 s.
-  if (v.sail > 0.3 && v.drive === 0 && v.speed < 1) {
+  // In irons: sail up but giving nothing, for 3 s (the rowers may still be making way).
+  if (v.sail > 0.3 && v.sailDrive === 0) {
     v.ironsTime += h;
     if (v.ironsTime > 3 && v.armed.irons) { v.armed.irons = false; events.push({ type: 'in_irons' }); }
   } else {

@@ -3,8 +3,8 @@
 // weathered reed hull riding with real freeboard, a worn and patched linen sail,
 // the hooded Shipmaster on his steering oar at the stern, and the player's
 // DOWNLINE at the oars — one chained galley slave per recruit, bent over their
-// benches, rowing at a rate set by the ship's speed (each a touch out of time with the
-// next) while an overseer's whip cracks harder the slower she goes.
+// benches, rowing at the effort you set (each a touch out of time with the next)
+// while an overseer's whip cracks faster the harder they're driven.
 // The pharaoh stands at the prow at true human scale, dressed for the player's
 // rank — a bare-headed future pharaoh at first, crowned only at PHARAOH — keeping
 // his balance, gazing about, and now and then raising his hand toward Crete.
@@ -23,7 +23,7 @@ const PER_SIDE    = MAX_ROWERS / 2;
 const BENCH_FROM  = -4.2, BENCH_TO = 3.2;     // z span of the oarlock stations (m)
 const OAR_LEN     = 5;                        // oarlock → blade tip
 const OAR_INBOARD = 1.1;                      // oarlock → handle (the loom)
-const STROKES_PER_MPS = 0.08;                 // stroke rate follows the ship: 10 m/s → 0.8/s; stopped → still
+const STROKES_AT_FULL = 0.9;                  // strokes per second at full rowing effort; resting at zero
 const UPPER_ARM = 0.32, FOREARM = 0.3;
 const WHIP_SEGS = 14;
 
@@ -513,7 +513,7 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
       // Sail: furls upward with trim, swings toward the wind, fills when it draws, luffs when it doesn't.
       rig.scale.y    = 0.12 + 0.88 * v.sail;
       rig.rotation.y = Math.max(-0.6, Math.min(0.6, wrapAngle(v.windAngle - v.heading) * 0.5));
-      const fill = Math.min(1, v.drive / (SAIL.drive * 0.9));
+      const fill = Math.min(1, v.sailDrive / SAIL.drive);
       const sp = sailGeo.attributes.position;
       for (let i = 0; i < sp.count; i++) {
         const bx = sailBase[i * 3], by = sailBase[i * 3 + 1];
@@ -527,8 +527,8 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
 
       steering.rotation.y = -v.rudder * 0.9;
 
-      // Rowers: the stroke rate follows the ship's speed; each slightly out of time.
-      strokePhase += dt * v.speed * STROKES_PER_MPS * Math.PI * 2;
+      // Rowers stroke at the effort you set; each slightly out of time.
+      strokePhase += dt * v.rowing * STROKES_AT_FULL * Math.PI * 2;
       seats.forEach((s, i) => {
         const phase = strokePhase + s.offset + 0.12 * Math.sin(v.t * 0.35 + s.wander);
         const lean  = -0.25 - 0.3 * Math.sin(phase);                     // bent over; reaching aft at the catch
@@ -557,9 +557,9 @@ export function createShip({ crew = 0, rank = 'PEASANT' } = {}) {
       });
       for (const im of [torsos, heads, cloths, shafts, blades, upperArms, forearms, hands]) im.instanceMatrix.needsUpdate = true;
 
-      // The overseer's whip: wind up, crack, recover — more often the slower she goes.
+      // The overseer's whip: wind up, crack, recover — faster the harder they're driven.
       whipClock += dt;
-      if (whipClock > 2.2 + 3 * Math.min(1, v.speed / 10)) whipClock = 0;
+      if (whipClock > 5.2 - 3 * v.rowing) whipClock = 0;
       const c = Math.min(1, whipClock / 0.7);
       let swing, bend;
       if (c < 0.45)     { const u = c / 0.45;          swing = 0.2 + 2.4 * u; bend = 1.2 * u; }
