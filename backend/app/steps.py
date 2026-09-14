@@ -38,6 +38,11 @@ STEP_CONFIG: dict[str, dict] = {
         "requires": {"requires_realms": ["chamber"]},
         "sets_flag": "upline_accepted",
     },
+    # Reaching Crete's bay by sea — the input a future Crete realm will read.
+    "crete_reached": {
+        "requires": {"requires_realms": ["sea"]},
+        "sets_flag": "crete_reached",
+    },
 }
 
 

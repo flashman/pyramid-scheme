@@ -25,6 +25,7 @@ SHOP_CATALOGUE: dict = {
     "seed_phrase":        {"name": "A Founder's Seed Phrase",               "price": 22, "kind": "keepsake"},
     "future_receipt":     {"name": "A Receipt from the Future",             "price": 6,  "kind": "keepsake"},
     "self_equity":        {"name": "Stock Certificate in Yourself",         "price": 10, "kind": "keepsake"},
+    "letter_of_passage":  {"name": "A Letter of Passage",                    "price": 8,  "kind": "keepsake"},
 }
 
 

@@ -89,6 +89,14 @@ REALM_CATALOGUE: dict[str, dict] = {
         "unlock_rule": {"requires_realms": ["chamber"], "requires_flags": ["upline_accepted"]},
         "legacy_flag": "cosmic_upline_done",
     },
+    "sea": {
+        "dir": "sea", "module": "/worlds/sea/SeaRealm.js",
+        "export": "SeaRealm", "sort": 8,
+        # Boarding also needs a Letter of Passage, checked client-side for now:
+        # there is no requires_items primitive and the voyage gates nothing of
+        # value yet. Add requires_items when a Crete realm makes arrival matter.
+        "unlock_rule": {"requires_realms": ["nile"]},
+    },
 }
 
 DEFAULT_UNLOCKED: frozenset[str] = frozenset(
