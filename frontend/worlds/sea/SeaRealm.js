@@ -89,7 +89,13 @@ export class SeaRealm extends Realm {
     this._narration = createNarrationMemory();
     this._lastTs = null;
     this._readyAt = performance.now();
-    if (this._scene) { this._scene.introView(); return; }
+    if (this._scene) {
+      // The scene is built once and reused: bring the crew and regalia up to date for this voyage.
+      this._scene.setCrew(rowersFor(G));
+      this._scene.setRank(getTier().name);
+      this._scene.introView();
+      return;
+    }
     loadScene()
       .then(mod => {
         if (RealmManager.currentId !== 'sea' || this._scene) return;

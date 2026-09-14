@@ -213,6 +213,8 @@ export class NileRealm extends SolidRealm {
       // so `sea` has to be claimed here or the WS realm gate would bar the channel.
       try { await Api.post('/api/unlocks/evaluate', {}); } catch { /* offline: the voyage still sails */ }
     }
+    // The evaluate call can be slow: don't sail if the player has since left the Delta or is already boarding.
+    if (RealmManager.currentId !== 'nile' || RealmManager.isTransitioning) return;
     PortalRegistry.use('nile', 'sea');
   }
 
