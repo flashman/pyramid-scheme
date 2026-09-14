@@ -555,6 +555,29 @@ const THEMES = {
     ],
   },
 
+  // ── THE SEA (sea) ──────────────────────────────────────────────────────
+  // A Phrygian drone at 48 bpm under two noise layers — wind (bandpass) and
+  // surf (lowpass) — both flagged `ambience` so SeaRealm can swell them with
+  // the storm. A sparse triangle voice surfaces now and then. Thunder is not
+  // part of the loop; SeaRealm fires it per strike via playThunder().
+  sea: {
+    bpm: 48,
+    tracks: [
+      { wave: 'noise', gain: 0.05, pan: -0.2, ambience: true,
+        filter: { type: 'bandpass', freq: 420, Q: 0.5 }, reverb: true,
+        seq: [[1, 32]] },
+      { wave: 'noise', gain: 0.07, pan: 0.2, ambience: true,
+        filter: { type: 'lowpass', freq: 260 },
+        seq: [[1, 32]] },
+      { wave: 'sine', gain: 0.09, pan: 0.0,
+        filter: { type: 'lowpass', freq: 240 }, reverb: true,
+        seq: [[N.A2, 8], [N.Bb2, 4], [N.A2, 4], [N.G2, 8], [N.A2, 8]] },                 // 32 beats
+      { wave: 'triangle', gain: 0.03, pan: 0.3,
+        filter: { type: 'lowpass', freq: 900 }, vibrato: { rate: 0.8, depth: 5 },
+        seq: [[_, 6], [N.E3, 3], [_, 5], [N.F3, 2], [_, 6], [N.D3, 4], [_, 6]] },       // 32 beats
+    ],
+  },
+
   // ── ATLANTIS (atlantis) ────────────────────────────────────────────────
   // D Phrygian: D Eb F G A Bb C — the lowered 2nd is the Mediterranean dark,
   // the sound of something very old and very wet. 52 bpm — barely a pulse,
@@ -710,7 +733,7 @@ const REALM_THEME = {
   council:  'council',
   atlantis: 'atlantis',
   nile:     'nile',
-  sea:      null,        // deliberately silent until THE SEA's theme is written (plan Task 14)
+  sea:      'sea',
 };
 
 // ── SoundManager singleton ────────────────────────────────
@@ -728,6 +751,8 @@ class SoundManagerClass {
     this._currentTheme = null;
     this._session      = 0;
     this._oscillators  = [];
+    this._ambienceLevel = 1;    // gain for theme noise tracks flagged `ambience` (the sea's wind + surf)
+    this._ambienceNodes = [];
 
     try {
       const saved = JSON.parse(localStorage.getItem('ps_audio') || '{}');
@@ -755,6 +780,50 @@ class SoundManagerClass {
     this._currentRealm = null;
     this._currentTheme = null;
     this._stop();
+  }
+
+  /** Swell or hush the current theme's `ambience` noise tracks (0..1). */
+  setAmbience(level) {
+    this._ambienceLevel = Math.max(0, Math.min(1, level));
+    if (!this._ctx) return;
+    for (const node of this._ambienceNodes) {
+      node.gain.setTargetAtTime(this._ambienceLevel, this._ctx.currentTime, 0.5);
+    }
+  }
+
+  /** One rolling thunderclap: brown-noise rumble, low-passed, arriving after
+      delaySec (distance / speed of sound). power 0..1 scales loudness and bite. */
+  playThunder(delaySec = 0, power = 1) {
+    if (!this._enabled) return;
+    this._ensureCtx();
+    const ctx = this._ctx;
+    if (ctx.state === 'suspended') return;
+    const t   = ctx.currentTime + Math.max(0, delaySec);
+    const dur = 2.8 + power * 1.8;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { last = last * 0.985 + (Math.random() * 2 - 1) * 0.15; data[i] = last; }
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 180 + 420 * power;
+    const env  = ctx.createGain();
+    const peak = 0.35 * power;
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(peak, t + 0.06);
+    env.gain.exponentialRampToValueAtTime(peak * 0.35, t + 0.5);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(lp);
+    lp.connect(env);
+    env.connect(this._masterGain);
+    env.connect(this._reverb);
+    src.start(t);
+    src.stop(t + dur);
   }
 
   setEnabled(val) {
@@ -845,6 +914,7 @@ class SoundManagerClass {
       try { osc.stop(0); } catch { /* already stopped */ }
     }
     this._oscillators = [];
+    this._ambienceNodes = [];
   }
 
   _startTheme(theme, startT) {
@@ -919,7 +989,17 @@ class SoundManagerClass {
       src.buffer = buf;
       src.loop   = true;
       src.connect(env);
-      env.connect(filter);
+      if (track.ambience) {
+        // Per-track gain (not shared — a shared node would cross-feed every
+        // track's noise through every other track's filter).
+        const amb = ctx.createGain();
+        amb.gain.value = this._ambienceLevel;
+        env.connect(amb);
+        amb.connect(filter);
+        this._ambienceNodes.push(amb);
+      } else {
+        env.connect(filter);
+      }
       src.start(startT);
       src.stop(startT + totalSec);
       this._oscillators.push(src);

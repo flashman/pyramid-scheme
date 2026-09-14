@@ -18,6 +18,7 @@ import { G }                from '../../game/state.js';
 import { getTier }         from '../../game/tiers.js';
 import { Api }             from '../../game/api.js';
 import { log }             from '../../ui/panels.js';
+import { SoundManager }    from '../../audio/sound.js';
 import { seaTransRender }  from '../transitions.js';
 import { COURSE_HEADING }  from './constants.js';
 import { createVoyage, stepVoyage }       from './voyage.js';
@@ -25,6 +26,7 @@ import { createNarrationMemory, narrate } from './narration.js';
 import { buildSeaMenuDialogue, buildArrivalDialogue } from './dialogue.js';
 
 const FADE_MS = 1200;
+const SPEED_OF_SOUND = 343;   // m/s — thunder arrives after the flash
 const HIRED_HANDS = 4;
 
 /** Your downline rows: one rower per recruit (24 benches); with no downline, a few hands are hired. */
@@ -109,6 +111,7 @@ export class SeaRealm extends Realm {
       this._c.style.touchAction = '';
     }
     this._dragId = null;
+    SoundManager.setAmbience(1);   // leave other realms' noise tracks at full level
   }
 
   update(ts) {
@@ -127,11 +130,13 @@ export class SeaRealm extends Realm {
     const events = stepVoyage(this.voyage, helm, this._dt);
     for (const line of narrate(events, this.voyage.t, this._narration)) log(line, 'hi');
     for (const e of events) this._onEvent(e);
+    SoundManager.setAmbience(0.35 + 0.65 * this.voyage.storm);
   }
 
   _onEvent(e) {
     if (e.type === 'lightning') {
       this._scene.flash(e);
+      SoundManager.playThunder(e.distance / SPEED_OF_SOUND, e.power);
     } else if (e.type === 'arrived') {
       this._recordArrival();
       DialogueManager.start(buildArrivalDialogue());
