@@ -23,6 +23,19 @@ const ICON = {
     X.save(); X.globalAlpha = 0.4 + 0.3*Math.sin(t/300); X.fillStyle = '#ffe9b0';
     X.fillRect(x - s*0.18, y - s*0.18, s*0.06, s*0.06); X.restore();
   },
+  letter_of_passage(X, x, y, s, t) {
+    X.fillStyle = '#e2d2a6'; X.fillRect(x - s*0.28, y - s*0.24, s*0.56, s*0.48);           // folded papyrus
+    X.fillStyle = '#c8b484'; X.fillRect(x - s*0.28, y - s*0.24, s*0.56, s*0.06);
+    X.strokeStyle = '#3a6a8a'; X.lineWidth = Math.max(1, s*0.04);                           // the wave glyph
+    X.beginPath();
+    for (let i = 0; i <= 12; i++) {
+      const px = x - s*0.2 + i * s*0.4 / 12, py = y - s*0.02 + Math.sin(i*0.9 + t/400) * s*0.05;
+      if (i === 0) X.moveTo(px, py); else X.lineTo(px, py);
+    }
+    X.stroke();
+    X.fillStyle = '#9a2a1e'; X.beginPath(); X.arc(x + s*0.14, y + s*0.14, s*0.09, 0, Math.PI*2); X.fill();   // wax seal
+    X.fillStyle = '#c84a3a'; X.fillRect(x + s*0.11, y + s*0.11, s*0.03, s*0.03);
+  },
   croc_sandals(X, x, y, s, t) {
     for (const dx of [-s*0.16, s*0.16]) {
       X.fillStyle = '#3a6a3a'; X.beginPath(); X.ellipse(x + dx, y, s*0.1, s*0.26, 0, 0, Math.PI*2); X.fill();

@@ -14,6 +14,7 @@ The stack is a FastAPI backend (Python, async SQLAlchemy, PostgreSQL, WebSockets
 |---|---|---|
 | `world` | The Desert | `WorldRealm` (scrolling, physics) |
 | `nile` | The Nile | `NileRealm` (scrolling, physics; west off the Desert; one-way river current) |
+| `sea` | The Sea | `SeaRealm` (WebGL/three.js, lazy-loaded; board at the Nile Delta with a Letter of Passage; voyage to Crete) |
 | `oasis` | The Oasis | `OasisRealm` (scrolling, physics, pool wading) |
 | `vault` | Beneath the Sphinx | `VaultRealm` (flat, indoor) |
 | `atlantis` | Atlantis | `AtlantisRealm` (free 2D swim, 5 zones) |
@@ -148,6 +149,15 @@ Movement is arrow-keys only (WASD was dropped as redundant; `S` is the astral-ch
 
 ### Realm manifest (`worlds/manifest.js`)
 Single file for realm instantiation. `main.js` imports `ALL_REALMS` and registers them — `main.js` never needs to change when adding realms. Add new realms here only.
+
+### THE SEA — the WebGL realm (`worlds/sea/`)
+The one realm that does not draw its world on the 2D canvas: three.js (vendored **0.170.0**, the last single-file build — `frontend/vendor/`, import map in `index.html`, `COPY vendor/` in the Dockerfile) renders into `<canvas id="gl">`, which sits *under* the transparent `#c`, so dialogue, the log, transitions and mobile controls are untouched. `SeaRealm.js` never imports `three` or `scene.js` statically (dynamic import on entry). All simulation is pure and tested, and each shared thing has one source:
+- `waves.js` is the **single source of the sea surface** — the GPU vertex shader is generated from it by `glslWaves()` (bay shelter included) and the hull's buoyancy samples it via `heightAt()`, so never hand-edit wave math in GLSL.
+- `coast.js` lays out every rock once, and Crete's shore — `gfx/landmarks.js` draws exactly those rocks and `voyage.js` collides with them and the shore (capsule hull; hard hits sink the ship, slow ones scrape). There are no walls at sea: sail off course, around Crete or to the horizon; only the storm objects.
+- `constants.js` `beachY()` is the landing beach's profile for both the sand mesh and the keel; `voyage.js` `haulProgress()` times the haul-up that `gfx/ship.js` animates.
+- `voyage.js` integrates on fixed 1/120 s substeps (frame-rate independent); `scene.js` + `gfx/*` only read voyage state.
+
+Boarding needs the `letter_of_passage` keepsake, checked client-side (no `requires_items` rule yet); arrival (beaching below Knossos) records the server-owned `crete_reached` step for a future Crete realm. The sea's music is the `sea` theme in `audio/sound.js`, with per-strike `playThunder()`.
 
 ### Adding a new world
 Follow `worlds/WORLD_TEMPLATE.md` — it is the authoritative step-by-step guide (constants → terrain → draw → realm class → register in `worlds/manifest.js` → wire portals via `PortalRegistry`).

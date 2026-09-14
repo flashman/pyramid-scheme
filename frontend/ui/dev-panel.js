@@ -10,6 +10,7 @@ import { Flags }           from '../engine/flags.js';
 import { Ledger }          from '../engine/ledger.js';
 import { RealmManager }    from '../engine/realm.js';
 import { Api }             from '../game/api.js';
+import { Inventory }       from '../game/inventory.js';
 import { updateStats, updateSlots, log } from './panels.js';
 import { GND }             from '../worlds/earth/constants.js';
 import { mkPyr, addLayer } from '../game/pyramids.js';
@@ -236,6 +237,14 @@ const REALMS = [
       if (!G.bought) _grantBuyIn();
       _devUnlock('nile', 'oasis');
       _ensurePlayerPyramid();
+    },
+  },
+  {
+    id: 'sea', label: '⛵ SEA',
+    setup() {
+      // Local Letter so the Delta boat works too; the server grant for accounts.
+      if (!Inventory.owned('letter_of_passage')) Inventory.addLocal('letter_of_passage');
+      _devUnlock('nile', 'sea');
     },
   },
 ];

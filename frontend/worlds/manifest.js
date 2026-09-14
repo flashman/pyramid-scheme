@@ -19,6 +19,7 @@ import { AtlantisRealm } from './atlantis/AtlantisRealm.js';
 import { DeepRealm }     from './deep/DeepRealm.js';
 import { ChamberRealm }  from './crypt/ChamberRealm.js';
 import { CouncilRealm }  from './council/CouncilRealm.js';
+import { SeaRealm }      from './sea/SeaRealm.js';
 
 // Instantiating each realm also registers its outgoing portals
 // (each constructor calls PortalRegistry.register() internally).
@@ -31,4 +32,5 @@ export const ALL_REALMS = [
   new DeepRealm(),
   new ChamberRealm(),
   new CouncilRealm(),
+  new SeaRealm(),
 ];

@@ -41,9 +41,17 @@ export const WARES = [
     blurb: 'PROOF OF A PAYMENT YOU HAVE NOT YET MADE.\nVERY USEFUL. VERY BINDING.\nIT DOES NOT SURVIVE THE CROSSING. NEITHER, STATISTICALLY, DO YOU.' },
   { id: 'self_equity',        name: 'Stock Certificate in Yourself', tier: 'CURIOS',      art: 'self_equity',
     blurb: 'ONE SHARE. THE ISSUER IS YOU.\nYOU ARE NOW LONG ON YOURSELF —\nTHE MOST VOLATILE POSITION ON THE RIVER. CONGRATULATIONS.' },
+  { id: 'letter_of_passage',  name: 'A Letter of Passage',           tier: 'RELICS',      art: 'letter_of_passage',
+    blurb: 'PASSAGE TO CRETE. TO KNOSSOS. TO THE LABYRINTH\nAND THE ONE WHO KEEPS ITS LEDGER.\nTHE VOYAGE HOME IS INCLUDED. THE RETURNS ARE NOT.' },
 ];
 
 export const WARES_BY_ID = Object.fromEntries(WARES.map(w => [w.id, w]));
+
+// Stall table layout: wares are laid out TABLE_ROWS rows of PER_ROW. StallOverlay's
+// rowY has exactly TABLE_ROWS entries — a ware past PER_ROW × TABLE_ROWS would
+// draw at an undefined row (NaN) and vanish, so the catalogue test pins this.
+export const TABLE_ROWS = 2;
+export const PER_ROW    = 10;
 
 // Snarky retorts the merchant fires the moment a purchase clears. Item-specific
 // where there's a joke; otherwise one of the generics is picked at random.
@@ -69,6 +77,7 @@ export const WARE_RETORTS = {
   self_equity:      'CONGRATULATIONS — YOU ARE NOW A SHAREHOLDER AND THE PRODUCT.',
   attentive_reel:   "ENJOY THE FOOTAGE. THEY HAVE THE DIRECTOR'S CUT.",
   astral_lens:      'SOLD. YOUR BODY STAYS HERE. HOLD THAT THOUGHT.',
+  letter_of_passage: 'SEALED. THE SHIPMASTER AT THE RIVER MOUTH WILL HONOUR IT. HE HONOURS EVERYTHING. HE READS NOTHING.',
 };
 
 // Fired when you try to buy something you can't afford.

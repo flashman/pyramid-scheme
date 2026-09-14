@@ -89,16 +89,34 @@ export const PortalRegistry = {
       if (p.triggerId && !triggerRegistry?.isInside(p.triggerId)) continue;
       if (p.condition && !p.condition())                continue;
 
-      p.onUse?.();
-
-      if (p.transition) {
-        RealmManager.scheduleTransition(p.toId, { duration: p.duration, render: p.transition });
-      } else {
-        RealmManager.transitionTo(p.toId);
-      }
+      this._fire(p);
       return true;
     }
     return false;
+  },
+
+  /**
+   * Fire a registered edge from code — for exits chosen in a dialogue rather
+   * than by a key (e.g. boarding the ship at the Nile Delta).
+   * Returns false if the edge isn't registered or its condition fails.
+   *
+   * @param {string} fromId  source realm id
+   * @param {string} toId    destination realm id
+   */
+  use(fromId, toId) {
+    const p = this._portals.find(q => q.fromId === fromId && q.toId === toId);
+    if (!p || (p.condition && !p.condition())) return false;
+    this._fire(p);
+    return true;
+  },
+
+  _fire(p) {
+    p.onUse?.();
+    if (p.transition) {
+      RealmManager.scheduleTransition(p.toId, { duration: p.duration, render: p.transition });
+    } else {
+      RealmManager.transitionTo(p.toId);
+    }
   },
 
   /**

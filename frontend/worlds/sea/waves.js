@@ -1,0 +1,155 @@
+// ── FILE: worlds/sea/waves.js ────────────────────────────
+// Gerstner ocean — the SINGLE source of truth for the sea surface.
+// Pure: imports nothing, touches no DOM or three.js. The GPU vertex shader is
+// GENERATED from these params by glslWaves(), and the ship's buoyancy samples
+// the same surface via heightAt(), so the two cannot drift apart. That includes
+// the bay's shelter: amplitude falls to `calm` inside it, on both sides.
+//
+// Conventions: meters, y up. A direction angle `a` points along
+// (x, z) = (sin a, cos a) — the same convention as the ship's heading.
+
+export const GRAVITY = 9.81;
+
+// Storm scaling. At storm s ∈ [0,1]:
+//   A = A_base · (AMP_BASE + AMP_GAIN·s) · shelter(x, z)
+//   Q = Q_base · (Q_BASE + Q_GAIN·s) · clampQ, where clampQ keeps Σ Q·k·A ≤ MAX_STEEPNESS
+// (above that limit Gerstner crests loop over themselves).
+export const AMP_BASE = 0.25;
+export const AMP_GAIN = 1.3;     // capped so a full storm doesn't bury an 18 m reed ship
+export const Q_BASE   = 0.3;
+export const Q_GAIN   = 0.7;
+export const MAX_STEEPNESS    = 0.95;
+export const SOLVE_ITERATIONS = 12;
+
+// dir: degrees relative to the wind · L: wavelength (m) · A: base amplitude (m) · Q: base steepness
+export const WAVES = [
+  { dir:   0, L: 96, A: 1.10, Q: 0.55 },   // long swell
+  { dir:  18, L: 61, A: 0.70, Q: 0.55 },   // swell
+  { dir: -14, L: 43, A: 0.50, Q: 0.60 },   // swell
+  { dir:  38, L: 23, A: 0.22, Q: 0.70 },   // chop
+  { dir: -32, L: 17, A: 0.16, Q: 0.70 },   // chop
+  { dir:  25, L: 11, A: 0.09, Q: 0.70 },   // chop
+  { dir: -40, L:  7, A: 0.05, Q: 0.70 },   // chop
+];
+
+/** Σ Q_base·k·A_base — storm-independent; the shader reuses it for the clamp. */
+export function baseSteepness(params = WAVES) {
+  return params.reduce((sum, p) => sum + p.Q * (2 * Math.PI / p.L) * p.A, 0);
+}
+
+/** Storm-resolved components: [{ dx, dz, k, w, A, Q }]. */
+export function resolveWaves(storm, windAngle, params = WAVES) {
+  const s      = Math.min(1, Math.max(0, storm));
+  const ampK   = AMP_BASE + AMP_GAIN * s;
+  const qK     = Q_BASE + Q_GAIN * s;
+  const steep  = baseSteepness(params) * ampK * qK;
+  const clampQ = steep > MAX_STEEPNESS ? MAX_STEEPNESS / steep : 1;
+  return params.map(p => {
+    const a = windAngle + p.dir * Math.PI / 180;
+    const k = 2 * Math.PI / p.L;
+    return {
+      dx: Math.sin(a), dz: Math.cos(a), k, w: Math.sqrt(GRAVITY * k),
+      A: p.A * ampK, Q: p.Q * qK * clampQ,
+    };
+  });
+}
+
+export function steepnessSum(comps) {
+  return comps.reduce((sum, c) => sum + c.Q * c.k * c.A, 0);
+}
+
+/** Shelter: the amplitude factor at (x, z) — `calm` inside `inner` of the centre,
+    1 beyond `outer`, smoothstepped between. No shelter → 1 everywhere. */
+export function shelterAt(shelter, x, z) {
+  if (!shelter) return 1;
+  const d = Math.hypot(x - shelter.x, z - shelter.z);
+  const u = Math.min(1, Math.max(0, (d - shelter.inner) / (shelter.outer - shelter.inner)));
+  return shelter.calm + (1 - shelter.calm) * u * u * (3 - 2 * u);
+}
+
+/** Displaced surface point for the UNdisplaced grid point (x0, z0) at time t. */
+export function displace(comps, x0, z0, t, shelter = null) {
+  const sk = shelterAt(shelter, x0, z0);
+  let x = x0, y = 0, z = z0;
+  for (const c of comps) {
+    const A   = c.A * sk;
+    const th  = c.k * (c.dx * x0 + c.dz * z0) - c.w * t;
+    const cos = Math.cos(th);
+    x += c.Q * A * c.dx * cos;
+    z += c.Q * A * c.dz * cos;
+    y += A * Math.sin(th);
+  }
+  return { x, y, z };
+}
+
+/** Gerstner moves water sideways, so invert it: find the grid point whose
+    displaced position lands on world (x, z). A contraction while Σ Q·k·A < 1. */
+export function solveUndisplaced(comps, x, z, t, shelter = null) {
+  let x0 = x, z0 = z;
+  for (let i = 0; i < SOLVE_ITERATIONS; i++) {
+    const p = displace(comps, x0, z0, t, shelter);
+    x0 += x - p.x;
+    z0 += z - p.z;
+  }
+  return { x0, z0 };
+}
+
+/** Water surface height at world (x, z), time t. */
+export function heightAt(comps, x, z, t, shelter = null) {
+  const { x0, z0 } = solveUndisplaced(comps, x, z, t, shelter);
+  return displace(comps, x0, z0, t, shelter).y;
+}
+
+/** Unit surface normal at world (x, z), time t. */
+export function normalAt(comps, x, z, t, shelter = null) {
+  const { x0, z0 } = solveUndisplaced(comps, x, z, t, shelter);
+  const sk = shelterAt(shelter, x0, z0);
+  let nx = 0, ny = 1, nz = 0;
+  for (const c of comps) {
+    const th = c.k * (c.dx * x0 + c.dz * z0) - c.w * t;
+    const kA = c.k * c.A * sk;
+    nx -= c.dx * kA * Math.cos(th);
+    nz -= c.dz * kA * Math.cos(th);
+    ny -= c.Q * kA * Math.sin(th);
+  }
+  const len = Math.hypot(nx, ny, nz);
+  return { x: nx / len, y: ny / len, z: nz / len };
+}
+
+/** GLSL for the ocean vertex shader, generated from the same params (and the same shelter).
+    `atten` (0..1) fades waves far from the camera; the ship is always near it. */
+export function glslWaves(windAngle, params = WAVES, shelter = null) {
+  const comps = resolveWaves(0, windAngle, params);   // dx/dz/k/w are storm-independent
+  const g = (v) => v.toFixed(6);
+  const out = [
+    '// Generated by worlds/sea/waves.js glslWaves() — do not hand-edit.',
+    'uniform float uTime;',
+    'uniform float uStorm;',
+    'float shelterK(vec2 p) {',
+    shelter
+      ? `  return ${g(shelter.calm)} + ${g(1 - shelter.calm)} * smoothstep(${g(shelter.inner)}, ${g(shelter.outer)}, length(p - vec2(${g(shelter.x)}, ${g(shelter.z)})));`
+      : '  return 1.0;',
+    '}',
+    'vec3 gerstner(vec2 p, float atten, out vec3 N, out float fold) {',
+    '  atten *= shelterK(p);',
+    `  float ampK = ${g(AMP_BASE)} + ${g(AMP_GAIN)} * uStorm;`,
+    `  float qK = ${g(Q_BASE)} + ${g(Q_GAIN)} * uStorm;`,
+    `  float steep = ${g(baseSteepness(params))} * ampK * qK;`,
+    `  float clampQ = steep > ${g(MAX_STEEPNESS)} ? ${g(MAX_STEEPNESS)} / steep : 1.0;`,
+    '  vec3 pos = vec3(p.x, 0.0, p.y);',
+    '  vec3 n = vec3(0.0, 1.0, 0.0);',
+    '  float th; float c; float s; float A; float Q;',
+  ];
+  params.forEach((p, i) => {
+    const cmp = comps[i];
+    out.push(
+      `  A = ${g(p.A)} * ampK * atten; Q = ${g(p.Q)} * qK * clampQ;`,
+      `  th = ${g(cmp.k)} * dot(vec2(${g(cmp.dx)}, ${g(cmp.dz)}), p) - ${g(cmp.w)} * uTime;`,
+      '  c = cos(th); s = sin(th);',
+      `  pos.x += Q * A * ${g(cmp.dx)} * c; pos.z += Q * A * ${g(cmp.dz)} * c; pos.y += A * s;`,
+      `  n.x -= ${g(cmp.dx)} * ${g(cmp.k)} * A * c; n.z -= ${g(cmp.dz)} * ${g(cmp.k)} * A * c; n.y -= Q * ${g(cmp.k)} * A * s;`,
+    );
+  });
+  out.push('  fold = n.y;', '  N = normalize(n);', '  return pos;', '}');
+  return out.join('\n');
+}

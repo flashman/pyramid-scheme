@@ -89,6 +89,53 @@ function drumGrid(kit, grid, { swing = 0.5, reps = 1 } = {}) {
   });
 }
 
+// ── THE SEA's shanty, written in 6/8 ─────────────────────
+// The sea theme's beat is the dotted-quarter pulse, so a 6/8 bar is 2 beats and
+// its six eighth notes are ⅓ beat each. eighths() lets the tune be written in
+// eighths (a bar sums to 6) — [freq|null, eighths, vel?] → [freq, beats, vel?].
+const eighths = (seq) => seq.map(([f, d, v]) => (v === undefined ? [f, d / 3] : [f, d / 3, v]));
+
+// The tune, 16 bars: a minor-key shanty sung on the Nile — A minor with the ♭2
+// (B♭) and the raised 7th (G♯), so it keeps the Hijaz leap F→G♯ and falls G♯→F→E.
+const SEA_TUNE = [
+  // ── A: the call ──
+  [N.E4,1,.6],[N.A4,2,.9],[N.A4,1,.7],[N.Bb4,1,.75],[N.C5,1,.8],    // Am
+  [N.Bb4,2,.85],[N.A4,1,.7],[N.Ab4,2,.75],[N.A4,1,.6],              // Am
+  [N.F4,1,.6],[N.Bb4,2,.9],[N.Bb4,1,.7],[N.C5,1,.75],[N.D5,1,.8],   // B♭
+  [N.C5,2,.85],[N.Bb4,1,.7],[N.A4,3,.7],                            // Am
+  [N.F4,1,.6],[N.A4,2,.9],[N.D5,1,.8],[N.C5,1,.75],[N.Bb4,1,.7],    // Dm
+  [N.Ab4,2,.85],[N.F4,1,.7],[N.E4,3,.8],                            // E
+  [N.E4,1,.6],[N.A4,1,.7],[N.C5,1,.8],[N.Bb4,2,.8],[N.Ab4,1,.7],    // Am
+  [N.A4,5,.85],[_,1],                                               // Am
+  // ── B: the crew answers, higher ──
+  [N.D5,2,.95],[N.D5,1,.75],[N.E5,2,.85],[N.F5,1,.8],               // Dm
+  [N.E5,2,.9],[N.D5,1,.75],[N.C5,3,.8],                             // Am
+  [N.D5,2,1.0],[N.C5,1,.8],[N.Bb4,2,.85],[N.A4,1,.75],              // B♭
+  [N.Ab4,2,.85],[N.F4,1,.7],[N.E4,3,.75],                           // E
+  [N.A4,1,.7],[N.C5,1,.75],[N.E5,1,.8],[N.F5,3,.95],                // Am
+  [N.E5,2,.9],[N.D5,1,.75],[N.C5,1,.7],[N.Bb4,1,.7],[N.Ab4,1,.7],   // E
+  [N.Bb4,2,.85],[N.A4,1,.7],[N.Ab4,2,.8],[N.F4,1,.7],               // B♭ → E
+  [N.E4,1,.6],[N.A4,4,.85],[_,1],                                   // Am
+];
+
+// One chord per bar (a pair splits the bar): [bass root, bass second, pad tone, pad tone].
+const SEA_CHORD = {
+  Am: [N.A2, N.E2, N.C4, N.E4],  Bb: [N.Bb2, N.F2, N.D4, N.F4],
+  Dm: [N.D2, N.A2, N.F3, N.A3],  E:  [N.E2, N.E3, N.Ab3, N.E4],
+};
+const SEA_BARS = ['Am', 'Am', 'Bb', 'Am', 'Dm', 'E', 'Am', 'Am', 'Dm', 'Am', 'Bb', 'E', 'Am', 'E', ['Bb', 'E'], 'Am'];
+const halves = (bar) => (Array.isArray(bar) ? bar : [bar, bar]);
+/** Root on the first pulse, its answer on the second (a split bar takes each chord's root). */
+const seaBass = () => eighths(SEA_BARS.flatMap(bar => {
+  const [a, b] = halves(bar);
+  return [[SEA_CHORD[a][0], 2, .9], [_, 1], [a === b ? SEA_CHORD[a][1] : SEA_CHORD[b][0], 2, .65], [_, 1]];
+}));
+/** A soft held chord tone per bar (or per half of a split bar) — no plucked pump. */
+const seaPad = (tone) => eighths(SEA_BARS.flatMap(bar => {
+  const [a, b] = halves(bar);
+  return a === b ? [[SEA_CHORD[a][tone], 6, .5]] : [[SEA_CHORD[a][tone], 3, .5], [SEA_CHORD[b][tone], 3, .5]];
+}));
+
 // ── Theme definitions ─────────────────────────────────────
 // bpm     — tempo
 // tracks  — oscillator layers:
@@ -555,6 +602,54 @@ const THEMES = {
     ],
   },
 
+  // ── THE SEA (sea) ──────────────────────────────────────────────────────
+  // A slow minor-key shanty where Egypt meets archaic Greece, 6/8 (beat = the dotted-quarter
+  // pulse; see eighths()). A breathy ney-like lead that slides between notes,
+  // the crew humming it an octave under, a wavering choir of gods, a root bass, a low A
+  // for the dread — carried by doumbek, riq, tambourine and a deep frame drum, over a
+  // sub-bass. A low rain wash (`ambience`) is near-silent in calm water and fills in with the storm;
+  // thunder is fired per strike by SeaRealm via playThunder().
+  sea: {
+    bpm: 50,
+    tracks: [
+      { wave: 'triangle', gain: 0.11, pan: -0.05, glide: 0.07, reverb: true,         // the ney
+        filter: { type: 'lowpass', freq: 1300 }, vibrato: { rate: 5, depth: 12 },
+        seq: eighths(SEA_TUNE) },
+      { wave: 'triangle', gain: 0.085, pan: 0.15,                                     // the crew, an octave under
+        filter: { type: 'lowpass', freq: 650 },
+        seq: eighths(SEA_TUNE.map(([f, d, v]) => [f && f / 2, d, v])) },
+      { wave: 'triangle', gain: 0.13, filter: { type: 'lowpass', freq: 320 }, seq: seaBass() },
+      { wave: 'sine', gain: 0.07, filter: { type: 'lowpass', freq: 150 },               // sub-bass, an octave under the bass
+        seq: seaBass().map(([f, d, v]) => [f && f / 2, d, v]) },
+      { wave: 'sine', gain: 0.04, pan: -0.3, detune: 7, reverb: true,                  // the gods: a slow, wavering choir
+        filter: { type: 'lowpass', freq: 1100 }, vibrato: { rate: 0.6, depth: 6 }, seq: seaPad(2) },
+      { wave: 'sine', gain: 0.035, pan: 0.3, detune: -7, reverb: true,
+        filter: { type: 'lowpass', freq: 1100 }, vibrato: { rate: 0.7, depth: 6 }, seq: seaPad(3) },
+      { wave: 'sine', gain: 0.045, reverb: true,                                      // the dread
+        filter: { type: 'lowpass', freq: 200 }, seq: [[N.A2, 32]] },
+      { wave: 'noise', gain: 0.04, pan: 0, ambience: true,                            // rain on the water: low, not hiss
+        filter: { type: 'lowpass', freq: 1400 }, seq: [[1, 32]] },
+      // Percussion, one char per eighth — 12 steps = two 6/8 bars (pulses on steps 0, 3, 6, 9):
+      ...drumGrid(
+        {
+          dum:    { freq: 110,  gain: 0.75, pan: 0.05 },
+          tek:    { freq: 1500, gain: 0.45, pan: 0.1 },
+          riq:    { freq: 3400, gain: 0.22, pan: 0.3, reverb: true },
+          bendir: { freq: 68,   gain: 0.6,  pan: -0.1, reverb: true },
+          tamb:   { freq: 6500, gain: 0.2,  pan: -0.25, reverb: true },
+        },
+        {
+          dum:    'X.....X..o..',
+          tek:    '..x.xo..x.x.',
+          riq:    'o..x..o..x..',
+          bendir: 'X...........',
+          tamb:   'XoxXoxXoxXox',                                                     // a shake every eighth, leaning on the pulse
+        },
+        { reps: 8 },                                                                  // ×8 = 32 beats
+      ),
+    ],
+  },
+
   // ── ATLANTIS (atlantis) ────────────────────────────────────────────────
   // D Phrygian: D Eb F G A Bb C — the lowered 2nd is the Mediterranean dark,
   // the sound of something very old and very wet. 52 bpm — barely a pulse,
@@ -710,6 +805,7 @@ const REALM_THEME = {
   council:  'council',
   atlantis: 'atlantis',
   nile:     'nile',
+  sea:      'sea',
 };
 
 // ── SoundManager singleton ────────────────────────────────
@@ -727,6 +823,8 @@ class SoundManagerClass {
     this._currentTheme = null;
     this._session      = 0;
     this._oscillators  = [];
+    this._ambienceLevel = 1;    // gain for theme noise tracks flagged `ambience` (storm-swelled by SeaRealm)
+    this._ambienceNodes = [];
 
     try {
       const saved = JSON.parse(localStorage.getItem('ps_audio') || '{}');
@@ -742,7 +840,8 @@ class SoundManagerClass {
     this._currentRealm = realmId;
     if (!this._enabled) return;
     const themeName = REALM_THEME[realmId];
-    if (!themeName) return;
+    if (themeName === null) { this._stop(); return; }   // a silent realm: the previous theme stops
+    if (!themeName) return;                            // unmapped (e.g. the Deep): whatever is playing carries on
     this._ensureCtx();
     this._stop();
     if (this._ctx.state === 'suspended') return;
@@ -753,6 +852,50 @@ class SoundManagerClass {
     this._currentRealm = null;
     this._currentTheme = null;
     this._stop();
+  }
+
+  /** Swell or hush the current theme's `ambience` noise tracks (0..1). */
+  setAmbience(level) {
+    this._ambienceLevel = Math.max(0, Math.min(1, level));
+    if (!this._ctx) return;
+    for (const node of this._ambienceNodes) {
+      node.gain.setTargetAtTime(this._ambienceLevel, this._ctx.currentTime, 0.5);
+    }
+  }
+
+  /** One rolling thunderclap: brown-noise rumble, low-passed, arriving after
+      delaySec (distance / speed of sound). power 0..1 scales loudness and bite. */
+  playThunder(delaySec = 0, power = 1) {
+    if (!this._enabled) return;
+    this._ensureCtx();
+    const ctx = this._ctx;
+    if (ctx.state === 'suspended') return;
+    const t   = ctx.currentTime + Math.max(0, delaySec);
+    const dur = 2.8 + power * 1.8;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { last = last * 0.985 + (Math.random() * 2 - 1) * 0.15; data[i] = last; }
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 180 + 420 * power;
+    const env  = ctx.createGain();
+    const peak = 0.35 * power;
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(peak, t + 0.06);
+    env.gain.exponentialRampToValueAtTime(peak * 0.35, t + 0.5);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(lp);
+    lp.connect(env);
+    env.connect(this._masterGain);
+    env.connect(this._reverb);
+    src.start(t);
+    src.stop(t + dur);
   }
 
   setEnabled(val) {
@@ -843,6 +986,7 @@ class SoundManagerClass {
       try { osc.stop(0); } catch { /* already stopped */ }
     }
     this._oscillators = [];
+    this._ambienceNodes = [];
   }
 
   _startTheme(theme, startT) {
@@ -917,7 +1061,17 @@ class SoundManagerClass {
       src.buffer = buf;
       src.loop   = true;
       src.connect(env);
-      env.connect(filter);
+      if (track.ambience) {
+        // Per-track gain (not shared — a shared node would cross-feed every
+        // track's noise through every other track's filter).
+        const amb = ctx.createGain();
+        amb.gain.value = this._ambienceLevel;
+        env.connect(amb);
+        amb.connect(filter);
+        this._ambienceNodes.push(amb);
+      } else {
+        env.connect(filter);
+      }
       src.start(startT);
       src.stop(startT + totalSec);
       this._oscillators.push(src);
@@ -935,9 +1089,10 @@ class SoundManagerClass {
       for (const [freq, dur, vel] of track.seq) {
         const durSec = dur * beatLen;
         if (freq !== null) {
-          // Three voices by centerFreq: dum (body), tek (crack), and sagat —
-          // finger cymbals: a high, high-Q, longer-ringing metallic tier.
-          const decay  = freq < 400 ? 0.20 : freq < 3000 ? 0.085 : 0.16;
+          // Four voices by centerFreq: dum (body), tek (crack), sagat — finger
+          // cymbals: a high, high-Q, longer-ringing metallic tier — and (≥5 kHz)
+          // tambourine: broad, bright jingles with a short shimmer.
+          const decay  = freq < 400 ? 0.20 : freq < 3000 ? 0.085 : freq < 5000 ? 0.16 : 0.13;
           const peak   = track.gain * (vel ?? 1);    // accents vs. ghost notes
           const bufLen = Math.floor(rate * decay);
           const buf    = ctx.createBuffer(1, bufLen, rate);
@@ -947,7 +1102,7 @@ class SoundManagerClass {
           const bp = ctx.createBiquadFilter();
           bp.type            = 'bandpass';
           bp.frequency.value = freq;
-          bp.Q.value         = freq < 400 ? 1.6 : freq < 3000 ? 3.0 : 9.0; // body / crack / ring
+          bp.Q.value         = freq < 400 ? 1.6 : freq < 3000 ? 3.0 : freq < 5000 ? 9.0 : 1.2; // body / crack / ring / jingle
 
           const env = ctx.createGain();
           env.gain.setValueAtTime(0, t);
