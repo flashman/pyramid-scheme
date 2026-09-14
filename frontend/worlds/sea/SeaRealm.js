@@ -27,10 +27,10 @@ import { buildSeaMenuDialogue, buildArrivalDialogue } from './dialogue.js';
 
 const FADE_MS = 1200;
 const SPEED_OF_SOUND = 343;   // m/s — thunder arrives after the flash
-const HIRED_HANDS = 4;
+const MIN_ROWERS = 8;
 
-/** Your downline rows: one rower per recruit (24 benches); with no downline, a few hands are hired. */
-const rowersFor = (g) => (g.recruits.length > 0 ? Math.min(24, g.recruits.length) : HIRED_HANDS);
+/** Your downline rows: one rower per recruit (24 benches); hired hands fill the benches up to MIN_ROWERS — guests too. */
+const rowersFor = (g) => Math.min(24, Math.max(MIN_ROWERS, g.recruits.length));
 
 let _sceneModule = null;
 /** Start (or reuse) the lazy scene import; a failed import can be retried. */
