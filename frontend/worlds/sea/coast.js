@@ -94,6 +94,30 @@ export const CRETE_ROCKS = (() => {
   return rocks;
 })();
 
+/** World → Crete-local (the inverse of creteToWorld). */
+export function worldToCrete(x, z) {
+  const dx = x - CENTER.x, dz = z - CENTER.z;
+  return { x: dx * COS - dz * SIN, z: dx * SIN + dz * COS };
+}
+
+// Crete's waterline. The island cone (1.3R × 0.8R footprint in landmarks.js) meets the sea at
+// ~0.91 of that footprint; the shore sits a touch inside it, so the hull visibly touches land
+// before it stops. The cove and its beach lie outside this ellipse, in the bay.
+export const CRETE_SHORE = { ax: 1.3 * R * 0.9, az: 0.8 * R * 0.9 };
+
+/** If world (x, z) is ashore on Crete: roughly how far in (m) and the outward normal (world); else null. */
+export function creteShoreContact(x, z) {
+  const p = worldToCrete(x, z);
+  const u = p.x / CRETE_SHORE.ax, w = p.z / CRETE_SHORE.az;
+  const rho = Math.hypot(u, w);
+  if (rho >= 1) return null;
+  let gx = u / CRETE_SHORE.ax, gz = w / CRETE_SHORE.az;                  // ∇(rho²)/2, local
+  const g = Math.hypot(gx, gz) || 1;
+  const depth = (1 - rho) * Math.max(rho, 1e-6) / g;                     // (1 − rho) / |∇rho|
+  gx /= g; gz /= g;
+  return { depth, nx: gx * COS + gz * SIN, nz: -gx * SIN + gz * COS };
+}
+
 const AT = Object.fromEntries(LANDMARKS.map(l => [l.id, courseToWorld(l.along, l.lateral)]));
 
 /** Everything solid, as world-space circles { id, x, z, r }. The landing beach is not here — it's safe. */

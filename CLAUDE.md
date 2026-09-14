@@ -153,7 +153,7 @@ Single file for realm instantiation. `main.js` imports `ALL_REALMS` and register
 ### THE SEA — the WebGL realm (`worlds/sea/`)
 The one realm that does not draw its world on the 2D canvas: three.js (vendored **0.170.0**, the last single-file build — `frontend/vendor/`, import map in `index.html`, `COPY vendor/` in the Dockerfile) renders into `<canvas id="gl">`, which sits *under* the transparent `#c`, so dialogue, the log, transitions and mobile controls are untouched. `SeaRealm.js` never imports `three` or `scene.js` statically (dynamic import on entry). All simulation is pure and tested, and each shared thing has one source:
 - `waves.js` is the **single source of the sea surface** — the GPU vertex shader is generated from it by `glslWaves()` (bay shelter included) and the hull's buoyancy samples it via `heightAt()`, so never hand-edit wave math in GLSL.
-- `coast.js` lays out every rock once — `gfx/landmarks.js` draws exactly those and `voyage.js` collides with exactly those (capsule hull; hard hits sink the ship, slow ones scrape).
+- `coast.js` lays out every rock once, and Crete's shore — `gfx/landmarks.js` draws exactly those rocks and `voyage.js` collides with them and the shore (capsule hull; hard hits sink the ship, slow ones scrape). There are no walls at sea: sail off course, around Crete or to the horizon; only the storm objects.
 - `constants.js` `beachY()` is the landing beach's profile for both the sand mesh and the keel; `voyage.js` `haulProgress()` times the haul-up that `gfx/ship.js` animates.
 - `voyage.js` integrates on fixed 1/120 s substeps (frame-rate independent); `scene.js` + `gfx/*` only read voyage state.
 

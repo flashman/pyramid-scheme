@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createVoyage, stepVoyage, polar, stormTarget, wrapAngle, haulProgress } from '../worlds/sea/voyage.js';
 import {
-  COURSE_HEADING, COURSE_LEN, CRETE_BAY, OUTER_LIMIT, SAIL, ROW, STORM, BEACH, FRONT_LIMIT, HULL, WRECK, beachY,
+  COURSE_HEADING, COURSE_LEN, CRETE_BAY, CRETE_ISLAND, SAIL, ROW, STORM, BEACH, HULL, WRECK, beachY,
   courseToWorld, worldToCourse,
 } from '../worlds/sea/constants.js';
-import { COLLIDERS } from '../worlds/sea/coast.js';
+import { COLLIDERS, CRETE_SHORE, creteShoreContact, creteToWorld, worldToCrete } from '../worlds/sea/coast.js';
 import { sail, steerToward } from './helpers/sea.js';
 
 const place = (v, along, lateral) => { const p = courseToWorld(along, lateral); v.x = p.x; v.z = p.z; };
@@ -135,16 +135,71 @@ test('no rock stands on the landing beach', () => {
   }
 });
 
-test('steering hard away from the course never escapes the outer limit', () => {
+test('the sea is open: sail straight off the course and nothing turns her back', () => {
   const v = createVoyage();
-  const policy = steerToward(COURSE_HEADING - Math.PI / 2);   // beam reach, straight off the line
+  const off = COURSE_HEADING - Math.PI / 2;                   // beam reach, straight off the line
+  const policy = steerToward(off);
   let maxLat = 0; const events = [];
-  for (let i = 0; i < 600 * 60; i++) {
+  for (let i = 0; i < 300 * 60; i++) {
     events.push(...stepVoyage(v, policy(v), 1 / 60));
     maxLat = Math.max(maxLat, Math.abs(worldToCourse(v.x, v.z).lateral));
   }
-  assert.ok(maxLat <= OUTER_LIMIT + 5, `max lateral ${maxLat.toFixed(1)}`);
+  assert.ok(maxLat > 2000, `max lateral ${maxLat.toFixed(1)}`);
+  assert.ok(Math.abs(wrapAngle(v.heading - off)) < 0.1, `heading pushed to ${v.heading}`);
   assert.ok(events.some(e => e.type === 'strayed'));
+  assert.equal(stormTarget(v), 1);                            // only the weather objects
+});
+
+test('sailing around Crete is open water', () => {
+  const v = createVoyage();
+  place(v, COURSE_LEN - 200, 1400);
+  const past = courseToWorld(COURSE_LEN + 2000, 1400);
+  const events = [];
+  for (let i = 0; i < 300 * 60 && worldToCourse(v.x, v.z).along < COURSE_LEN + 1800; i++) {
+    events.push(...stepVoyage(v, steerToward(Math.atan2(past.x - v.x, past.z - v.z))(v), 1 / 60));
+  }
+  assert.ok(worldToCourse(v.x, v.z).along >= COURSE_LEN + 1800, 'never got past the island');
+  assert.ok(!events.some(e => e.type === 'wrecked' || e.type === 'scrape'));
+});
+
+test('Crete\'s frame round-trips and her shore is solid', () => {
+  const p = creteToWorld(312, -455), q = worldToCrete(p.x, p.z);
+  assert.ok(Math.abs(q.x - 312) < 1e-9 && Math.abs(q.z + 455) < 1e-9);
+  assert.equal(creteShoreContact(p.x + 5000, p.z), null);
+  const inside = creteToWorld(CRETE_SHORE.ax - 10, 0), hit = creteShoreContact(inside.x, inside.z);
+  assert.ok(hit && hit.depth > 5 && hit.depth < 15, `depth ${hit?.depth}`);
+  const outward = creteToWorld(CRETE_SHORE.ax + 100, 0);           // the normal points off the island
+  assert.ok((outward.x - inside.x) * hit.nx + (outward.z - inside.z) * hit.nz > 0);
+  const beach = courseToWorld(BEACH.along + 20, 0);
+  assert.equal(creteShoreContact(beach.x, beach.z), null, 'the landing beach is not ashore');
+});
+
+/** At Crete's widest, `gap` m off her shore on the given side, heading straight in. */
+function aimAtCrete(v, gap) {
+  const lateral = CRETE_SHORE.ax + HULL.halfLen + gap;
+  place(v, CRETE_ISLAND.along, lateral);
+  v.heading = COURSE_HEADING + Math.PI / 2;                   // toward the course line, i.e. the island
+  return lateral;
+}
+
+test('running Crete\'s shore at speed wrecks her', () => {
+  const v = createVoyage();
+  aimAtCrete(v, 40);
+  v.speed = 10; v.sail = 1;
+  const events = sail(v, 30, 60, () => ({ trim: 1 }));
+  const wreck = events.find(e => e.type === 'wrecked');
+  assert.ok(wreck && wreck.id === 'crete', JSON.stringify(wreck));
+});
+
+test('drifting onto Crete\'s shore only scrapes, and she stays off it', () => {
+  const v = createVoyage();
+  aimAtCrete(v, 1);
+  v.speed = 1; v.sail = 0; v.rowing = 0;
+  const events = sail(v, 4, 60, () => ({ trim: -1, row: -1 }));
+  assert.ok(events.some(e => e.type === 'scrape' && e.id === 'crete'), 'no scrape');
+  assert.ok(!v.sinking);
+  const bow = creteShoreContact(v.x + Math.sin(v.heading) * HULL.halfLen, v.z + Math.cos(v.heading) * HULL.halfLen);
+  assert.ok(!bow || bow.depth < 0.5, `bow ${bow?.depth} m ashore`);
 });
 
 test('storm target builds to its peak halfway, rises off course, and falls calm in the bay', () => {
@@ -154,7 +209,7 @@ test('storm target builds to its peak halfway, rises off course, and falls calm 
   place(v, COURSE_LEN / 2, 0);   assert.ok(Math.abs(stormTarget(v) - STORM.peak) < 1e-9);   // at its worst halfway
   place(v, COURSE_LEN - 700, 0); const approach = stormTarget(v); assert.ok(approach > 0.8, `approach ${approach}`);
   place(v, COURSE_LEN, 0);       assert.ok(Math.abs(stormTarget(v) - STORM.bay) < 1e-9);
-  place(v, 1200, OUTER_LIMIT);   assert.equal(stormTarget(v), 1);                 // far off the line mid-voyage: full storm
+  place(v, 1200, STORM.offFull); assert.equal(stormTarget(v), 1);                 // far off the line mid-voyage: full storm
   v.arrived = true;              assert.equal(stormTarget(v), STORM.moored);
 });
 
@@ -168,7 +223,7 @@ test('storm intensity converges to its target', () => {
 
 test('storm_rising fires once per threshold', () => {
   const v = createVoyage();
-  place(v, 2000, OUTER_LIMIT - 10);       // late and far off course, outside the bay: target ≈ 1
+  place(v, 2000, STORM.offFull - 10);       // late and far off course, outside the bay: target ≈ 1
   v.sail = 0; v.rowing = 0;
   const events = sail(v, 60, 60, () => ({ trim: -1 }));
   const levels = events.filter(e => e.type === 'storm_rising').map(e => e.level);
@@ -226,14 +281,17 @@ test('running up the beach lands the ship; the crew hauls her clear of the water
   assert.equal(stormTarget(v), STORM.bay);
 });
 
-test('the cliffs either side of the beach stop the ship short of the shore', () => {
+test('off the beach, the cove\'s cliffs and Crete\'s shore stop the ship — no landing there', () => {
   const v = createVoyage();
-  place(v, BEACH.along - 150, BEACH.halfWidth + 80);
+  const lateral = BEACH.halfWidth + 80;
+  place(v, BEACH.along - 150, lateral);
   let maxAlong = -Infinity; const events = [];
-  for (let i = 0; i < 60 * 60; i++) {
+  for (let i = 0; i < 60 * 60 && !v.sinking; i++) {
     events.push(...stepVoyage(v, { trim: 1 }, 1 / 60));
     maxAlong = Math.max(maxAlong, worldToCourse(v.x, v.z).along);
   }
-  assert.ok(maxAlong <= FRONT_LIMIT + 5, `max along ${maxAlong.toFixed(1)} vs ${FRONT_LIMIT.toFixed(1)}`);
+  const shore = CRETE_ISLAND.along - CRETE_SHORE.az * Math.sqrt(1 - (lateral / CRETE_SHORE.ax) ** 2);
+  assert.ok(maxAlong <= shore + HULL.halfLen, `max along ${maxAlong.toFixed(1)} vs shore ${shore.toFixed(1)}`);
   assert.ok(!v.arrived);
+  assert.ok(events.some(e => e.type === 'wrecked' || e.type === 'scrape'));
 });

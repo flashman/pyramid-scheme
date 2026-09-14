@@ -13,13 +13,13 @@
 // input = { steer: -1..1 (+1 turns LEFT), trim: -1..1 (+1 raises sail), row: -1..1 (+1 rows harder) }
 
 import { resolveWaves, heightAt, shelterAt } from './waves.js';
-import { COLLIDERS } from './coast.js';
+import { COLLIDERS, creteShoreContact } from './coast.js';
 
 import {
   DEPARTURE, CRETE_BAY, COURSE_LEN, COURSE_HEADING,
-  CORRIDOR_HALF, OUTER_LIMIT, BACK_LIMIT, FRONT_LIMIT, WALL_DRIFT, WALL_TURN,
+  CORRIDOR_HALF, BACK_LIMIT, WALL_DRIFT,
   BEACH, SHELTER, beachY,
-  WIND_VEER_MAX, CURRENT_SPEED, SAIL, ROW, WRECK, RUDDER, SUBSTEP, MAX_DT, STORM,
+  CURRENT_SPEED, SAIL, ROW, WRECK, RUDDER, SUBSTEP, MAX_DT, STORM,
   LANDMARKS, LANDMARK_RADIUS, courseToWorld, worldToCourse, HULL, WAKE,
 } from './constants.js';
 
@@ -51,8 +51,8 @@ export function stormTarget(v) {
   const { along, lateral } = worldToCourse(v.x, v.z);
   const p    = clamp(along / COURSE_LEN, 0, 1);
   const ramp = STORM.start + (STORM.peak - STORM.start) * smoothstep(0.05, 0.5, p);
-  const off  = STORM.offCourse * clamp((Math.abs(lateral) - STORM.offFrom) / (OUTER_LIMIT - STORM.offFrom), 0, 1);
-  const open = v.arrived ? STORM.moored : clamp(ramp + off, 0, 1);
+  const far  = clamp((Math.abs(lateral) - STORM.offFrom) / (STORM.offFull - STORM.offFrom), 0, 1);   // 0 on the line … 1 far out
+  const open = v.arrived ? STORM.moored : ramp + (1 - ramp) * far;
   const exposed = (shelterAt(SHELTER, v.x, v.z) - SHELTER.calm) / (1 - SHELTER.calm);   // 0 in the bay … 1 outside
   return STORM.bay + (open - STORM.bay) * exposed;
 }
@@ -137,18 +137,9 @@ function _substep(v, input, h, events) {
   v.rudder += (steer * RUDDER.max - v.rudder) * (1 - Math.exp(-h / RUDDER.tau));
   v.heading = wrapAngle(v.heading + v.speed * v.rudder * RUDDER.turnGain * h);
 
-  const { along, lateral } = worldToCourse(v.x, v.z);
-  if (Math.abs(lateral) > OUTER_LIMIT || along < BACK_LIMIT) {
-    // The sea itself swings the bow back toward Crete — stronger than full rudder.
-    v.heading = wrapAngle(v.heading + clamp(wrapAngle(COURSE_HEADING - v.heading), -1, 1) * WALL_TURN * h);
-  }
-
-  // ── Wind: steady in the corridor, veering back toward the line outside it.
-  //    Moored, it swings abeam so nothing pins the ship against the shore. ──
-  const excess = clamp((Math.abs(lateral) - CORRIDOR_HALF) / (OUTER_LIMIT - CORRIDOR_HALF), 0, 1);
-  v.windAngle = v.arrived
-    ? COURSE_HEADING + Math.PI / 2
-    : COURSE_HEADING + Math.sign(lateral) * excess * WIND_VEER_MAX;
+  // ── Wind: blows steadily toward Crete wherever you sail — the sea is open, and
+  //    nothing turns the bow back. Moored, it swings abeam so nothing pins the ship. ──
+  v.windAngle = v.arrived ? COURSE_HEADING + Math.PI / 2 : COURSE_HEADING;
 
   // ── Drive against quadratic drag; speed is along the bow and never negative ──
   const off = Math.abs(wrapAngle(v.heading - (v.windAngle + Math.PI)));
@@ -157,11 +148,11 @@ function _substep(v, input, h, events) {
   v.drive = v.sailDrive + v.rowing * ROW.drive;              // the rowers push whatever the wind does
   v.speed = Math.max(0, v.speed + (v.drive - SAIL.drag * v.speed * v.speed) * h);
 
-  // ── Ground velocity = bow + current, limited by the soft walls ──
+  // ── Ground velocity = bow + current, eased off the Delta shore behind the start ──
   const cur = v.arrived ? 0 : CURRENT_SPEED;
   let vx = Math.sin(v.heading) * v.speed + FX * cur;
   let vz = Math.cos(v.heading) * v.speed + FZ * cur;
-  [vx, vz] = _walls(v, along, lateral, vx, vz);
+  [vx, vz] = _deltaShore(v, vx, vz);
   v.x += vx * h;
   v.z += vz * h;
   _beach(v, h, events);
@@ -176,25 +167,20 @@ function _substep(v, input, h, events) {
   _events(v, h, events);
 }
 
-/** Past a limit: cancel outward velocity and drift back in (overshoot ≤ one substep). */
-function _axis(pos, min, max, vel) {
-  if (pos > max) return Math.min(vel, 0) - WALL_DRIFT * Math.min(1, (pos - max) / 50);
-  if (pos < min) return Math.max(vel, 0) + WALL_DRIFT * Math.min(1, (min - pos) / 50);
-  return vel;
+/** The Delta's shore behind the departure is land: past it, cancel the landward velocity
+    and drift back off (overshoot ≤ one substep). Everywhere else the sea is open. */
+function _deltaShore(v, vx, vz) {
+  const { along } = worldToCourse(v.x, v.z);
+  if (along >= BACK_LIMIT) return [vx, vz];
+  const va = vx * FX + vz * FZ, vl = vx * RX + vz * RZ;
+  const back = Math.max(va, 0) + WALL_DRIFT * Math.min(1, (BACK_LIMIT - along) / 50);
+  return [FX * back + RX * vl, FZ * back + RZ * vl];
 }
 
-function _walls(v, along, lateral, vx, vz) {
-  const onBeach = Math.abs(lateral) < BEACH.halfWidth - HULL.halfBeam;     // the cliffs open only here
-  const va = _axis(along, BACK_LIMIT, onBeach ? Infinity : FRONT_LIMIT, vx * FX + vz * FZ);
-  const vl = _axis(lateral, -OUTER_LIMIT, OUTER_LIMIT, vx * RX + vz * RZ);
-  vx = FX * va + RX * vl;
-  vz = FZ * va + RZ * vl;
-  return [vx, vz];
-}
-
-/** Rock is solid. The hull is a capsule — the keel line bow to stern, radius halfBeam —
-    tested against every collider in coast.js. A slow contact pushes the ship clear and
-    scrapes her speed off; one closing faster than WRECK.sinkSpeed holes the hull. */
+/** Rock and land are solid. The hull is a capsule — the keel line bow to stern, radius
+    halfBeam — tested against every rock in coast.js, and her bow, midships and stern
+    against Crete's shore. A slow contact pushes the ship clear and scrapes her speed off;
+    one closing faster than WRECK.sinkSpeed holes the hull. */
 function _collide(v, h, vx, vz, events) {
   v.scrapeTimer = Math.max(0, v.scrapeTimer - h);
   const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
@@ -206,19 +192,29 @@ function _collide(v, h, vx, vz, events) {
     const nx = v.x + fx * t - c.x, nz = v.z + fz * t - c.z;
     const d = Math.hypot(nx, nz), min = c.r + HULL.halfBeam;
     if (d >= min || d === 0) continue;
-    const ux = nx / d, uz = nz / d;
-    const closing = -(vx * ux + vz * uz);                                   // m/s she was driving into the rock
-    if (closing > WRECK.sinkSpeed) {
-      v.sinking = true;
-      v.speed = 0;
-      events.push({ type: 'wrecked', speed: closing, id: c.id });
-      return;
-    }
-    v.x += ux * (min - d);
-    v.z += uz * (min - d);
-    v.speed = Math.max(0, v.speed - Math.max(0, closing) * 1.5);
-    if (v.scrapeTimer === 0) { v.scrapeTimer = WRECK.scrapeCooldown; events.push({ type: 'scrape', id: c.id }); }
+    if (_contact(v, vx, vz, nx / d, nz / d, min - d, c.id, events)) return;
   }
+  for (const t of [HULL.halfLen, 0, -HULL.halfLen]) {
+    const hit = creteShoreContact(v.x + fx * t, v.z + fz * t);
+    if (hit && _contact(v, vx, vz, hit.nx, hit.nz, hit.depth, 'crete', events)) return;
+  }
+}
+
+/** One contact, `depth` m in along the outward normal (ux, uz): wrecked if she drove in
+    hard (returns true), otherwise pushed clear with her speed scraped off. */
+function _contact(v, vx, vz, ux, uz, depth, id, events) {
+  const closing = -(vx * ux + vz * uz);                                     // m/s she was driving in
+  if (closing > WRECK.sinkSpeed) {
+    v.sinking = true;
+    v.speed = 0;
+    events.push({ type: 'wrecked', speed: closing, id });
+    return true;
+  }
+  v.x += ux * depth;
+  v.z += uz * depth;
+  v.speed = Math.max(0, v.speed - Math.max(0, closing) * 1.5);
+  if (v.scrapeTimer === 0) { v.scrapeTimer = WRECK.scrapeCooldown; events.push({ type: 'scrape', id }); }
+  return false;
 }
 
 /** Crete's beach: inside the landing band the bow runs up the sand, the ship grinds

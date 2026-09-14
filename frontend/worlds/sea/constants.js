@@ -8,16 +8,14 @@ export const CRETE_BAY      = { x: -1400, z: -1950 };
 export const COURSE_LEN     = Math.hypot(CRETE_BAY.x - DEPARTURE.x, CRETE_BAY.z - DEPARTURE.z);
 export const COURSE_HEADING = Math.atan2(CRETE_BAY.x - DEPARTURE.x, CRETE_BAY.z - DEPARTURE.z);
 
-export const CORRIDOR_HALF = 260;                 // free wandering either side of the course line
-export const OUTER_LIMIT   = 700;                 // soft wall: the sea turns you back past this
-export const BACK_LIMIT    = -300;                // soft wall behind the Delta (along-course m)
-export const FRONT_LIMIT   = COURSE_LEN + 110;    // soft wall at Crete's cliffs — open only where the beach is (see BEACH)
-export const WALL_DRIFT    = 3;                   // m/s pushed back in, at 50 m past a wall
-export const WALL_TURN     = 0.4;                 // rad/s the sea swings the bow back (beats full rudder)
+// The sea is open: sail off course, around Crete, or out to the horizon — only the weather objects.
+export const CORRIDOR_HALF = 260;                 // wander past this and the voyage notes that you've strayed
+export const BACK_LIMIT    = -300;                // the Delta shore behind the departure (along-course m) — land, so soft
+export const WALL_DRIFT    = 3;                   // m/s the Delta shore eases you back off, at 50 m past it
 
 // Crete's landing beach, in the cove below Knossos. Bronze Age ships were beached, not
-// moored at quays. Inside |lateral| < halfWidth the front wall opens and the bow can run
-// up the sand — that is the arrival. Either side of it are cliffs.
+// moored at quays. Inside |lateral| < halfWidth the bow can run up the sand — that is the
+// arrival. Either side of it are cliffs, and the rest of Crete's shore is solid (coast.js).
 export const BEACH = {
   along:     COURSE_LEN + 150,                     // the waterline (along-course m)
   halfWidth: 100,                                  // half-width of the beach across the course
@@ -43,7 +41,6 @@ export function beachY(depth) {
 }
 
 export const WIND_SPEED    = 11;                  // m/s — visual/audio only; drive is SAIL.drive
-export const WIND_VEER_MAX = 0.9;                 // rad the wind veers toward the line at OUTER_LIMIT
 export const CURRENT_SPEED = 0.6;                 // m/s drift toward Crete (off after arrival)
 
 export const SAIL = {
@@ -95,7 +92,7 @@ export const STORM = {
   start:     0.15,                                // at the Delta…
   peak:      0.9,                                 // …building to its worst halfway, and holding there until the bay's shelter
   offFrom:   150,                                 // m off the line where the open sea starts adding weather…
-  offCourse: 0.5,                                 // …up to this much more at OUTER_LIMIT — miss the island and it's a full storm
+  offFull:   700,                                 // …until by here it's a full storm, wherever along the voyage you are
   moored:    0.2,                                 // target once arrived
   bay:       0.08,                                // target inside the bay's shelter
   marks:     [0.3, 0.5, 0.7],                     // storm_rising narration thresholds
