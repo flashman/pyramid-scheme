@@ -238,9 +238,10 @@ average frame time exceeds 25 ms for 3 s, halve the ocean grid and disable rain
 - `worlds/nile/shop/catalogue.js`: `WARES` entry (tier `RELICS`,
   `art: 'letter_of_passage'`) and a `WARE_RETORTS` line; `draw/ware-art.js`: a
   sealed papyrus with a wave glyph.
-- Merchant blurb stays cryptic about the destination, e.g.
-  *"PASSAGE TO AN ISLAND THAT IS NOT READY FOR YOU. IT WILL BE READY WHEN YOU
-  HAVE PAID. IT IS ALWAYS READY WHEN YOU HAVE PAID."*
+- Merchant blurb promises the whole myth — Crete, Knossos, the Labyrinth — and never
+  admits the island is unbuilt:
+  *"PASSAGE TO CRETE. TO KNOSSOS. TO THE LABYRINTH AND THE ONE WHO KEEPS ITS
+  LEDGER. THE VOYAGE HOME IS INCLUDED. THE RETURNS ARE NOT."*
 
 ### Boarding (Nile Delta boat)
 
@@ -282,8 +283,10 @@ and restores).
 ### Arrival
 
 1. On `arrived`, a Shipmaster dialogue: *"CRETE. KING MINOS KEEPS A LABYRINTH
-   HERE. SOMETHING IN IT KEEPS HIM. THE ISLAND IS NOT TAKING VISITORS. YOU MAY
-   ANCHOR AND ADMIRE IT. ADMIRATION IS FREE. IT IS THE ONLY THING HERE THAT IS."*
+   HERE. SOMETHING IN IT KEEPS HIM. THE PALACE OF KNOSSOS WATCHES FROM THE HILL.
+   BENEATH IT, THE LABYRINTH. AT ITS HEART, AN OPPORTUNITY THAT HAS EATEN EVERY
+   MAN WHO TOOK IT. WAIT BY THE SHIP. THE ISLAND WILL SEND FOR YOU."* (Never say
+   the island isn't ready — it is a land of myth and scheme still to come.)
 2. Record it: logged in → `POST /api/progress {step_id: 'crete_reached'}`;
    guest → local `Flags.set('crete_reached', true)`.
 3. Mooring per §2. On `bay_exit` → "Sail home?" dialogue → `sea → nile`.

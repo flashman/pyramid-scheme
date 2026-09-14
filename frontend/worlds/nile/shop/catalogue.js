@@ -42,7 +42,7 @@ export const WARES = [
   { id: 'self_equity',        name: 'Stock Certificate in Yourself', tier: 'CURIOS',      art: 'self_equity',
     blurb: 'ONE SHARE. THE ISSUER IS YOU.\nYOU ARE NOW LONG ON YOURSELF —\nTHE MOST VOLATILE POSITION ON THE RIVER. CONGRATULATIONS.' },
   { id: 'letter_of_passage',  name: 'A Letter of Passage',           tier: 'RELICS',      art: 'letter_of_passage',
-    blurb: 'PASSAGE TO AN ISLAND THAT IS NOT READY FOR YOU.\nIT WILL BE READY WHEN YOU HAVE PAID.\nIT IS ALWAYS READY WHEN YOU HAVE PAID.' },
+    blurb: 'PASSAGE TO CRETE. TO KNOSSOS. TO THE LABYRINTH\nAND THE ONE WHO KEEPS ITS LEDGER.\nTHE VOYAGE HOME IS INCLUDED. THE RETURNS ARE NOT.' },
 ];
 
 export const WARES_BY_ID = Object.fromEntries(WARES.map(w => [w.id, w]));

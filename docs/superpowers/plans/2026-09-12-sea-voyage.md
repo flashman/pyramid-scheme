@@ -2755,7 +2755,7 @@ export function buildSeaMenuDialogue({ arrived, onTurnBack }) {
     start: {
       speaker: SHIPMASTER,
       text: arrived
-        ? 'WE ARE ON THE BEACH AT CRETE.\nTHE ISLAND IS NOT TAKING VISITORS.\nTHE VIEW IS INCLUDED IN YOUR PASSAGE.'
+        ? 'WE ARE ON THE BEACH AT CRETE.\nKNOSSOS IS UP THE HILL.\nTHE LABYRINTH IS BENEATH IT.\nTHE ISLAND WILL SEND FOR YOU.'
         : 'THE HEADING IS CRETE.\nTHE WIND AGREES.\nTHE WIND IS PAID TO AGREE.',
       choices: [
         { label: 'Keep sailing', next: null },
@@ -2780,7 +2780,7 @@ export function buildArrivalDialogue() {
     },
     anchor: {
       speaker: SHIPMASTER,
-      text: 'THE ISLAND IS NOT TAKING VISITORS.\nTHE SHIP IS ON THE SAND.\nYOU MAY STAND HERE AND ADMIRE IT.\nADMIRATION IS FREE.\nIT IS THE ONLY THING HERE THAT IS.',
+      text: 'THE PALACE OF KNOSSOS WATCHES FROM THE HILL.\nBENEATH IT, THE LABYRINTH.\nAT ITS HEART, AN OPPORTUNITY\nTHAT HAS EATEN EVERY MAN WHO TOOK IT.\nWAIT BY THE SHIP. THE ISLAND WILL SEND FOR YOU.',
       next: null,
     },
   });
@@ -3303,7 +3303,7 @@ Expected: FAIL — `PER_ROW`/`TABLE_ROWS` undefined and the Letter missing.
 1. Append to `WARES`, after the `self_equity` entry:
 ```js
   { id: 'letter_of_passage',  name: 'A Letter of Passage',           tier: 'RELICS',      art: 'letter_of_passage',
-    blurb: 'PASSAGE TO AN ISLAND THAT IS NOT READY FOR YOU.\nIT WILL BE READY WHEN YOU HAVE PAID.\nIT IS ALWAYS READY WHEN YOU HAVE PAID.' },
+    blurb: 'PASSAGE TO CRETE. TO KNOSSOS. TO THE LABYRINTH\nAND THE ONE WHO KEEPS ITS LEDGER.\nTHE VOYAGE HOME IS INCLUDED. THE RETURNS ARE NOT.' },
 ```
 
 2. Add to `WARE_RETORTS`, after `astral_lens`:

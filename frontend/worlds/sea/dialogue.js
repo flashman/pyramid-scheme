@@ -12,7 +12,7 @@ export function buildSeaMenuDialogue({ arrived, onTurnBack }) {
     start: {
       speaker: SHIPMASTER,
       text: arrived
-        ? 'WE ARE ON THE BEACH AT CRETE.\nTHE ISLAND IS NOT TAKING VISITORS.\nTHE VIEW IS INCLUDED IN YOUR PASSAGE.'
+        ? 'WE ARE ON THE BEACH AT CRETE.\nKNOSSOS IS UP THE HILL.\nTHE LABYRINTH IS BENEATH IT.\nTHE ISLAND WILL SEND FOR YOU.'
         : 'THE HEADING IS CRETE.\nTHE WIND AGREES.\nTHE WIND IS PAID TO AGREE.',
       choices: [
         { label: 'Keep sailing', next: null },
@@ -37,7 +37,7 @@ export function buildArrivalDialogue() {
     },
     anchor: {
       speaker: SHIPMASTER,
-      text: 'THE ISLAND IS NOT TAKING VISITORS.\nTHE SHIP IS ON THE SAND.\nYOU MAY STAND HERE AND ADMIRE IT.\nADMIRATION IS FREE.\nIT IS THE ONLY THING HERE THAT IS.',
+      text: 'THE PALACE OF KNOSSOS WATCHES FROM THE HILL.\nBENEATH IT, THE LABYRINTH.\nAT ITS HEART, AN OPPORTUNITY\nTHAT HAS EATEN EVERY MAN WHO TOOK IT.\nWAIT BY THE SHIP. THE ISLAND WILL SEND FOR YOU.',
       next: null,
     },
   });
