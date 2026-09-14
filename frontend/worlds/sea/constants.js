@@ -93,7 +93,7 @@ export const MAX_DT  = 0.1;                       // a long frame (tab switch) i
 export const STORM = {
   tau:       6,                                   // seconds for intensity to ease toward target
   start:     0.15,                                // at the Delta…
-  peak:      0.9,                                 // …building all the way to Crete's approach (p = 0.8, just outside the bay's shelter)
+  peak:      0.9,                                 // …building to its worst halfway, and holding there until the bay's shelter
   offFrom:   150,                                 // m off the line where the open sea starts adding weather…
   offCourse: 0.5,                                 // …up to this much more at OUTER_LIMIT — miss the island and it's a full storm
   moored:    0.2,                                 // target once arrived

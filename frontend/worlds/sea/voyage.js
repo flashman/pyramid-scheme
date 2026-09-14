@@ -50,7 +50,7 @@ export function polar(offWind) {
 export function stormTarget(v) {
   const { along, lateral } = worldToCourse(v.x, v.z);
   const p    = clamp(along / COURSE_LEN, 0, 1);
-  const ramp = STORM.start + (STORM.peak - STORM.start) * smoothstep(0.05, 0.8, p);
+  const ramp = STORM.start + (STORM.peak - STORM.start) * smoothstep(0.05, 0.5, p);
   const off  = STORM.offCourse * clamp((Math.abs(lateral) - STORM.offFrom) / (OUTER_LIMIT - STORM.offFrom), 0, 1);
   const open = v.arrived ? STORM.moored : clamp(ramp + off, 0, 1);
   const exposed = (shelterAt(SHELTER, v.x, v.z) - SHELTER.calm) / (1 - SHELTER.calm);   // 0 in the bay … 1 outside
