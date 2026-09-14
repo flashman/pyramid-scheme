@@ -89,6 +89,53 @@ function drumGrid(kit, grid, { swing = 0.5, reps = 1 } = {}) {
   });
 }
 
+// ── THE SEA's shanty, written in 6/8 ─────────────────────
+// The sea theme's beat is the dotted-quarter pulse, so a 6/8 bar is 2 beats and
+// its six eighth notes are ⅓ beat each. eighths() lets the tune be written in
+// eighths (a bar sums to 6) — [freq|null, eighths, vel?] → [freq, beats, vel?].
+const eighths = (seq) => seq.map(([f, d, v]) => (v === undefined ? [f, d / 3] : [f, d / 3, v]));
+
+// The tune, 16 bars of A minor (G# from A harmonic minor gives the dark pull home).
+const SEA_TUNE = [
+  // ── A: the call ──
+  [N.E4,1,.6],[N.A4,2,.9],[N.A4,1,.7],[N.B4,1,.75],[N.C5,1,.8],     // Am
+  [N.B4,2,.85],[N.A4,1,.7],[N.G4,2,.75],[N.E4,1,.6],                // Am
+  [N.D4,1,.6],[N.G4,2,.9],[N.G4,1,.7],[N.A4,1,.75],[N.B4,1,.8],     // G
+  [N.A4,2,.85],[N.G4,1,.7],[N.E4,3,.7],                             // G
+  [N.F4,1,.6],[N.A4,2,.9],[N.C5,1,.8],[N.B4,1,.75],[N.A4,1,.7],     // F
+  [N.Ab4,2,.85],[N.B4,1,.75],[N.E5,3,.9],                           // E
+  [N.C5,1,.8],[N.B4,1,.7],[N.A4,1,.7],[N.Ab4,2,.8],[N.B4,1,.7],     // Am
+  [N.A4,5,.85],[_,1],                                               // Am
+  // ── B: the crew answers, higher ──
+  [N.D5,2,.95],[N.D5,1,.75],[N.C5,2,.85],[N.A4,1,.7],               // Dm
+  [N.C5,2,.85],[N.B4,1,.7],[N.A4,3,.8],                             // Am
+  [N.F5,2,1.0],[N.E5,1,.8],[N.D5,2,.85],[N.C5,1,.75],               // Dm
+  [N.B4,2,.85],[N.Ab4,1,.7],[N.E4,3,.75],                           // E
+  [N.A4,1,.7],[N.B4,1,.75],[N.C5,1,.8],[N.E5,3,.95],                // Am
+  [N.D5,2,.9],[N.C5,1,.75],[N.B4,3,.8],                             // G
+  [N.C5,2,.85],[N.A4,1,.7],[N.Ab4,2,.8],[N.B4,1,.75],               // F → E
+  [N.A4,5,.85],[_,1],                                               // Am
+];
+
+// One chord per bar (a pair splits the bar): [bass root, bass fifth, pump third, pump fifth].
+const SEA_CHORD = {
+  Am: [N.A2, N.E2, N.C4, N.E4],  G: [N.G2, N.D2, N.B3, N.D4],  F: [N.F2, N.C3, N.A3, N.C4],
+  E:  [N.E2, N.B2, N.Ab3, N.B3], Dm: [N.D2, N.A2, N.F3, N.A3],
+};
+const SEA_BARS = ['Am', 'Am', 'G', 'G', 'F', 'E', 'Am', 'Am', 'Dm', 'Am', 'Dm', 'E', 'Am', 'G', ['F', 'E'], 'Am'];
+const halves = (bar) => (Array.isArray(bar) ? bar : [bar, bar]);
+/** Root on the first pulse, fifth on the second (a split bar takes each chord's root). */
+const seaBass = () => eighths(SEA_BARS.flatMap(bar => {
+  const [a, b] = halves(bar);
+  return [[SEA_CHORD[a][0], 2, .9], [_, 1], [a === b ? SEA_CHORD[a][1] : SEA_CHORD[b][0], 2, .65], [_, 1]];
+}));
+/** The squeezebox pump: rest on the pulse, "pa-pa" after it — one chord tone per track. */
+const seaPump = (tone) => eighths(SEA_BARS.flatMap(bar => {
+  const [a, b] = halves(bar);
+  return [[_, 1], [SEA_CHORD[a][tone], 1, .55], [SEA_CHORD[a][tone], 1, .4],
+          [_, 1], [SEA_CHORD[b][tone], 1, .55], [SEA_CHORD[b][tone], 1, .4]];
+}));
+
 // ── Theme definitions ─────────────────────────────────────
 // bpm     — tempo
 // tracks  — oscillator layers:
@@ -556,25 +603,32 @@ const THEMES = {
   },
 
   // ── THE SEA (sea) ──────────────────────────────────────────────────────
-  // A Phrygian drone at 48 bpm under two noise layers — wind (bandpass) and
-  // surf (lowpass) — both flagged `ambience` so SeaRealm can swell them with
-  // the storm. A sparse triangle voice surfaces now and then. Thunder is not
-  // part of the loop; SeaRealm fires it per strike via playThunder().
+  // A minor-key sea shanty in 6/8 (beat = the dotted-quarter pulse; see
+  // eighths()): a reedy squeezebox lead with the crew humming it an octave
+  // under, an oom-pa-pa pump, a root-fifth bass, a foot-stomp and clap, and a
+  // low A held beneath it all for the dread. Thunder is not in the loop —
+  // SeaRealm fires playThunder() per strike.
   sea: {
-    bpm: 48,
+    bpm: 64,
     tracks: [
-      { wave: 'noise', gain: 0.05, pan: -0.2, ambience: true,
-        filter: { type: 'bandpass', freq: 420, Q: 0.5 }, reverb: true,
-        seq: [[1, 32]] },
-      { wave: 'noise', gain: 0.07, pan: 0.2, ambience: true,
-        filter: { type: 'lowpass', freq: 260 },
-        seq: [[1, 32]] },
-      { wave: 'sine', gain: 0.09, pan: 0.0,
-        filter: { type: 'lowpass', freq: 240 }, reverb: true,
-        seq: [[N.A2, 8], [N.Bb2, 4], [N.A2, 4], [N.G2, 8], [N.A2, 8]] },                 // 32 beats
-      { wave: 'triangle', gain: 0.03, pan: 0.3,
-        filter: { type: 'lowpass', freq: 900 }, vibrato: { rate: 0.8, depth: 5 },
-        seq: [[_, 6], [N.E3, 3], [_, 5], [N.F3, 2], [_, 6], [N.D3, 4], [_, 6]] },       // 32 beats
+      { wave: 'sawtooth', gain: 0.1, pan: -0.05, reverb: true,
+        filter: { type: 'lowpass', freq: 1700, Q: 2 }, vibrato: { rate: 5.2, depth: 8 },
+        seq: eighths(SEA_TUNE) },
+      { wave: 'triangle', gain: 0.045, pan: 0.15, detune: -4,                        // the crew, an octave under
+        filter: { type: 'lowpass', freq: 900 },
+        seq: eighths(SEA_TUNE.map(([f, d, v]) => [f && f / 2, d, v])) },
+      { wave: 'triangle', gain: 0.09, filter: { type: 'lowpass', freq: 420 }, seq: seaBass() },
+      { wave: 'sawtooth', gain: 0.03, pan: -0.25, detune: 6,
+        filter: { type: 'lowpass', freq: 950 }, seq: seaPump(2) },
+      { wave: 'sawtooth', gain: 0.026, pan: 0.25, detune: -6,
+        filter: { type: 'lowpass', freq: 950 }, seq: seaPump(3) },
+      { wave: 'sine', gain: 0.05, reverb: true,                                       // the dread
+        filter: { type: 'lowpass', freq: 200 }, seq: [[N.A2, 32]] },
+      ...drumGrid(
+        { stomp: { freq: 95, gain: 0.55 }, clap: { freq: 1500, gain: 0.22, pan: 0.2, reverb: true } },
+        { stomp: 'X..o..X..o..', clap: '...x.....x..' },
+        { reps: 8 },                                                                  // 12 steps = two 6/8 bars; ×8 = 32 beats
+      ),
     ],
   },
 
@@ -751,7 +805,7 @@ class SoundManagerClass {
     this._currentTheme = null;
     this._session      = 0;
     this._oscillators  = [];
-    this._ambienceLevel = 1;    // gain for theme noise tracks flagged `ambience` (the sea's wind + surf)
+    this._ambienceLevel = 1;    // gain for theme noise tracks flagged `ambience` (storm-swelled by SeaRealm)
     this._ambienceNodes = [];
 
     try {
