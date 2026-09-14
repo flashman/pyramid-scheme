@@ -606,8 +606,8 @@ const THEMES = {
   // A slow minor-key shanty where Egypt meets archaic Greece, 6/8 (beat = the dotted-quarter
   // pulse; see eighths()). A breathy ney-like lead that slides between notes,
   // the crew humming it an octave under, a wavering choir of gods, a root bass, a low A
-  // for the dread — carried by doumbek, riq and a deep frame drum. A thin rain
-  // hiss (`ambience`) is near-silent in calm water and fills in with the storm;
+  // for the dread — carried by doumbek, riq, tambourine and a deep frame drum, over a
+  // sub-bass. A low rain wash (`ambience`) is near-silent in calm water and fills in with the storm;
   // thunder is fired per strike by SeaRealm via playThunder().
   sea: {
     bpm: 50,
@@ -615,18 +615,20 @@ const THEMES = {
       { wave: 'triangle', gain: 0.11, pan: -0.05, glide: 0.07, reverb: true,         // the ney
         filter: { type: 'lowpass', freq: 1300 }, vibrato: { rate: 5, depth: 12 },
         seq: eighths(SEA_TUNE) },
-      { wave: 'sine', gain: 0.04, pan: 0.15,                                          // the crew, an octave under
-        filter: { type: 'lowpass', freq: 700 },
+      { wave: 'triangle', gain: 0.085, pan: 0.15,                                     // the crew, an octave under
+        filter: { type: 'lowpass', freq: 650 },
         seq: eighths(SEA_TUNE.map(([f, d, v]) => [f && f / 2, d, v])) },
-      { wave: 'triangle', gain: 0.085, filter: { type: 'lowpass', freq: 380 }, seq: seaBass() },
+      { wave: 'triangle', gain: 0.13, filter: { type: 'lowpass', freq: 320 }, seq: seaBass() },
+      { wave: 'sine', gain: 0.07, filter: { type: 'lowpass', freq: 150 },               // sub-bass, an octave under the bass
+        seq: seaBass().map(([f, d, v]) => [f && f / 2, d, v]) },
       { wave: 'sine', gain: 0.04, pan: -0.3, detune: 7, reverb: true,                  // the gods: a slow, wavering choir
         filter: { type: 'lowpass', freq: 1100 }, vibrato: { rate: 0.6, depth: 6 }, seq: seaPad(2) },
       { wave: 'sine', gain: 0.035, pan: 0.3, detune: -7, reverb: true,
         filter: { type: 'lowpass', freq: 1100 }, vibrato: { rate: 0.7, depth: 6 }, seq: seaPad(3) },
       { wave: 'sine', gain: 0.045, reverb: true,                                      // the dread
         filter: { type: 'lowpass', freq: 200 }, seq: [[N.A2, 32]] },
-      { wave: 'noise', gain: 0.022, pan: 0, ambience: true,                           // rain
-        filter: { type: 'highpass', freq: 4200 }, seq: [[1, 32]] },
+      { wave: 'noise', gain: 0.04, pan: 0, ambience: true,                            // rain on the water: low, not hiss
+        filter: { type: 'lowpass', freq: 1400 }, seq: [[1, 32]] },
       // Percussion, one char per eighth — 12 steps = two 6/8 bars (pulses on steps 0, 3, 6, 9):
       ...drumGrid(
         {
@@ -634,12 +636,14 @@ const THEMES = {
           tek:    { freq: 1500, gain: 0.45, pan: 0.1 },
           riq:    { freq: 3400, gain: 0.22, pan: 0.3, reverb: true },
           bendir: { freq: 68,   gain: 0.6,  pan: -0.1, reverb: true },
+          tamb:   { freq: 6500, gain: 0.2,  pan: -0.25, reverb: true },
         },
         {
           dum:    'X.....X..o..',
           tek:    '..x.xo..x.x.',
           riq:    'o..x..o..x..',
           bendir: 'X...........',
+          tamb:   'XoxXoxXoxXox',                                                     // a shake every eighth, leaning on the pulse
         },
         { reps: 8 },                                                                  // ×8 = 32 beats
       ),
@@ -1085,9 +1089,10 @@ class SoundManagerClass {
       for (const [freq, dur, vel] of track.seq) {
         const durSec = dur * beatLen;
         if (freq !== null) {
-          // Three voices by centerFreq: dum (body), tek (crack), and sagat —
-          // finger cymbals: a high, high-Q, longer-ringing metallic tier.
-          const decay  = freq < 400 ? 0.20 : freq < 3000 ? 0.085 : 0.16;
+          // Four voices by centerFreq: dum (body), tek (crack), sagat — finger
+          // cymbals: a high, high-Q, longer-ringing metallic tier — and (≥5 kHz)
+          // tambourine: broad, bright jingles with a short shimmer.
+          const decay  = freq < 400 ? 0.20 : freq < 3000 ? 0.085 : freq < 5000 ? 0.16 : 0.13;
           const peak   = track.gain * (vel ?? 1);    // accents vs. ghost notes
           const bufLen = Math.floor(rate * decay);
           const buf    = ctx.createBuffer(1, bufLen, rate);
@@ -1097,7 +1102,7 @@ class SoundManagerClass {
           const bp = ctx.createBiquadFilter();
           bp.type            = 'bandpass';
           bp.frequency.value = freq;
-          bp.Q.value         = freq < 400 ? 1.6 : freq < 3000 ? 3.0 : 9.0; // body / crack / ring
+          bp.Q.value         = freq < 400 ? 1.6 : freq < 3000 ? 3.0 : freq < 5000 ? 9.0 : 1.2; // body / crack / ring / jingle
 
           const env = ctx.createGain();
           env.gain.setValueAtTime(0, t);
