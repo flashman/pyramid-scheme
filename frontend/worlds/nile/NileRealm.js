@@ -27,7 +27,10 @@ import { G }                              from '../../game/state.js';
 import { SPDHALF }                        from '../constants.js';
 import { CW }                             from '../../engine/canvas.js';
 import { log }                            from '../../ui/panels.js';
-import { desertTransRender }              from '../transitions.js';
+import { Api }                            from '../../game/api.js';
+import { Inventory }                      from '../../game/inventory.js';
+import { webglAvailable }                 from '../../engine/webgl.js';
+import { desertTransRender, seaTransRender } from '../transitions.js';
 import {
   NILE_W, BANK_Y, WATER_Y, RIVERBED_Y, WATER_BOTTOM, REED_TOP, CROC_BACK,
   CURRENT_SPD, SWIM_SPD, JUMP_VY,
@@ -48,6 +51,8 @@ import {
   buildSobekDialogue,
   buildJosephDialogue,
   buildBabyDialogue,
+  buildShipmasterDialogue,
+  buildNoWebglDialogue,
 } from './dialogue.js';
 
 const CROC_BACK_HW = 20;   // half-width of a crocodile's standable back
@@ -140,15 +145,14 @@ export class NileRealm extends SolidRealm {
     joseph.interactRange = 80;
     this.registry.register(joseph);
 
-    // The reed boat at the river mouth — seeds a future chapter across the sea
-    // (no travel yet; the destination is unrevealed to the player).
+    // The reed boat at the river mouth — the Shipmaster honours a Letter of
+    // Passage (sold at JUST POTS) and carries you out onto THE SEA.
     const boat = new Entity('boat', BOAT_X, RIVERBED_Y - 8);
     boat.interactRange = 72;
-    boat.onInteract = () => {
-      log('✦ A reed boat, pointed at the open sea.', 'hi');
-      setTimeout(() => log('It faces something past the horizon. Too far to make out what.', ''), 600);
-      setTimeout(() => log('Not yet. The sea is not ready for you.', ''), 1200);
-    };
+    boat.onInteract = () => DialogueManager.start(buildShipmasterDialogue({
+      hasLetter: () => Inventory.owned('letter_of_passage'),
+      onBoard:   () => this._board(),
+    }));
     this.registry.register(boat);
 
     // The basket in the bulrushes — a fork. Take it or drown it (see
@@ -179,11 +183,14 @@ export class NileRealm extends SolidRealm {
       transition: desertTransRender, duration: 2600,
     });
 
-    // ── Disabled outbound portal — seeds the future across-the-sea chapter.
-    //    Destination intentionally unnamed (the player doesn't know it yet). ──
+    // ── Boarding edge: the reed boat → THE SEA. Key-less — fired from the
+    //    Shipmaster's dialogue via PortalRegistry.use (see _board). ──
     PortalRegistry.register({
       from: 'nile', to: 'sea',
-      key: null, condition: () => false,
+      key: null,
+      condition: () => Inventory.owned('letter_of_passage'),
+      onUse: () => { G.shake = 4; log('✦ You step aboard. The Delta lets go of the rope.', 'hi'); },
+      transition: seaTransRender, duration: 2200,
     });
   }
 
@@ -193,6 +200,20 @@ export class NileRealm extends SolidRealm {
   _onBank(x) {
     for (const s of BANK_SEGMENTS) if (x >= s.x1 && x <= s.x2) return true;
     return false;
+  }
+
+  /** Board the ship. Called from the Shipmaster dialogue's onComplete — which
+      runs just BEFORE that dialogue closes, so yield first: starting another
+      dialogue synchronously would be closed out from under us. */
+  async _board() {
+    await null;
+    if (!webglAvailable()) { DialogueManager.start(buildNoWebglDialogue()); return; }
+    if (Api.hasToken()) {
+      // The Nile is granted directly (invites.py) without an evaluation pass,
+      // so `sea` has to be claimed here or the WS realm gate would bar the channel.
+      try { await Api.post('/api/unlocks/evaluate', {}); } catch { /* offline: the voyage still sails */ }
+    }
+    PortalRegistry.use('nile', 'sea');
   }
 
   // Required by drawRealmPharaoh(). pZ 0 → normal feet-at-py rendering.
@@ -205,12 +226,18 @@ export class NileRealm extends SolidRealm {
     if (fromId === 'world') {
       G.px = NILE_ENTRY_X; G.py = BANK_Y; G.pvy = 0;
       G.camX = Math.max(0, G.px - CW / 2);
+    } else if (fromId === 'sea') {
+      // Back from the voyage: wading in the calm Delta, beside the boat.
+      G.px = BOAT_X + 70; G.py = RIVERBED_Y; G.pvy = 0;
+      G.camX = Math.max(0, G.px - CW / 2);
     }
     G.pZ = 0;
     this.health.setImmunity(1500);
     G.camY = 0;
     G.shake = 6;
-    log('✦ You walk west, and the sand turns to mud. The sun is setting on this side of the river.', 'hi');
+    log(fromId === 'sea'
+      ? '✦ The ship noses back into the Delta reeds. The river takes you back without comment.'
+      : '✦ You walk west, and the sand turns to mud. The sun is setting on this side of the river.', 'hi');
   }
 
   onExit() { G.shake = 4; }

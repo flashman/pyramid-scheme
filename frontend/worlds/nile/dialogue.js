@@ -6,6 +6,8 @@
 //   • buildJosephDialogue    — the original founder; insider of the flood
 //   • buildBabyDialogue      — the basket fork: take it or drown it
 
+//   • buildShipmasterDialogue — the reed boat at the river mouth: passage to the sea
+//   • buildNoWebglDialogue    — the sea refuses a vessel that cannot render water
 import { Dialogue } from '../../engine/dialogue.js';
 import { Flags }    from '../../engine/flags.js';
 import { Ledger }   from '../../engine/ledger.js';
@@ -13,6 +15,7 @@ import { Events }   from '../../engine/events.js';
 import { log }      from '../../ui/panels.js';
 import { Inventory } from '../../game/inventory.js';
 
+import { SHIPMASTER } from '../sea/dialogue.js';
 export function buildMerchantDialogue() {
   // Shared so "Step inside" is offered at every beat — including the greeting,
   // letting a returning player skip straight to the stall.
@@ -368,6 +371,48 @@ export function buildBabyDialogue() {
       speaker: 'YOU HOLD IT UNDER',
       text: 'The reeds go still. Sobek’s eyes break the surface — and\napprove. The river takes what it is owed and remembers who\npaid it. No rival will rise from this water.\nThe ledger notes the deposit. At face amount.',
       onComplete: () => log('✦ The river goes quiet. Sobek has reviewed your account favourably.', 'hi'),
+      next: null,
+    },
+  });
+}
+
+// ── Shipmaster ───────────────────────────────────────────
+// Stands at the reed boat in the Delta. He does not sell passage — he honours
+// the Letter the Merchant sold you. Opening this dialogue asks THE SEA to start
+// loading, so the scene is usually ready by the time you board.
+// Nodes: start → board (with a Letter) | no_letter (without)
+
+export function buildShipmasterDialogue({ hasLetter, onBoard }) {
+  return new Dialogue({
+    start: {
+      speaker: SHIPMASTER,
+      text: 'A SHIP, PHARAOH. POINTED AT THE OPEN SEA.\nIT GOES WHERE THE LETTER SAYS.\nTHE LETTER ALWAYS SAYS THE SAME THING.',
+      onEnter: () => Events.emit('sea:preload'),
+      choices: [
+        { label: '✦ Board the ship',   condition: hasLetter,         next: 'board'     },
+        { label: 'How do I board?',    condition: () => !hasLetter(), next: 'no_letter' },
+        { label: 'Leave',                                              next: null        },
+      ],
+    },
+    no_letter: {
+      speaker: SHIPMASTER,
+      text: 'WITH A LETTER OF PASSAGE.\nI DO NOT SELL PASSAGE. I HONOUR IT.\nTHE MERCHANT UPRIVER SELLS IT.\nTHE MERCHANT SELLS EVERYTHING UPRIVER.',
+      next: null,
+    },
+    board: {
+      speaker: SHIPMASTER,
+      text: 'YOUR LETTER IS IN ORDER.\nIT IS ALWAYS IN ORDER. THAT IS WHAT YOU PAID FOR.\nMIND THE STORM. IT IS NOT INCLUDED.',
+      onComplete: onBoard,
+      next: null,
+    },
+  });
+}
+
+export function buildNoWebglDialogue() {
+  return new Dialogue({
+    start: {
+      speaker: SHIPMASTER,
+      text: 'THE SEA WILL NOT TAKE THIS VESSEL.\nSOMETHING IN YOUR VESSEL CANNOT RENDER WATER.\nI DO NOT MAKE THE RULES. I DO NOT EVEN READ THEM.',
       next: null,
     },
   });
