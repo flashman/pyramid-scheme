@@ -10,7 +10,7 @@ import { G }                from '../../../game/state.js';
 import { Events }           from '../../../engine/events.js';
 import { Api }              from '../../../game/api.js';
 import { loadConfig, getShop, shopLoaded } from '../../../game/config.js';
-import { WARES, GENERIC_RETORTS, WARE_RETORTS, POOR_RETORTS, OWNED_RETORTS } from './catalogue.js';
+import { WARES, GENERIC_RETORTS, WARE_RETORTS, POOR_RETORTS, OWNED_RETORTS, PER_ROW } from './catalogue.js';
 import { purchase, isOwned } from './buy.js';
 import { drawWareArt }      from '../../../draw/ware-art.js';
 import { drawMerchant, drawMerchantTent, drawBalanceScale } from '../draw/nile.js';
@@ -18,7 +18,6 @@ import { drawMerchant, drawMerchantTent, drawBalanceScale } from '../draw/nile.j
 const SCALE   = 2.7;     // merchant + tent magnification ("life size" in frame)
 const FEET_Y  = 345;     // merchant feet (just behind the table top → legs hidden)
 const TABLE_Y = 318;     // table surface line
-const PER_ROW = 9;       // wares per row laid on the table (2 rows for 17)
 const TYPE_MS = 26;      // ms per character of the merchant's spoken pitch
 const WELCOME = 'STEP IN, FUTURE PHARAOH. MIND THE POTS.\nEVERYTHING ON THE TABLE IS FOR SALE.\nTHE LOOKING IS FREE. THE WANTING, ALSO.';
 
