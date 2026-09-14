@@ -95,45 +95,45 @@ function drumGrid(kit, grid, { swing = 0.5, reps = 1 } = {}) {
 // eighths (a bar sums to 6) — [freq|null, eighths, vel?] → [freq, beats, vel?].
 const eighths = (seq) => seq.map(([f, d, v]) => (v === undefined ? [f, d / 3] : [f, d / 3, v]));
 
-// The tune, 16 bars of A minor (G# from A harmonic minor gives the dark pull home).
+// The tune, 16 bars: a minor-key shanty sung on the Nile — A minor with the ♭2
+// (B♭) and the raised 7th (G♯), so it keeps the Hijaz leap F→G♯ and falls G♯→F→E.
 const SEA_TUNE = [
   // ── A: the call ──
-  [N.E4,1,.6],[N.A4,2,.9],[N.A4,1,.7],[N.B4,1,.75],[N.C5,1,.8],     // Am
-  [N.B4,2,.85],[N.A4,1,.7],[N.G4,2,.75],[N.E4,1,.6],                // Am
-  [N.D4,1,.6],[N.G4,2,.9],[N.G4,1,.7],[N.A4,1,.75],[N.B4,1,.8],     // G
-  [N.A4,2,.85],[N.G4,1,.7],[N.E4,3,.7],                             // G
-  [N.F4,1,.6],[N.A4,2,.9],[N.C5,1,.8],[N.B4,1,.75],[N.A4,1,.7],     // F
-  [N.Ab4,2,.85],[N.B4,1,.75],[N.E5,3,.9],                           // E
-  [N.C5,1,.8],[N.B4,1,.7],[N.A4,1,.7],[N.Ab4,2,.8],[N.B4,1,.7],     // Am
+  [N.E4,1,.6],[N.A4,2,.9],[N.A4,1,.7],[N.Bb4,1,.75],[N.C5,1,.8],    // Am
+  [N.Bb4,2,.85],[N.A4,1,.7],[N.Ab4,2,.75],[N.A4,1,.6],              // Am
+  [N.F4,1,.6],[N.Bb4,2,.9],[N.Bb4,1,.7],[N.C5,1,.75],[N.D5,1,.8],   // B♭
+  [N.C5,2,.85],[N.Bb4,1,.7],[N.A4,3,.7],                            // Am
+  [N.F4,1,.6],[N.A4,2,.9],[N.D5,1,.8],[N.C5,1,.75],[N.Bb4,1,.7],    // Dm
+  [N.Ab4,2,.85],[N.F4,1,.7],[N.E4,3,.8],                            // E
+  [N.E4,1,.6],[N.A4,1,.7],[N.C5,1,.8],[N.Bb4,2,.8],[N.Ab4,1,.7],    // Am
   [N.A4,5,.85],[_,1],                                               // Am
   // ── B: the crew answers, higher ──
-  [N.D5,2,.95],[N.D5,1,.75],[N.C5,2,.85],[N.A4,1,.7],               // Dm
-  [N.C5,2,.85],[N.B4,1,.7],[N.A4,3,.8],                             // Am
-  [N.F5,2,1.0],[N.E5,1,.8],[N.D5,2,.85],[N.C5,1,.75],               // Dm
-  [N.B4,2,.85],[N.Ab4,1,.7],[N.E4,3,.75],                           // E
-  [N.A4,1,.7],[N.B4,1,.75],[N.C5,1,.8],[N.E5,3,.95],                // Am
-  [N.D5,2,.9],[N.C5,1,.75],[N.B4,3,.8],                             // G
-  [N.C5,2,.85],[N.A4,1,.7],[N.Ab4,2,.8],[N.B4,1,.75],               // F → E
-  [N.A4,5,.85],[_,1],                                               // Am
+  [N.D5,2,.95],[N.D5,1,.75],[N.E5,2,.85],[N.F5,1,.8],               // Dm
+  [N.E5,2,.9],[N.D5,1,.75],[N.C5,3,.8],                             // Am
+  [N.D5,2,1.0],[N.C5,1,.8],[N.Bb4,2,.85],[N.A4,1,.75],              // B♭
+  [N.Ab4,2,.85],[N.F4,1,.7],[N.E4,3,.75],                           // E
+  [N.A4,1,.7],[N.C5,1,.75],[N.E5,1,.8],[N.F5,3,.95],                // Am
+  [N.E5,2,.9],[N.D5,1,.75],[N.C5,1,.7],[N.Bb4,1,.7],[N.Ab4,1,.7],   // E
+  [N.Bb4,2,.85],[N.A4,1,.7],[N.Ab4,2,.8],[N.F4,1,.7],               // B♭ → E
+  [N.E4,1,.6],[N.A4,4,.85],[_,1],                                   // Am
 ];
 
-// One chord per bar (a pair splits the bar): [bass root, bass fifth, pump third, pump fifth].
+// One chord per bar (a pair splits the bar): [bass root, bass second, pad tone, pad tone].
 const SEA_CHORD = {
-  Am: [N.A2, N.E2, N.C4, N.E4],  G: [N.G2, N.D2, N.B3, N.D4],  F: [N.F2, N.C3, N.A3, N.C4],
-  E:  [N.E2, N.B2, N.Ab3, N.B3], Dm: [N.D2, N.A2, N.F3, N.A3],
+  Am: [N.A2, N.E2, N.C4, N.E4],  Bb: [N.Bb2, N.F2, N.D4, N.F4],
+  Dm: [N.D2, N.A2, N.F3, N.A3],  E:  [N.E2, N.E3, N.Ab3, N.E4],
 };
-const SEA_BARS = ['Am', 'Am', 'G', 'G', 'F', 'E', 'Am', 'Am', 'Dm', 'Am', 'Dm', 'E', 'Am', 'G', ['F', 'E'], 'Am'];
+const SEA_BARS = ['Am', 'Am', 'Bb', 'Am', 'Dm', 'E', 'Am', 'Am', 'Dm', 'Am', 'Bb', 'E', 'Am', 'E', ['Bb', 'E'], 'Am'];
 const halves = (bar) => (Array.isArray(bar) ? bar : [bar, bar]);
-/** Root on the first pulse, fifth on the second (a split bar takes each chord's root). */
+/** Root on the first pulse, its answer on the second (a split bar takes each chord's root). */
 const seaBass = () => eighths(SEA_BARS.flatMap(bar => {
   const [a, b] = halves(bar);
   return [[SEA_CHORD[a][0], 2, .9], [_, 1], [a === b ? SEA_CHORD[a][1] : SEA_CHORD[b][0], 2, .65], [_, 1]];
 }));
-/** The squeezebox pump: rest on the pulse, "pa-pa" after it — one chord tone per track. */
-const seaPump = (tone) => eighths(SEA_BARS.flatMap(bar => {
+/** A soft held chord tone per bar (or per half of a split bar) — no plucked pump. */
+const seaPad = (tone) => eighths(SEA_BARS.flatMap(bar => {
   const [a, b] = halves(bar);
-  return [[_, 1], [SEA_CHORD[a][tone], 1, .55], [SEA_CHORD[a][tone], 1, .4],
-          [_, 1], [SEA_CHORD[b][tone], 1, .55], [SEA_CHORD[b][tone], 1, .4]];
+  return a === b ? [[SEA_CHORD[a][tone], 6, .5]] : [[SEA_CHORD[a][tone], 3, .5], [SEA_CHORD[b][tone], 3, .5]];
 }));
 
 // ── Theme definitions ─────────────────────────────────────
@@ -603,31 +603,45 @@ const THEMES = {
   },
 
   // ── THE SEA (sea) ──────────────────────────────────────────────────────
-  // A minor-key sea shanty in 6/8 (beat = the dotted-quarter pulse; see
-  // eighths()): a reedy squeezebox lead with the crew humming it an octave
-  // under, an oom-pa-pa pump, a root-fifth bass, a foot-stomp and clap, and a
-  // low A held beneath it all for the dread. Thunder is not in the loop —
-  // SeaRealm fires playThunder() per strike.
+  // A slow minor-key shanty where Egypt meets archaic Greece, 6/8 (beat = the dotted-quarter
+  // pulse; see eighths()). A breathy ney-like lead that slides between notes,
+  // the crew humming it an octave under, a wavering choir of gods, a root bass, a low A
+  // for the dread — carried by doumbek, riq and a deep frame drum. A thin rain
+  // hiss (`ambience`) is near-silent in calm water and fills in with the storm;
+  // thunder is fired per strike by SeaRealm via playThunder().
   sea: {
-    bpm: 64,
+    bpm: 50,
     tracks: [
-      { wave: 'sawtooth', gain: 0.1, pan: -0.05, reverb: true,
-        filter: { type: 'lowpass', freq: 1700, Q: 2 }, vibrato: { rate: 5.2, depth: 8 },
+      { wave: 'triangle', gain: 0.11, pan: -0.05, glide: 0.07, reverb: true,         // the ney
+        filter: { type: 'lowpass', freq: 1300 }, vibrato: { rate: 5, depth: 12 },
         seq: eighths(SEA_TUNE) },
-      { wave: 'triangle', gain: 0.045, pan: 0.15, detune: -4,                        // the crew, an octave under
-        filter: { type: 'lowpass', freq: 900 },
+      { wave: 'sine', gain: 0.04, pan: 0.15,                                          // the crew, an octave under
+        filter: { type: 'lowpass', freq: 700 },
         seq: eighths(SEA_TUNE.map(([f, d, v]) => [f && f / 2, d, v])) },
-      { wave: 'triangle', gain: 0.09, filter: { type: 'lowpass', freq: 420 }, seq: seaBass() },
-      { wave: 'sawtooth', gain: 0.03, pan: -0.25, detune: 6,
-        filter: { type: 'lowpass', freq: 950 }, seq: seaPump(2) },
-      { wave: 'sawtooth', gain: 0.026, pan: 0.25, detune: -6,
-        filter: { type: 'lowpass', freq: 950 }, seq: seaPump(3) },
-      { wave: 'sine', gain: 0.05, reverb: true,                                       // the dread
+      { wave: 'triangle', gain: 0.085, filter: { type: 'lowpass', freq: 380 }, seq: seaBass() },
+      { wave: 'sine', gain: 0.04, pan: -0.3, detune: 7, reverb: true,                  // the gods: a slow, wavering choir
+        filter: { type: 'lowpass', freq: 1100 }, vibrato: { rate: 0.6, depth: 6 }, seq: seaPad(2) },
+      { wave: 'sine', gain: 0.035, pan: 0.3, detune: -7, reverb: true,
+        filter: { type: 'lowpass', freq: 1100 }, vibrato: { rate: 0.7, depth: 6 }, seq: seaPad(3) },
+      { wave: 'sine', gain: 0.045, reverb: true,                                      // the dread
         filter: { type: 'lowpass', freq: 200 }, seq: [[N.A2, 32]] },
+      { wave: 'noise', gain: 0.022, pan: 0, ambience: true,                           // rain
+        filter: { type: 'highpass', freq: 4200 }, seq: [[1, 32]] },
+      // Percussion, one char per eighth — 12 steps = two 6/8 bars (pulses on steps 0, 3, 6, 9):
       ...drumGrid(
-        { stomp: { freq: 95, gain: 0.55 }, clap: { freq: 1500, gain: 0.22, pan: 0.2, reverb: true } },
-        { stomp: 'X..o..X..o..', clap: '...x.....x..' },
-        { reps: 8 },                                                                  // 12 steps = two 6/8 bars; ×8 = 32 beats
+        {
+          dum:    { freq: 110,  gain: 0.75, pan: 0.05 },
+          tek:    { freq: 1500, gain: 0.45, pan: 0.1 },
+          riq:    { freq: 3400, gain: 0.22, pan: 0.3, reverb: true },
+          bendir: { freq: 68,   gain: 0.6,  pan: -0.1, reverb: true },
+        },
+        {
+          dum:    'X.....X..o..',
+          tek:    '..x.xo..x.x.',
+          riq:    'o..x..o..x..',
+          bendir: 'X...........',
+        },
+        { reps: 8 },                                                                  // ×8 = 32 beats
       ),
     ],
   },

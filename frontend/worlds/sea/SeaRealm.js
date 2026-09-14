@@ -130,7 +130,7 @@ export class SeaRealm extends Realm {
     const events = stepVoyage(this.voyage, helm, this._dt);
     for (const line of narrate(events, this.voyage.t, this._narration)) log(line, 'hi');
     for (const e of events) this._onEvent(e);
-    SoundManager.setAmbience(0.35 + 0.65 * this.voyage.storm);
+    SoundManager.setAmbience(this.voyage.storm * this.voyage.storm);   // rain: a whisper in calm water, full in the storm
   }
 
   _onEvent(e) {
