@@ -1,6 +1,6 @@
 # The Sea Voyage — Design
 
-**Date:** 2026-09-12 · **Branch:** `feat/sea-voyage` · **Status:** approved in brainstorming, awaiting spec review
+**Date:** 2026-09-12 · **Branch:** `feat/sea-voyage` · **Status:** implemented (plan: `docs/superpowers/plans/2026-09-12-sea-voyage.md`)
 
 ## Goal
 
