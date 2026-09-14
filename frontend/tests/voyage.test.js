@@ -147,13 +147,13 @@ test('steering hard away from the course never escapes the outer limit', () => {
   assert.ok(events.some(e => e.type === 'strayed'));
 });
 
-test('storm target ramps with progress, rises off course, and falls calm in the bay', () => {
+test('storm target builds toward Crete, rises off course, and falls calm in the bay', () => {
   const v = createVoyage();
-  assert.ok(Math.abs(stormTarget(v) - 0.1) < 1e-9);
-  place(v, COURSE_LEN / 2, 0);   assert.ok(Math.abs(stormTarget(v) - 0.35) < 1e-9);
-  place(v, COURSE_LEN - 700, 0); const approach = stormTarget(v); assert.ok(approach > 0.4 && approach < 0.75, `approach ${approach}`);
+  assert.ok(Math.abs(stormTarget(v) - STORM.start) < 1e-9);
+  place(v, COURSE_LEN / 2, 0);   const mid = stormTarget(v); assert.ok(mid > 0.55 && mid < 0.7, `mid ${mid}`);
+  place(v, COURSE_LEN - 700, 0); const approach = stormTarget(v); assert.ok(approach > 0.8, `approach ${approach}`);
   place(v, COURSE_LEN, 0);       assert.ok(Math.abs(stormTarget(v) - STORM.bay) < 1e-9);
-  place(v, 1200, OUTER_LIMIT);   assert.ok(Math.abs(stormTarget(v) - 0.70) < 1e-9);
+  place(v, 1200, OUTER_LIMIT);   assert.equal(stormTarget(v), 1);                 // far off the line mid-voyage: full storm
   v.arrived = true;              assert.equal(stormTarget(v), STORM.moored);
 });
 

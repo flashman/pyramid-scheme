@@ -50,8 +50,8 @@ export function polar(offWind) {
 export function stormTarget(v) {
   const { along, lateral } = worldToCourse(v.x, v.z);
   const p    = clamp(along / COURSE_LEN, 0, 1);
-  const ramp = 0.1 + 0.25 * smoothstep(0, 0.25, p) + 0.4 * smoothstep(0.6, 0.95, p);
-  const off  = STORM.offCourse * clamp((Math.abs(lateral) - CORRIDOR_HALF) / (OUTER_LIMIT - CORRIDOR_HALF), 0, 1);
+  const ramp = STORM.start + (STORM.peak - STORM.start) * smoothstep(0.05, 0.8, p);
+  const off  = STORM.offCourse * clamp((Math.abs(lateral) - STORM.offFrom) / (OUTER_LIMIT - STORM.offFrom), 0, 1);
   const open = v.arrived ? STORM.moored : clamp(ramp + off, 0, 1);
   const exposed = (shelterAt(SHELTER, v.x, v.z) - SHELTER.calm) / (1 - SHELTER.calm);   // 0 in the bay … 1 outside
   return STORM.bay + (open - STORM.bay) * exposed;
@@ -77,7 +77,7 @@ export function createVoyage({ rng = Math.random, waveParams } = {}) {
     heading: COURSE_HEADING, speed: 0, rudder: 0, sail: SAIL.start, rowing: ROW.start,
     windAngle: COURSE_HEADING,              // direction the wind blows TOWARD
     sailDrive: 0, drive: 0,                 // last substep's sail drive and total drive (m/s²)
-    storm: 0.1, arrived: false, landed: false, haulT: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false,
+    storm: STORM.start, arrived: false, landed: false, haulT: 0, hauled: 0, sinking: false, sinkT: 0, sunk: false,
     hull: { y: 0, vy: 0, pitch: 0, pitchVel: 0, roll: 0, rollVel: 0 },
     wake: [], wakeTimer: 0,
     ironsTime: 0, nextFlash: 8, scrapeTimer: 0,
